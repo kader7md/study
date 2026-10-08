@@ -8,7 +8,8 @@ extends Node
 
 signal changed(section: String, key: String)
 
-const PATH := "user://settings.cfg"
+const FILE := "settings.cfg"
+const PATH := "user://" + FILE
 const BUSES := ["Master", "Music", "SFX", "Voice"]
 const WINDOW_MODES := ["Windowed", "Borderless fullscreen", "Fullscreen"]
 const SHADOW_LEVELS := ["Off", "Low", "Medium", "High"]
@@ -50,7 +51,7 @@ var player_name: String:
 		var n: String = str(get_value("profile", "name", ""))
 		return n if n.strip_edges() != "" else "Player"  # = Net.DEFAULT_NAME
 	set(value):
-		set_value("profile", "name", value.strip_edges().left(20))  # Net.NAME_MAX
+		set_value("profile", "name", value.strip_edges().left(Net.NAME_MAX))
 var mouse_sensitivity: float:
 	get:
 		return float(get_value("controls", "mouse_sensitivity", 0.0025))
@@ -88,6 +89,7 @@ func _ready() -> void:
 	headless = DisplayServer.get_name() == "headless"
 	_register_actions()
 	_collect_defaults()
+	path = Game.save_dir + FILE  # user://test/ when started from a test scene (see Game.save_dir)
 	load_settings()
 	var theme := UiTheme.build()
 	get_tree().root.theme = theme
@@ -124,6 +126,14 @@ func set_value(section: String, key: String, value: Variant) -> void:
 	_apply(section, key)
 	changed.emit(section, key)
 	_queue_save()
+
+
+## Keeps settings.cfg in `dir` from now on (Game.use_save_dir) and loads it from there.
+func use_dir(dir: String) -> void:
+	if _save_queued:
+		save()  # pending changes belong to the old file
+	path = dir + FILE
+	load_settings()
 
 
 func save() -> void:
@@ -243,11 +253,6 @@ func key_label(action: String) -> String:
 		"Mouse Middle": return "MMB"
 		"Escape": return "Esc"
 	return t
-
-
-## Key hint for an action in brackets, e.g. "[E]" (or "[F]" after rebinding "interact" to F).
-func key_hint(action: String) -> String:
-	return "[%s]" % key_label(action)
 
 
 ## Hints in game texts are written with the default keys ("[E]", "[Q]", "[Tab]", "[LMB]", "[E / Esc]").

@@ -299,7 +299,7 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
 - **Invites:** the host's lobby shows two codes: **Same Wi-Fi** (the LAN address) and **Internet** (the public address,
   found by asking the router or an HTTPS lookup, or typed by the host; it needs UDP port 24565 forwarded, by hand or
   with UPnP). With no network it says so and shows no code. Steam invites (no port forwarding) come with the Steam
-  backend. A player who drops out can rejoin the running run with the same name.
+  backend. A player who drops out can rejoin the running run (bound to a private ticket the host gave them, not the name).
 - **Settings** (saved in `user://settings.cfg`, applied at startup): **Controls** (rebind every action, keyboard or mouse,
   conflict warnings, reset to defaults, mouse sensitivity, invert Y), **Graphics** (window mode: Windowed, Borderless
 fullscreen or Fullscreen; V-Sync, resolution scale,
@@ -330,7 +330,7 @@ your name).
   (use, tool hits, carry, weld, buy, sabotage). The host streams the train 20 times a second plus every repair, pickup,
   inventory change and sabotage. Exactly one secret impostor with 3 to 5 players, told only to that player.
   Proximity voice chat (push-to-talk or open mic with a noise gate). A player who drops out can rejoin the running run with
-  the same name; brand-new players cannot join mid-run yet. If the host leaves, the run ends for everyone.
+  the private rejoin ticket the host gave them; brand-new players cannot join mid-run yet. If the host leaves, the run ends for everyone.
 - **The train is a path follower:** it moves along a track curve (`Path3D` + `PathFollow3D`) with real speed, not full physics.
   It's stable online and easy to derail on purpose at broken track.
 - **Players on a moving train or raft:** they stand in the vehicle's local space so they don't slide off. This is a known hard problem, and we solve it early.

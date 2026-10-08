@@ -47,10 +47,6 @@ func hide_wait() -> void:
 	_wait.visible = false
 
 
-func is_waiting() -> bool:
-	return _wait.visible
-
-
 ## A message card at the top of the screen for a few seconds.
 func notice(text: String, seconds := 6.0) -> void:
 	_notice_label.text = text

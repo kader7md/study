@@ -6,6 +6,10 @@ extends Node
 ## why a join failed; once the host lets us in -> Lobby. Settings, Quit.
 
 const MAIN_SCENE := "res://scenes/main/Main.tscn"
+## Main menu column: left margin, top margin, and room kept free at the bottom for the footer line.
+const COLUMN_LEFT := 96.0
+const COLUMN_TOP := 40.0
+const COLUMN_BOTTOM := 80.0
 const LOBBY_SCENE := "res://scenes/net/Lobby.tscn"
 const TAGLINES := [
 	"Fix the rails. Feed the fire. Trust no one.",
@@ -23,6 +27,7 @@ var _join: Control
 var _join_code: LineEdit
 var _join_status: Label
 var _name_edit: LineEdit
+var _join_name: LineEdit
 var _toast: Label
 var _fade: ColorRect
 var _busy := false
@@ -77,20 +82,18 @@ func _build_ui() -> void:
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(shade)
 
+	var saved := Game.saved_station()
+	# The column is placed and, on short screens, scaled down by _fit_column (it must never cover the footer).
 	_column = VBoxContainer.new()
-	_column.add_theme_constant_override("separation", 14)
-	_column.anchor_top = 0.5
-	_column.anchor_bottom = 0.5
-	_column.offset_left = 96
-	_column.offset_top = -380
-	_column.offset_right = 96 + 560
+	_column.add_theme_constant_override("separation", 14 if saved < 0 else 10)
+	_column.position = Vector2(COLUMN_LEFT, COLUMN_TOP)
 	_root.add_child(_column)
 
 	var title_box := VBoxContainer.new()
-	title_box.add_theme_constant_override("separation", -26)
+	title_box.add_theme_constant_override("separation", -26 if saved < 0 else -22)
 	_column.add_child(title_box)
 	for word in ["TRUST", "ISSUES"]:
-		var t := UiTheme.title_label(word, 112)  # the same rounded display face as every other title
+		var t := UiTheme.title_label(word, 112 if saved < 0 else 96)  # the same rounded display face as every other title
 		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		title_box.add_child(t)
 	(title_box.get_child(1) as Label).add_theme_color_override("font_color", UiTheme.HONEY)
@@ -113,10 +116,9 @@ func _build_ui() -> void:
 	_column.add_child(plank)
 
 	var gap := Control.new()
-	gap.custom_minimum_size.y = 18
+	gap.custom_minimum_size.y = 18 if saved < 0 else 6
 	_column.add_child(gap)
 
-	var saved := Game.saved_station()
 	if saved >= 0:
 		_add_button("Continue  (station %d)" % saved, &"AccentButton", _on_continue)
 	_add_button("Play solo", &"AccentButton" if saved < 0 else &"BigButton", _on_solo)
@@ -197,6 +199,23 @@ func _build_ui() -> void:
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_fade)
 
+	get_viewport().size_changed.connect(_fit_column)
+	_fit_column.call_deferred()
+
+
+## Centres the title and buttons between the top margin and the footer, scaling the whole column down when the
+## screen is too short for it (a save adds the Continue button), so Quit never runs into the footer.
+func _fit_column() -> void:
+	if not is_instance_valid(_column):
+		return
+	var view := _root.get_viewport_rect().size
+	var need := _column.get_combined_minimum_size()
+	var room := view.y - COLUMN_TOP - COLUMN_BOTTOM
+	var s := clampf(room / maxf(need.y, 1.0), 0.5, 1.0)
+	_column.size = need
+	_column.scale = Vector2(s, s)
+	_column.position = Vector2(COLUMN_LEFT * s, COLUMN_TOP + maxf(0.0, room - need.y * s) * 0.5)
+
 
 func _add_button(text: String, variation: StringName, action: Callable) -> Button:
 	var b := Button.new()
@@ -276,11 +295,15 @@ func _build_join_dialog() -> void:
 	_join_code.placeholder_text = "7K2QF-9XM4A   or   192.168.1.20:24565"
 	_join_code.text_submitted.connect(func(_t: String) -> void: _on_join())
 	col.add_child(_join_code)
+	# The name card at the bottom right sits under the dim layer, so the dialog has its own name field.
 	var l2 := Label.new()
-	l2.theme_type_variation = &"MutedLabel"
-	l2.add_theme_font_size_override("font_size", 16)
-	l2.text = "You join as the name in the card at the bottom right."
+	l2.text = "Your name"
 	col.add_child(l2)
+	_join_name = LineEdit.new()
+	_join_name.max_length = Net.NAME_MAX
+	_join_name.placeholder_text = Net.DEFAULT_NAME
+	_join_name.text_submitted.connect(func(_t: String) -> void: _on_join())
+	col.add_child(_join_name)
 	_join_status = Label.new()
 	_join_status.theme_type_variation = &"MutedLabel"
 	_join_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -342,6 +365,7 @@ func _on_host() -> void:
 
 func _open_join() -> void:
 	_join_status.text = ""
+	_join_name.text = _name_edit.text
 	_join.show()
 	_join_code.grab_focus()
 
@@ -366,7 +390,7 @@ func _on_join() -> void:
 		_join_status.text = "Paste the invite code your host gave you (or their IP:port)."
 		_join_code.grab_focus()
 		return
-	_save_name(_name_edit.text)
+	_save_name(_join_name.text)
 	if Net.join_game(code) != OK:
 		_join_status.text = Net.last_error  # connection_failed is ignored while the dialog shows it
 		return

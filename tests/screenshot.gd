@@ -1,7 +1,7 @@
 extends Node
 ## Saves preview screenshots (needs a real or virtual display, not --headless):
-##   godot --path . res://tests/Screenshot.tscn -- <output_dir> [repair|train|menu|hud|gate|end|tools]
-## menu: title screen, settings tabs, join dialog. hud: in-game HUD (1600x900 and 1280x720), shop, pause menu.
+##   godot --path . res://tests/Screenshot.tscn -- <output_dir> [repair|train|menu|menu_save|hud|gate|end|tools|station]
+## menu: title screen, settings tabs, join dialog, title with a save (menu_save: only that one). hud: in-game HUD (1600x900 and 1280x720), shop, pause menu.
 ## station: station 1 (canopy, name board, shop kiosk) from the track and from the platform.
 ## gate: locked gate and key. end: Chapter 1 end screen. tools: tool animations and carry poses.
 
@@ -16,16 +16,21 @@ var shot_count := 0
 
 ## File name prefixes each mode writes (the default run writes the numbered landscape / repair / train shots).
 const MODE_PREFIXES := {
-	"menu": ["menu_"], "hud": ["hud_"], "gate": ["gate_"], "end": ["end_"], "tools": ["tool_", "carry_"],
+	"menu": ["menu_"], "menu_save": ["menu_5"], "hud": ["hud_"], "gate": ["gate_"], "end": ["end_"], "tools": ["tool_", "carry_"],
 	"station": ["station_"], "repair": ["6_", "7_"], "train": ["8_", "9_"],
 }
 
 
 func _ready() -> void:
+	Game.use_save_dir(Game.test_save_dir())  # user://test/<scene>/: never the player's own saves and settings
 	if OS.get_cmdline_user_args().size() > 0:
 		out = OS.get_cmdline_user_args()[0]
 	_clear_old(OS.get_cmdline_user_args())
 	tree_exiting.connect(func() -> void: print("DONE %d shots" % shot_count))
+	if OS.get_cmdline_user_args().has("menu_save"):
+		await _menu_save_shot()
+		get_tree().quit()
+		return
 	if OS.get_cmdline_user_args().has("menu"):
 		await _menu_shots()
 		get_tree().quit()
@@ -161,6 +166,20 @@ func _menu_shots() -> void:
 	settings.close()
 	menu.call("_open_join")
 	await _shot("menu_4_join")
+	menu.queue_free()
+	await _menu_save_shot()
+
+
+func _menu_save_shot() -> void:
+	# A returning player: a save in the (test) save folder adds Continue, and the column must still fit
+	var f := FileAccess.open(Game.save_path("solo"), FileAccess.WRITE)
+	f.store_string(JSON.stringify({"station": 3, "inventory": {"gold": 20}, "gates": [0, 1, 2]}))
+	f.close()
+	var menu: Node = load("res://scenes/menu/MainMenu.tscn").instantiate()
+	add_child(menu)
+	await get_tree().create_timer(3.5).timeout
+	await _shot("menu_5_title_with_save")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Game.save_path("solo")))
 
 
 func _hud_shots(track: Track, train: Train, player: Player) -> void:

@@ -103,7 +103,7 @@ func _build_frame() -> void:
 	for side in ["left", "right"]:
 		margin.add_theme_constant_override("margin_" + side, 64)
 	margin.add_theme_constant_override("margin_top", 36)
-	margin.add_theme_constant_override("margin_bottom", 36)
+	margin.add_theme_constant_override("margin_bottom", 40)
 	add_child(margin)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 14)
@@ -308,6 +308,21 @@ func _build_room() -> void:
 	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	foot.text = "1-2 players: pure co-op, the world itself sabotages you.  3-5 players: one of you is secretly the impostor."
 	crew_col.add_child(foot)
+	# Your name sits in the crew panel (it has room to spare; the invite panel is the tall one)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	crew_col.add_child(spacer)
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 12)
+	crew_col.add_child(name_row)
+	var nl := Label.new()
+	nl.text = "Your name"
+	nl.theme_type_variation = &"MutedLabel"
+	name_row.add_child(nl)
+	_name_edit = _line(Net.player_name(Net.local_id()), Net.DEFAULT_NAME)
+	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_name_edit.text_changed.connect(_on_name_changed)
+	name_row.add_child(_name_edit)
 
 	# Right: the invite
 	var inv := _panel(&"WoodPanel", Vector2(520, 0))
@@ -362,19 +377,6 @@ func _build_room() -> void:
 		_public_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_public_edit.text_changed.connect(_on_public_ip_typed)
 		ip_row.add_child(_public_edit)
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	inv_col.add_child(spacer)
-	var name_row := HBoxContainer.new()
-	inv_col.add_child(name_row)
-	var nl := Label.new()
-	nl.text = "Your name"
-	nl.theme_type_variation = &"HudLabel"
-	name_row.add_child(nl)
-	_name_edit = _line(Net.player_name(Net.local_id()), Net.DEFAULT_NAME)
-	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_name_edit.text_changed.connect(_on_name_changed)
-	name_row.add_child(_name_edit)
 
 	# Bottom bar on a dark strip
 	var strip := PanelContainer.new()

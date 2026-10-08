@@ -203,7 +203,16 @@ func close() -> void:
 	Game.close_ui(&"end")
 
 
+## Online, the host's Back to main menu ends the session for the crew too (some may be exploring): ask first.
 func _on_menu() -> void:
+	if Net.is_online() and Net.is_host() and Net.players.size() > 1:
+		ConfirmCard.ask(self, "End the run for everyone?", "Your crew goes back to the main menu too, even players who chose Keep exploring.",
+			"End for everyone", _leave)
+		return
+	_leave()
+
+
+func _leave() -> void:
 	visible = false
 	Game.return_to_menu()
 

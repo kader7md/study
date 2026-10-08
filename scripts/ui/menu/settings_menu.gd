@@ -410,17 +410,18 @@ func _build_mic_tab() -> void:
 	var ptt := KeyRebindButton.create("push_to_talk")
 	ptt_row.add_child(ptt)
 	_rebind_buttons.append(ptt)
+
+	_header(page, "Profile")
 	var name_row := _row(page, "Your name", "Shown to other players")
 	var name_edit := LineEdit.new()
 	name_edit.custom_minimum_size = Vector2(300, 0)
-	name_edit.max_length = 20
-	name_edit.placeholder_text = "Player"
+	name_edit.max_length = Net.NAME_MAX
+	name_edit.placeholder_text = Net.DEFAULT_NAME
 	name_row.add_child(name_edit)
 	_sync.append(func() -> void:
 		if not name_edit.has_focus():
 			name_edit.text = str(Settings.get_value("profile", "name", "")))
-	name_edit.text_changed.connect(func(t: String) -> void: Settings.set_value("profile", "name", t.strip_edges().left(20)))
-
+	name_edit.text_changed.connect(func(t: String) -> void: Settings.set_value("profile", "name", t.strip_edges().left(Net.NAME_MAX)))
 
 func _fill_devices() -> void:
 	_mic_device.clear()

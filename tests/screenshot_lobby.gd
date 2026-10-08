@@ -9,6 +9,7 @@ var shots := 0
 
 
 func _ready() -> void:
+	Game.use_save_dir(Game.test_save_dir())  # user://test/<scene>/: never the player's own saves and settings
 	if OS.get_cmdline_user_args().size() > 0:
 		out = OS.get_cmdline_user_args()[0]
 	_clear_old()

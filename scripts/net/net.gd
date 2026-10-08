@@ -33,7 +33,7 @@ const DEFAULT_PORT := 24565
 const PORT_TRIES := 10
 const MAX_PLAYERS := 5
 ## Bumped whenever the RPC layout changes; the host refuses other versions.
-const PROTOCOL := 1
+const PROTOCOL := 2
 const IMPOSTOR_MIN_PLAYERS := 3
 const JOIN_TIMEOUT := 10.0
 ## How far (m) a client's player may be from what it asks the host to use. Generous: latency and big colliders.
@@ -82,7 +82,10 @@ var auto_public_ip := DisplayServer.get_name() != "headless"
 const PUBLIC_IP_URL := "https://api.ipify.org"
 
 var _ready_peers := {}          # host: peer id -> true once their Main is loaded
-var _run_roster := {}           # host: name -> {"color": Color, "impostor": bool} of everyone who started the run
+var _run_roster := {}           # host: name -> {"color", "impostor", "token"} of everyone who started the run
+## Client: the rejoin ticket the host gave us for the running session: {"address": joined_address, "token": String}.
+## Kept when we drop out (leave() does not clear it), so the same player can come back; a new run replaces it.
+var _rejoin_ticket := {}
 var _world_cp: Dictionary = {}  # the checkpoint the current world was built from (a rejoining player builds the same)
 var _host_world_ready := false
 var _impostor := 0              # host only. Never printed or sent to anyone but that peer.
@@ -485,14 +488,6 @@ func lan_addresses() -> PackedStringArray:
 	return EnetBackend.lan_addresses()
 
 
-static func encode_invite(ip: String, invite_port: int) -> String:
-	return InviteCode.encode(ip, invite_port)
-
-
-static func decode_invite(code: String) -> Dictionary:
-	return InviteCode.decode(code, DEFAULT_PORT)
-
-
 ## Host: asks the router to forward the port (UPnP) on a thread. Watch `upnp_finished`.
 func open_upnp() -> void:
 	if not is_host() or not backend or not backend.supports_upnp() or _upnp_busy:
@@ -537,12 +532,21 @@ func start_run(from_save := false) -> void:
 	_assign_roles()
 	_run_roster.clear()
 	for id: int in players:
-		_run_roster[str(players[id].name)] = {"color": players[id].color, "impostor": id == _impostor}
+		_run_roster[str(players[id].name)] = {"color": players[id].color, "impostor": id == _impostor, "token": _new_token()}
 	Game.world_sabotage = _impostor == 0  # 1-2 players: the world sabotages (GDD 2)
 	Game.save_slot = "host"
 	var cp: Dictionary = Game.read_save("host") if from_save else {}
 	_rpc_start_run.rpc(run_seed, cp)
 	_send_roles()
+	for id: int in players:
+		if id != 1:
+			_rpc_rejoin_ticket.rpc_id(id, str(_run_roster[str(players[id].name)].token))
+
+
+## A random per-session secret: the only thing that lets a dropped player back into a running run (a name alone
+## can be typed by anyone).
+static func _new_token() -> String:
+	return Crypto.new().generate_random_bytes(16).hex_encode()
 
 
 ## Offline solo run: exactly the old single-player game. `from_save`: continue from the checkpoint on disk.
@@ -973,7 +977,8 @@ func _on_peer_disconnected(id: int) -> void:
 func _on_connected_to_server() -> void:
 	if backend:
 		backend.on_peer_connected(1)
-	_rpc_register.rpc_id(1, PROTOCOL, my_name())
+	var token := str(_rejoin_ticket.get("token", "")) if _rejoin_ticket.get("address", "") == joined_address else ""
+	_rpc_register.rpc_id(1, PROTOCOL, my_name(), token)
 
 
 func _on_connection_failed() -> void:
@@ -1048,16 +1053,17 @@ func _reject(id: int, reason: String) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _rpc_register(protocol: int, n: String) -> void:
+func _rpc_register(protocol: int, n: String, token := "") -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
+	var back := _rejoin_name(token) if run_active else ""
 	if protocol != PROTOCOL:
 		_reject(id, "The host runs a different version of the game")
-	elif run_active and _can_rejoin(clean_name(n)):
-		_rejoin(id, clean_name(n))
+	elif back != "":
+		_rejoin(id, back)
 	elif run_active:
-		_reject(id, "The run has already started. Only players who were in it can rejoin (with the same name)")
+		_reject(id, "The run has already started. Only players who were in it can rejoin (from the same game)")
 	elif players.size() >= MAX_PLAYERS:
 		_reject(id, "The lobby is full (%d/%d)" % [MAX_PLAYERS, MAX_PLAYERS])
 	else:
@@ -1066,14 +1072,18 @@ func _rpc_register(protocol: int, n: String) -> void:
 		_broadcast_players()
 
 
-## Host: `n` started this run, is not in it now, and there is room.
-func _can_rejoin(n: String) -> bool:
-	if not _run_roster.has(n) or players.size() >= MAX_PLAYERS:
-		return false
-	for other: int in players:
-		if players[other].name == n:
-			return false
-	return true
+## Host: the run-start name of the player whose rejoin ticket is `token`, if they are not in the game now and there
+## is room; else "". The name the client sends is ignored: the ticket decides who comes back.
+func _rejoin_name(token: String) -> String:
+	if token.length() < 16 or players.size() >= MAX_PLAYERS:
+		return ""
+	for n: String in _run_roster:
+		if str(_run_roster[n].get("token", "")) == token:
+			for other: int in players:
+				if players[other].name == n:
+					return ""  # that player is still here
+			return n
+	return ""
 
 
 ## Host: a player who dropped out comes back: they load the world the host built (same seed and checkpoint), get
@@ -1089,6 +1099,7 @@ func _rejoin(id: int, n: String) -> void:
 	Game.say("%s is back" % n)
 	_rpc_start_run.rpc_id(id, run_seed, _world_cp)
 	_rpc_role.rpc_id(id, "impostor" if id == _impostor else "crew", _impostor != 0)
+	_rpc_rejoin_ticket.rpc_id(id, str(info.token))
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -1151,6 +1162,12 @@ func _rpc_start_run(new_seed: int, cp: Dictionary = {}) -> void:
 	run_started.emit()
 	_overlay.show_wait("Loading the world…")
 	get_tree().change_scene_to_file(MAIN_SCENE)
+
+
+## Client: the host's rejoin ticket for this run (see _rejoin_ticket). Only ever sent to its owner.
+@rpc("authority", "call_remote", "reliable")
+func _rpc_rejoin_ticket(token: String) -> void:
+	_rejoin_ticket = {"address": joined_address, "token": token}
 
 
 @rpc("authority", "call_remote", "reliable")

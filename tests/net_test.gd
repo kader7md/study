@@ -25,6 +25,7 @@ var _expect_disconnect := false
 
 
 func _ready() -> void:
+	Game.use_save_dir(Game.test_save_dir())  # user://test/<scene>/: never the player's own saves and settings
 	var args := OS.get_cmdline_user_args()
 	for m in ["host", "client", "late", "shots", "crew_host", "crew_client"]:
 		if args.has(m):
@@ -618,9 +619,22 @@ func _crew_client() -> void:
 	if loaded and OS.get_cmdline_user_args().has("rejoin"):
 		await _wait(2.0)
 		var my_name := Net.player_name(Net.local_id())
+		var ticket: Dictionary = Net._rejoin_ticket.duplicate()
+		check(str(ticket.get("token", "")).length() >= 16, "the host gave us a rejoin ticket")
 		Net.leave_to_menu()
 		await _wait(1.5)
+		# the right name with a forged ticket is turned away: rejoining is bound to the host's ticket, not the name
 		Net.local_name = my_name
+		Net._rejoin_ticket = {"address": ticket.get("address", ""), "token": "0123456789abcdef0123456789abcdef"}
+		var refused := []
+		var on_fail := func(r: String): refused.append(r)
+		Net.connection_failed.connect(on_fail)
+		Net.join_game("127.0.0.1:%d" % port)
+		var told := await _wait_until(func(): return not refused.is_empty(), 20.0)
+		Net.connection_failed.disconnect(on_fail)
+		check(told and str(refused[0]).contains("already started"), "a forged rejoin ticket is refused ('%s')" % (refused[0] if told else "no answer"))
+		await _wait(1.0)
+		Net._rejoin_ticket = ticket
 		Net.join_game("127.0.0.1:%d" % port)
 		var again := await _wait_until(func(): return _main() != null and _main().player != null and Net.run_active, 40.0)
 		check(again, "rejoined the run as %s and got a player" % my_name)

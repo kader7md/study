@@ -26,16 +26,15 @@ Things we couldn't do from the cloud session. Do these **first** once the repo i
 - [ ] Test: Claude creates a cube in Blender, and Claude runs an empty Godot project
 
 ## 3. Things from the polish session that need your PC (see `docs/POLISH_REPORT.md`)
-- [ ] **Back up your saves before you run the tests.** The tests still write the real `user://checkpoint_solo.json`,
-  `checkpoint_host.json` and `settings.cfg` (issue T3-02, a fix is planned). On Windows they are in
-  `%APPDATA%\Godot\app_userdata\Trust Issues\`.
+- [x] ~~Back up your saves before you run the tests~~: fixed (T3-02). Test scenes keep their saves and settings in
+  `user://test/<TestScene>/` (on Windows `%APPDATA%\Godot\app_userdata\Trust Issues\test\`), never your own files.
 - [ ] **Microphone with real hardware:** Settings > Microphone: pick the device, check that the level meter moves, try
   "hear yourself", push-to-talk on (V) and off (noise gate). Then talk to a friend online and check proximity volume.
   The cloud session had no audio device, so voice is only tested in code.
 - [ ] **Playtest with friends (M5):** host from the main menu, send the **Same Wi-Fi** code to someone on your network
   and the **Internet** code to someone outside it (forward UDP 24565 on the router, or press "Open the port (UPnP)").
   Play 2, 3 (impostor) and 5 players to station 5. Note lag, desyncs, confusing UI and where people got stuck;
-  also try a drop-out and rejoin with the same name.
+  also try a drop-out and rejoin (same invite code, without closing the game).
 - [ ] **Firewall:** the first Host game on Windows shows a firewall prompt; allow private and public networks.
 - [ ] **Steam / GodotSteam:** get a Steam App ID (or test with 480 Spacewar), install the GodotSteam GDExtension for
   4.7, fill in `scripts/net/steam_backend.gd` (steps in `docs/NETWORK.md`), then test lobby invites through the Steam

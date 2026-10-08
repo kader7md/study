@@ -18,10 +18,15 @@ signal run_finished(run_stats: Dictionary)
 ## Checkpoint stations after the departure station (index 0). Station 5 is the last one (the port).
 const STATION_COUNT := 5
 ## Solo and hosted runs keep separate saves, so an online session never overwrites the solo run (and back).
-const SAVE_PATH := "user://checkpoint_solo.json"
-const HOST_SAVE_PATH := "user://checkpoint_host.json"
+## The files live in `save_dir` (see use_save_dir); Settings keeps settings.cfg there too.
+const SAVE_FILE := "checkpoint_solo.json"
+const HOST_SAVE_FILE := "checkpoint_host.json"
 ## Saves from before the split (read as the solo save when there is no solo save yet).
-const LEGACY_SAVE_PATH := "user://checkpoint.json"
+const LEGACY_SAVE_FILE := "checkpoint.json"
+const DEFAULT_SAVE_DIR := "user://"
+## Where the test scenes keep their saves and settings (one sub-folder per test scene, so tests running side by side
+## don't share files), so a test run never touches the player's own files.
+const TEST_SAVE_DIR := "user://test/"
 const MENU_SCENE := "res://scenes/menu/MainMenu.tscn"
 const MAIN_SCENE := "res://scenes/main/Main.tscn"
 
@@ -107,6 +112,10 @@ var objective := "":
 			objective = value
 			objective_changed.emit(value)
 
+## Folder of the checkpoint saves and settings.cfg. Test scenes (anything started from res://tests/) use
+## TEST_SAVE_DIR from the very first frame; use_save_dir() switches it by hand.
+static var save_dir := DEFAULT_SAVE_DIR
+
 ## Scene references, set by Main.
 var track: Track
 var train: Train
@@ -115,8 +124,35 @@ var terrain: Terrain
 
 
 func _ready() -> void:
+	if test_scene() != "":
+		save_dir = test_save_dir()
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(save_dir))
 	_setup_input()
 	new_game(false)
+
+
+## The test scene named on the command line ("TestMenu" for res://tests/TestMenu.tscn), or "". Autoloads run before
+## that scene, so this is how Game and Settings pick the test folder before they read or write anything.
+static func test_scene() -> String:
+	for a in OS.get_cmdline_args():
+		if a.begins_with("res://tests/") or a.begins_with("tests/"):
+			return a.get_file().get_basename()
+	return ""
+
+
+## The save folder for the running test scene: user://test/<TestScene>/ (user://test/ outside a test).
+static func test_save_dir() -> String:
+	var t := test_scene()
+	return TEST_SAVE_DIR + (t + "/" if t != "" else "")
+
+
+## Moves the saves and settings.cfg to `dir` (e.g. TEST_SAVE_DIR) and reloads the settings from there.
+func use_save_dir(dir: String) -> void:
+	save_dir = dir if dir.ends_with("/") else dir + "/"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(save_dir))
+	var settings := get_node_or_null(^"/root/Settings")
+	if settings and settings.has_method("use_dir"):
+		settings.call("use_dir", save_dir)
 
 
 ## A modal window opens: the mouse is freed until every open window has closed again.
@@ -349,7 +385,7 @@ func save_checkpoint(station_index: int) -> void:
 
 ## The file of a save slot ("solo" or "host").
 static func save_path(slot: String) -> String:
-	return HOST_SAVE_PATH if slot == "host" else SAVE_PATH
+	return save_dir + (HOST_SAVE_FILE if slot == "host" else SAVE_FILE)
 
 
 ## The checkpoint saved on disk in `slot` ("solo" or "host"), or {} when there is none or it is unusable.
@@ -357,7 +393,7 @@ static func save_path(slot: String) -> String:
 static func read_save(slot := "solo") -> Dictionary:
 	var path := save_path(slot)
 	if not FileAccess.file_exists(path) and slot == "solo":
-		path = LEGACY_SAVE_PATH
+		path = save_dir + LEGACY_SAVE_FILE
 	if not FileAccess.file_exists(path):
 		return {}
 	var text := FileAccess.get_file_as_string(path)
