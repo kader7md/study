@@ -1,26 +1,43 @@
-# Game Design Doc (draft v0.1)
+# Game Design Doc (draft v0.2)
 
 **Working title:** *Last Train* (placeholder, other ideas: *Off the Rails*, *Kidnap Express*)
 **Engine:** Godot 4 (GDScript) · **Assets:** Tripo3D + Blender (see `VIDEO_METHOD.md`)
+**Platform:** PC, **Steam** (friend invites through Steam lobbies)
 **Players:** 1–5 online co-op · **Impostor:** 1 secret saboteur when there are 3–5 players
-**Inspired by:** RV There Yet (vehicle co-op chaos), Peak (co-op through hard terrain), Raft (gather, build, repair), Among Us (hidden impostor)
+**Inspired by:** RV There Yet (vehicle co-op chaos + **art style**), Peak (co-op climbing), Raft (gather, build, repair, sea), Among Us (hidden impostor)
 
 ---
 
 ## 1. One-line pitch
-A man's coffee date goes wrong when his girlfriend is kidnapped. He and his friends chase the kidnapper's helicopter
-across the country on an old coal train: gathering fuel, repairing broken rails and fighting zombies, eagles and storms.
+A man's coffee date goes wrong when his girlfriend is kidnapped. He and his friends chase the kidnapper across the country
+on an old coal train (**Chapter 1**), then across the sea on a raft they build themselves (**Chapter 2**).
 **One of the friends is secretly working against them.**
 
 ## 2. Roles
 | Role | Who | Goal |
 |------|-----|------|
 | **Host (the boyfriend)** | The player who creates the lobby | Rescue the girlfriend |
-| **Friends (crew)** | Invited players | Help the host reach the last station |
-| **Impostor** | 1 random crew member (only with 3–5 players) | Plays like a normal crew member, but secretly chooses the kidnap and sabotages the train so the crew fails |
+| **Friends (crew)** | Invited players | Help the host rescue her |
+| **Impostor** | 1 random crew member (only with 3–5 players) | Plays like a normal crew member, but secretly chooses the kidnap and sabotages the crew so they all die |
 
 - 1–2 players: no impostor. Pure co-op, and sabotage events happen randomly ("the world" sabotages).
 - Only the impostor knows they're the impostor.
+
+### Voting (Among Us style, with a twist)
+- The crew can call a **vote** and pick someone.
+- The voted player is **not kicked**. They keep playing normally.
+- **If the voted player was the impostor:** their sabotage abilities are **silently locked/frozen**.
+- **If the vote hit an innocent:** nothing happens.
+- Nobody is told the result, so **the crew never knows for sure whether they caught the impostor.**
+  That keeps the paranoia going all game.
+- *Open: how often can they vote? Does a lock last forever or for a while? See 10.*
+
+### Win and lose
+- **Crew loses** when **all players are dead**.
+- **Impostor's last-man choice:** if everyone else is dead and only the impostor is alive, the impostor chooses:
+  - **Kill themself:** the game is lost, and the impostor wins.
+  - **Revive the others** and keep playing innocent, staying hidden for a later chance.
+- **Crew wins** by rescuing the girlfriend at the end of Chapter 2.
 
 ## 3. Story flow
 
@@ -40,22 +57,28 @@ across the country on an old coal train: gathering fuel, repairing broken rails 
 - The crew runs to the station. A **helicopter** lands and takes her away.
 - The crew jumps on an old **coal train** to follow. The helicopter flies off screen.
 
-### Act 3: The Train Chase (main gameplay)
+### Chapter 1: The Train Chase
 - Ride the train through **5 stations**. Each one is a **checkpoint**, and the game saves on arrival.
 - Between stations: keep the train running, gather resources, repair the track, survive sabotage.
-- Some routes are **locked** and need a key from a side quest (see 6).
+- Some routes are **locked** and need a key from a side quest (see 7).
+- The train has a **locked container**. The crew doesn't know what's inside until Chapter 2: a boat engine, gasoline and boat tools.
 
-### Finale: The Port
-- At the last station the crew finds the **helicopter** parked near a **boat port**.
-- The kidnapper's **big yacht** is there. *(Open question: boss fight, chase, rescue sequence? See 9.)*
+### Chapter 2: The Sea (the yacht chase)
+- At the last station the crew finds the **helicopter** near a **boat port** with the kidnapper's **big yacht**.
+- The kidnapper **escapes out to sea** on the yacht.
+- **The game changes from train to sea.** The crew opens the train's container (boat engine, gasoline, boat tools)
+  and **builds a raft** (Raft-style), then chases the yacht.
+- **Carried over:** gold, the crafting table and blueprints.
+- **New impostor sabotages:** 🦈 shark, 🐟 piranhas, 🌊 tsunami, 🌀 whirlpool / windstorm *(confirm which, see 10)*.
+- Ending: reach the yacht and rescue her *(how the yacht finale plays: see 10)*.
 
-## 4. Core loop: the train
+## 4. Core loop: the train (Chapter 1)
 ```
 Shovel coal → furnace heats + powers the train → drive (forward / back / stop)
      ↑                                                     ↓
 Collect coal / wood / scrap / gold  ←  Stop, get out, explore  ←  Obstacle / damage / missing rails
      ↓
-Repair (wood + scrap + nails) · Buy tools at stations (gold)
+Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations (gold)
 ```
 
 ### Train systems
@@ -65,85 +88,130 @@ Repair (wood + scrap + nails) · Buy tools at stations (gold)
 - **Track problems:** missing rails, broken bridges, missing foundations and rock slides in the mountains.
   Players get off and **rebuild** with wood, scrap and nails.
 - **Storage:** a cargo car holds coal, wood, scrap and gold. Eagles can steal from it.
+- **Locked container car:** the Chapter 2 surprise (see 3).
+- **Crafting table** on the train (see 6).
+- **Sacrifice altar** on the train, for reviving (see 8).
+
+### Two kinds of repair
+| On the track (anywhere) | **Only at a station** |
+|-------------------------|-----------------------|
+| Rails, bridges and foundations with wood, scrap and nails | **Arc welding** for heavy train-body damage |
+| Small body patches | **New train wheels** |
+| | Special items found only at stations: **engine oil, repair hammer, nail gun** |
+
+A badly damaged train has to **limp to the next station** to be fully fixed, which builds tension between stations.
 
 ### Resources
 | Resource | Where | Used for |
 |----------|-------|----------|
 | **Coal** | Dropped along the track, coal piles | Furnace: speed and heat |
-| **Wood** | Trees, crates, dropped along the track | Track and train repair, extra furnace fuel (weaker) |
+| **Wood** | Trees, crates, dropped along the track | Track and train repair, crafting, extra furnace fuel (weaker) |
 | **Scrap** | Wrecks, dropped items | Repair, crafting |
-| **Gold** | Mining **gold rocks** near the track | Shop currency |
+| **Gold** | Mining **gold rocks** near the track | Shop currency, crafting blueprints. **Carried into Chapter 2** |
 
 ### Shops (at stations)
-Nail gun · nails · grappling hook (reach cliffs, cross gaps, like Peak) · medkit · *(more later: lantern, better shovel, weapons?)*
+Nail gun · nails · grappling hook (reach cliffs, cross gaps, like Peak) · medkit · train wheels · engine oil · repair hammer ·
+blueprint special items (tools, guns)
 
 ### Cold and heat
 - Areas get cold. The furnace heats the cabin, and players near the heat are safe.
 - Out in the cold, players build up **frost**: slower, then taking damage.
 
 ## 5. Impostor sabotage
-The impostor plays normally (shovels, repairs) but has a **secret sabotage menu** with **cooldowns**:
+The impostor plays normally (shovels, repairs) but has a **secret sabotage menu** with **cooldowns**.
+If the crew votes them correctly, the menu **locks** without telling anyone (see 2).
 
+### Chapter 1 (train)
 | Sabotage | Effect | Skill element |
 |----------|--------|---------------|
 | ☄️ **Meteor** | Impostor picks a spot on the map: on the train, the track ahead, anywhere | The train is moving, so bad timing **misses** |
 | 🧟 **Zombie horde** | Zombies attack the train | — |
 | 🦅 **Eagles** | Eagles attack and **steal stored resources** (wood, scrap) | — |
 | 🌬️ **Freezing wind** | Slows the train, uses more fuel, frost on players unless the furnace burns hot | — |
-| *(more ideas: jam the brake, spill coal, hide the key)* | | |
 
-- **Impostor wins** if the crew fails: the train is destroyed, everyone is down, or a time limit runs out *(see 9)*.
-- **Crew wins** by reaching the port and rescuing her.
+### Chapter 2 (sea)
+| Sabotage | Effect |
+|----------|--------|
+| 🦈 **Shark** | Attacks the raft and bites pieces off it, or attacks swimmers |
+| 🐟 **Piranhas** | A swarm that hurts anyone in the water |
+| 🌊 **Tsunami** | A big wave that can flip or damage the raft |
+| 🌀 **Whirlpool / windstorm** | Pulls the raft off course, or blows it back |
 
-## 6. Side quests and puzzles
+## 6. Crafting and blueprints
+- **Crafting table** on the train (and on the raft in Chapter 2).
+- Starting recipe: **spear** (wood + scrap).
+- **Blueprints** unlock special items: **tools and guns**. Two ways to get them:
+  1. **Earn them** from side quests and puzzles (labyrinth, mountain climb, see 7).
+  2. **Buy them with gold** at station shops.
+
+## 7. Side quests and puzzles (off the train)
 - **Labyrinth key:** a locked route needs a key. The key is in a **labyrinth near a zombie nest, at night**.
-  Players must sneak (stealth: crouch, stay out of zombies' sight) to get it, then unlock the route.
-- More puzzle ideas later: switch tracks to the right route, fix a bridge before the train arrives.
+  Players must sneak (stealth: crouch, stay out of zombies' sight) to get it.
+- **Mountain climb (Peak style):** climb a mountain with stamina, the grappling hook and help from teammates to reach a key or blueprint,
+  then **get back to the train**, which keeps waiting or slowly runs low on fuel.
+- Rewards: **keys** (open locked routes) and **blueprints** (special items).
 
-## 7. Feel and style
-- Co-op chaos and comedy (like RV There Yet and Peak), with tension from the impostor.
-- Art style: *open, see 9*. Stylised low-poly is cheaper and fits Tripo3D plus funny physics. Realistic dark fantasy fits the video's look.
+## 8. Death and revive
+- A dead player leaves a **body**. Teammates must **carry the body** to revive them. Three ways:
+  1. **Medkit:** use it on the body.
+  2. **Goat sacrifice:** catch a goat (they wander near the track), carry it to the **sacrifice altar on the train**,
+     and sacrifice it. That revives a **random** dead player.
+  3. **Station grave:** carry the body to the **grave at the next checkpoint station**.
+- Dead players spectate until revived.
 
-## 8. Technical plan
+## 9. Look, camera and UI (reference: RV There Yet)
+- **Art style: exactly like RV There Yet.** Bright stylised cartoon, chunky round characters with big heads and short bodies,
+  painterly trees, warm sunny colours, simple materials. Not realistic.
+- **First-person camera** with big cartoony hands visible, holding tools and items.
+- **HUD (from the reference screenshots):**
+  - Top centre: **train health bar** (green) plus a **journey progress bar** to the next station
+  - Top left: carried item counts (e.g. nails, scrap)
+  - Bottom left: player status (health, frost, poison)
+- **Objective list on paper/phone:** the player holds up a handwritten checklist (like RV There Yet's camping-trip note),
+  e.g. "find the train station ✔, reach station 1, get engine oil…". The host can use the **phone with the tracker**.
+- Comedy: goofy physics, ragdolls, players carrying each other's bodies around.
+
+## 10. Still open
+1. **Combat:** how do players fight zombies, sharks and the rest: spear, guns from blueprints, shovel melee?
+2. **Votes:** how often can the crew vote? Does a correct vote lock sabotage forever or for a while?
+3. **Sea sabotage:** "widstrom", is that a **whirlpool** or a **windstorm** (or both)?
+4. **Yacht finale:** when the raft reaches the yacht, what happens: a fight with the kidnapper, a boarding sequence? Who is the kidnapper?
+5. **Game length:** how long should a full run (both chapters) take?
+6. **Title:** keep *Last Train*? With a sea chapter, maybe something broader.
+
+## 11. Technical plan
 - **Multiplayer from day one.** It's the hardest part, so the game is built around it.
-  Godot high-level multiplayer, **host-authoritative** (the host player's PC runs the game).
-  Connection: **Steam (GodotSteam)** for invites and lobbies with a friends list, or ENet plus a relay for testing.
+  Godot high-level multiplayer, **host-authoritative** (the host player's PC runs the game). **Steam lobbies and invites via GodotSteam.**
+  Use ENet locally for quick testing.
 - **The train is a path follower:** it moves along a track curve (`Path3D` + `PathFollow3D`) with real speed, not full physics.
   It's stable online and easy to derail on purpose at broken track.
-- **Players on a moving train:** they stand in the train's local space so they don't slide off. This is a known hard problem, and we solve it early.
-- **Sabotage map:** the impostor opens a top-down map view to place meteors.
+- **Players on a moving train or raft:** they stand in the vehicle's local space so they don't slide off. This is a known hard problem, and we solve it early.
+- **The raft (Chapter 2)** is a grid-based buildable platform (like Raft) with simple buoyancy and wave motion.
+- **Sabotage map:** the impostor opens a top-down map view to place meteors and the rest.
+- **Carry system:** pick up and carry bodies, goats and resources. One shared system.
 - **Saves:** a checkpoint save at each station (host saves).
 
-### Assets to make (Tripo3D → Blender → Godot)
-Characters: host, girlfriend, friends (customisable colours), kidnappers, zombies, eagle, villain.
-Train: locomotive, cargo car, passenger car (modular, damage states, removable wheels).
-World: café, store, toilet, train stations ×5, track pieces, bridges, mountains, gold rocks, trees, labyrinth, port, yacht, helicopter.
-Animations: Mixamo / Quaternius (walk, run, shovel, carry, climb, crouch, hit, knocked out, zombie set).
+### Assets to make (Tripo3D → Blender → Godot, RV There Yet style)
+Characters: host, girlfriend, friends (customisable colours and hats), kidnappers, zombies, eagle, goat, shark, piranha, villain.
+First-person hands (with holding poses).
+Train: locomotive, cargo car, container car, altar/crafting car (modular, damage states, removable wheels).
+World: café, store, toilet, train stations ×5 (with shop + grave), track pieces, bridges, mountains, gold rocks, trees, labyrinth, port, yacht, helicopter.
+Sea: raft pieces, boat engine, ocean, islands.
+Animations: Mixamo / Quaternius (walk, run, shovel, carry, climb, crouch, hit, knocked out, swim, zombie set).
 
-## 9. Open questions (answer these next)
-1. **Impostor caught?** Can the crew **vote out** the impostor like Among Us? Does the impostor get revealed at the end?
-2. **Losing:** what makes the crew lose? The train destroyed, all players down, a time limit (the helicopter gets too far)?
-3. **Finale:** what happens at the yacht? A fight with the kidnapper, a boat chase, a rescue puzzle? Who is the villain?
-4. **Combat:** how do players fight zombies: weapons, shovel melee, only defend the train?
-5. **Art style:** stylised and cartoony, or realistic and dark?
-6. **Platform:** Steam on PC? Do you want Steam friend invites?
-7. **Death:** when a player dies, respawn at the train, get revived by friends, or spectate?
-8. **Game length:** how long should one full run take (e.g. 1–2 hours)?
-9. **Title:** do you like *Last Train*?
-
-## 10. Build order (milestones)
+## 12. Build order (milestones)
 | # | Milestone | Done when |
 |---|-----------|-----------|
 | M0 | PC + MCP setup | See `TODO_LOCAL.md` |
-| M1 | **Multiplayer base** | 2+ players join a lobby, walk around and see each other |
+| M1 | **Multiplayer base** | 2+ players join a Steam/ENet lobby, walk around in first person and see each other |
 | M2 | **Train core** | Train drives on a track, furnace + coal, forward/back/stop, players ride it without sliding |
-| M3 | **Gather + repair** | Collect coal/wood/scrap, missing rail repaired with wood + nails |
-| M4 | **Impostor** | Secret role + sabotage menu + meteor with cooldown |
-| M5 | **Vertical slice** ⭐ | Board the train → reach station 1 with a shop, 1–2 sabotages, cold. **Playtest with friends** |
+| M3 | **Gather + repair + carry** | Collect coal/wood/scrap, missing rail repaired, carry items/bodies |
+| M4 | **Impostor + voting** | Secret role, sabotage menu + meteor with cooldown, vote that silently locks sabotage |
+| M5 | **Vertical slice** ⭐ | Board the train → reach station 1 (shop, station-only repairs, grave), death + medkit revive, cold. **Playtest with friends** |
 | M6 | Intro + kidnap | Café intro, 4 kidnap scenes, impostor chooses with a timer |
-| M7 | Content | 5 stations, zombies, eagles, freezing wind, damage and wheels, gold rocks |
-| M8 | Labyrinth | Night stealth key quest + locked route |
-| M9 | Finale | Port, helicopter, yacht ending |
-| M10 | Polish + Steam | Menus, sound, balance, export |
+| M7 | Chapter 1 content | 5 stations, zombies, eagles, freezing wind, wheels, gold rocks, goat altar, crafting + blueprints |
+| M8 | Side quests | Night labyrinth key + Peak-style mountain climb |
+| M9 | **Chapter 2** | Container reveal, raft building, sea sabotages, yacht chase + finale |
+| M10 | Polish + Steam | Menus, sound, balance, Steam page and export |
 
 The intro comes *after* the train gameplay on purpose. If the train isn't fun with friends, nothing else matters.
