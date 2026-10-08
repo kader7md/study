@@ -1,0 +1,33 @@
+; Engine configuration file.
+; Trust Issues: co-op train chase with a secret impostor.
+
+config_version=5
+
+[application]
+
+config/name="Trust Issues"
+config/description="Co-op train chase with a secret impostor."
+run/main_scene="res://scenes/main/Main.tscn"
+config/features=PackedStringArray("4.4", "Forward Plus")
+
+[autoload]
+
+Game="*res://scripts/autoload/game.gd"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+
+[layer_names]
+
+3d_physics/layer_1="world"
+3d_physics/layer_2="player"
+3d_physics/layer_3="train"
+3d_physics/layer_4="interact"
+3d_physics/layer_5="enemy"
+3d_render/layer_2="own_body"
+
+[physics]
+
+common/physics_ticks_per_second=60

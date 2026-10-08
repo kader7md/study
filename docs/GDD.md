@@ -1,6 +1,6 @@
 # Game Design Doc (draft v0.3)
 
-**Title:** to be picked, see [13. Title ideas](#13-title-ideas) (not about the train: about the girl, the impostor and the chase)
+**Title: TRUST ISSUES**: lots of *issues* to fix (rails, wheels, the train) and nobody can be *trusted* (the impostor)
 **Engine:** Godot 4 (GDScript) · **Assets:** Tripo3D + Blender (see `VIDEO_METHOD.md`)
 **Platform:** PC, **Steam** (friend invites through Steam lobbies)
 **Players:** 1–5 online co-op · **Impostor:** 1 secret saboteur when there are 3–5 players
@@ -204,9 +204,8 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
 
 ## 10. Still open
 1. **Yacht finale:** when the raft reaches the yacht, what happens: a fight with the kidnapper, a boarding sequence? Who is the kidnapper?
-2. **Title:** pick one from 13.
-3. **Correct-vote lock:** until the end of the chapter (default), or only for a while?
-4. **Which quest maps** go in Chapter 1, and in what order across the 5 runs?
+2. **Correct-vote lock:** until the end of the chapter (default), or only for a while?
+3. **Which quest maps** go in Chapter 1, and in what order across the 5 runs?
 
 ## 11. Technical plan
 - **Multiplayer from day one.** It's the hardest part, so the game is built around it.
@@ -245,8 +244,8 @@ Animations: Mixamo / Quaternius (walk, run, shovel, carry, climb, crouch, hit, k
 
 The intro comes *after* the train gameplay on purpose. If the train isn't fun with friends, nothing else matters.
 
-## 13. Title ideas
-Not about the train. About **her**, **the traitor friend** and **the chase**:
+## 13. Title ideas (decided: **Trust Issues**)
+Other candidates we had, not about the train. About **her**, **the traitor friend** and **the chase**:
 
 | Title | Why |
 |-------|-----|
