@@ -10,7 +10,6 @@ extends CharacterBody3D
 const WALK := 4.5
 const SPRINT := 7.5
 const JUMP := 5.5
-const MOUSE_SENS := 0.0025
 const REACH := 3.5
 const AIM_RANGE := 500.0
 const HAMMER_DAMAGE := 20.0
@@ -76,7 +75,7 @@ func _ready() -> void:
 
 	camera = Camera3D.new()
 	camera.position.y = 1.6
-	camera.fov = 80
+	camera.fov = Settings.fov
 	camera.near = 0.03
 	camera.cull_mask &= ~2
 	add_child(camera)
@@ -102,6 +101,7 @@ func _ready() -> void:
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	Game.ui_changed.connect(_on_ui_changed)
+	Settings.changed.connect(_on_settings_changed)
 	select_tool("hammer")
 
 
@@ -265,20 +265,24 @@ func _on_ui_changed(open: bool) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if open else Input.MOUSE_MODE_CAPTURED
 
 
+## Live settings: field of view (mouse sensitivity and invert Y are read on every mouse move).
+func _on_settings_changed(_section: String, key: String) -> void:
+	if key == "fov" and camera:
+		camera.fov = Settings.fov
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if Game.ui_open:
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-event.relative.x * MOUSE_SENS)
-		camera.rotate_x(-event.relative.y * MOUSE_SENS)
+		var sens := Settings.mouse_sensitivity
+		rotate_y(-event.relative.x * sens)
+		camera.rotate_x(-event.relative.y * sens * (-1.0 if Settings.invert_y else 1.0))
 		camera.rotation.x = clampf(camera.rotation.x, -1.45, 1.45)
 		return
 	if event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		get_viewport().set_input_as_handled()
-		return
-	if event.is_action_pressed("ui_cancel"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		return
 	if downed:
 		return

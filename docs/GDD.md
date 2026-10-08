@@ -122,7 +122,8 @@ a **cable** (30 m): walk too far and it stops you, go much further and it pulls 
 then **bolt it on with 3 hammer hits**.
 
 ### Train damage: two bars (100 % = 50 % body + 50 % mechanics)
-HUD top centre: 🟩 **body bar** and 🟧 **mechanics bar**, plus a line with engine / chassis / wheels.
+HUD top centre (train card): 🟩 **body bar**, then the mechanics as **6 yellow wheel squares** (a square empties as its
+wheel wears loose; a lost wheel is an empty slot with an X), a 🟥 **engine bar** and a 🟦 **chassis bar**.
 Every hit is split **half to the body, half to the mechanics** (two random wheels wear, the chassis bends, the engine suffers).
 
 | Part | Share | What damage does | How to fix |
@@ -236,10 +237,26 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
   stylization, detailed hand-painted textures with wear, rust and dirt (Sea of Thieves / Valheim direction).
   Gameplay feel and HUD stay RV There Yet-like.
 - **First-person camera** with big cartoony hands visible, holding tools and items.
-- **HUD (from the reference screenshots):**
-  - Top centre: **train health bar** (green) plus a **journey progress bar** to the next station
-  - Top left: carried item counts (e.g. nails, scrap)
-  - Bottom left: player status (health, frost, poison)
+- **UI look (our own design, same cosy and chunky spirit as the reference, nothing copied):** one warm theme
+  (`UiTheme`, built in code) for every menu, HUD card and panel: cream paper and varnished wood panels, dark ink
+  outlines, big rounded corners, soft drop shadows, bold Open Sans text, rust and teal accents, honey hover states.
+  Train colours: body green, wheels yellow, engine red, chassis blue, journey orange.
+- **HUD:**
+  - Top centre: the **train card** (body bar, wheel squares, engine and chassis bars) and the **journey strip**:
+    stations 0 to 5 as pips, a train marker, padlocks on locked rail sections, the next station's name and metres to go
+  - Top left: inventory chips (icon + count); multiplayer widgets (player list, speaking icons) go below them
+  - Top right: speed, lever and fuel card, and the **objective note** (a pinned paper card)
+  - Right: messages as toasts that slide in and fade · centre: crosshair, prompt pill, hold bar · banners on a wood plate
+  - Bottom: health and frost (left), tool hotbar and help (centre), the impostor's sabotage panel (right)
+  - Readable at 1280x720 and 1920x1080 (the UI scales with the window height)
+- **Menus:** the title screen shows **TRUST ISSUES** over a slow camera at the departure station (the real Chapter 1
+  world from the same seed, chimney smoke, a small generated music-box loop). Buttons: **Host game**, **Join game**
+  (invite code or IP:port, plus your name), **Settings**, **Quit**. **Esc** in game opens the pause menu (Resume,
+  Settings, Back to menu, Quit). Solo play pauses; online the game keeps running.
+- **Settings** (saved in `user://settings.cfg`, applied at startup): **Controls** (rebind every action, keyboard or mouse,
+  conflict warnings, reset to defaults, mouse sensitivity, invert Y), **Graphics** (window mode, V-Sync, resolution scale,
+  shadow quality, anti-aliasing, FOV, max FPS), **Audio** (Master, Music, SFX, Voice), **Microphone** (input device, live
+  level meter, "hear yourself" test, push-to-talk on/off and key, your name).
 - **Objective list on paper/phone:** the player holds up a handwritten checklist (like RV There Yet's camping-trip note),
   e.g. "find the train station ✔, reach station 1, get engine oil…". The host can use the **phone with the tracker**.
 - Comedy: goofy physics, ragdolls, players carrying each other's bodies around.
