@@ -172,7 +172,8 @@ fasteners `Fix_<part>_<n>`, extras `Zombie_<n>`, `Eagle_<n>`, `Fallen_<n>`, `Anc
 | Gates, stations, ending | reliable | gate opened (when the gameplay API exists), station reached (+ stats), chapter completed, `run_finished(stats)`, objective text |
 
 A client that finished loading first gets `send_full_state()`: broken pieces with their repair state, rebuilt rolls,
-taken pickups, gold rocks, inventory, next station, every cover piece, gates, objective, then a snapshot and all extras.
+taken pickups, gold rocks, inventory, next station, every cover piece, gates, objective, run stats, runtime crates,
+then a snapshot and all extras.
 
 ## Roles: the secret impostor
 
