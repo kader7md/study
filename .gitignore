@@ -17,3 +17,7 @@ Thumbs.db
 # Secrets (API keys)
 .env
 *.env
+
+# Python caches (Blender scripts)
+__pycache__/
+*.pyc

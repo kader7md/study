@@ -68,64 +68,74 @@ def cone_between(name, a, b, r0, r1, material, verts=10):
 
 
 def pine(name, height=11.0, snow=False):
+    """Spruce-like pine: tapered bark trunk, whorls of drooping branch clusters getting shorter towards the top."""
     A.clear_scene()
     random.seed(hash(name) % 1000)
-    parts = [cone_between("trunk", (0, 0, -0.3), (0, 0, height * 0.95), 0.32, 0.05, "bark", 12)]
-    displace(parts[0], 0.05, 0.15)
-    layers = 8
-    for i in range(layers):
-        t = i / (layers - 1)
-        z = height * (0.22 + t * 0.7)
-        r = (1.0 - t) * 2.6 + 0.45
-        h = 2.4 - t * 1.1
-        c = A.cyl(f"layer{i}", r, h, (0, 0, z), "pine_needles", verts=14, radius2=0.12, bevel=0.0)
-        c.rotation_euler.z = random.random() * 6.28
-        displace(c, 0.35 + (1 - t) * 0.3, 0.6, subdiv=1)
-        parts.append(c)
-        if snow:
-            s = A.cyl(f"snow{i}", r * 0.82, h * 0.35, (0, 0, z + h * 0.32), "snow", verts=14, radius2=0.1, bevel=0.0)
-            displace(s, 0.25, 0.5, subdiv=1)
-            parts.append(s)
-    obj = A.join(name, parts, origin=(0, 0, 0))
+    parts = [cone_between("trunk", (0, 0, -0.3), (0, 0, height), 0.3, 0.04, "bark", 12)]
+    displace(parts[0], 0.04, 0.12)
+    whorls = 11
+    for i in range(whorls):
+        t = i / (whorls - 1)
+        z = height * (0.18 + t * 0.78)
+        reach = (1.0 - t) ** 0.9 * 2.8 + 0.35
+        count = max(4, int(9 - t * 5))
+        for k in range(count):
+            a = k * 2 * math.pi / count + random.uniform(-0.25, 0.25) + i * 0.6
+            droop = 0.35 + (1.0 - t) * 0.5
+            tip = (math.cos(a) * reach, math.sin(a) * reach, z - droop * reach * 0.6)
+            # the branch: a flattened cone of needles from the trunk to the tip, slightly upturned at the end
+            c = cone_between(f"br{i}_{k}", (0, 0, z + 0.15), tip, 0.55 * (1.0 - t * 0.5), 0.08, "pine_needles", 7)
+            c.scale = (1.0, 1.0, 1.0)
+            displace(c, 0.18, 0.35, subdiv=1)
+            parts.append(c)
+            if snow and k % 2 == 0:
+                sn = cone_between(f"sn{i}_{k}", (0, 0, z + 0.3), (tip[0] * 0.8, tip[1] * 0.8, tip[2] + 0.25), 0.3, 0.05, "snow", 6)
+                displace(sn, 0.1, 0.3)
+                parts.append(sn)
+    top = A.cyl("top", 0.35, 1.2, (0, 0, height + 0.2), "pine_needles", verts=8, radius2=0.02, bevel=0.0)
+    parts.append(top)
+    A.join(name, parts, origin=(0, 0, 0))
     A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 1024)
 
 
-def oak(name):
+def _leafy_tree(name, trunk_h, trunk_r, limbs, spread, leaf_mat, bark_mat, clump=(0.55, 0.9), seed=11):
+    """Broadleaf tree: trunk splitting into limbs that fork twice, each twig end carrying a few leaf clumps."""
     A.clear_scene()
-    random.seed(11)
-    parts = [cone_between("trunk", (0, 0, -0.3), (0, 0, 3.2), 0.55, 0.35, "bark", 14)]
-    displace(parts[0], 0.12, 0.3, subdiv=1)
+    random.seed(seed)
+    parts = [cone_between("trunk", (0, 0, -0.3), (0, 0, trunk_h), trunk_r, trunk_r * 0.65, bark_mat, 12)]
+    displace(parts[0], trunk_r * 0.2, 0.3, subdiv=1)
     tips = []
-    for i in range(5):
-        a = i * 2 * math.pi / 5 + random.random() * 0.4
-        tip = (math.cos(a) * 2.4, math.sin(a) * 2.4, 4.8 + random.random() * 1.2)
-        parts.append(cone_between(f"limb{i}", (0, 0, 3.0), tip, 0.3, 0.12, "bark", 10))
-        tips.append(tip)
-    for i, t in enumerate(tips + [(0, 0, 6.2)]):
+
+    def fork(p, d, length, r, depth):
+        end = (p[0] + d[0] * length, p[1] + d[1] * length, p[2] + d[2] * length)
+        parts.append(cone_between(f"limb{len(parts)}", p, end, r, r * 0.6, bark_mat, 8))
+        if depth == 0:
+            tips.append(end)
+            return
+        for k in range(2):
+            nd = (d[0] + random.uniform(-0.7, 0.7), d[1] + random.uniform(-0.7, 0.7), d[2] + random.uniform(0.0, 0.6))
+            n = math.sqrt(sum(c * c for c in nd))
+            fork(end, tuple(c / n for c in nd), length * 0.7, r * 0.6, depth - 1)
+    for i in range(limbs):
+        a = i * 2 * math.pi / limbs + random.uniform(-0.3, 0.3)
+        d = (math.cos(a) * 0.7, math.sin(a) * 0.7, 0.75)
+        n = math.sqrt(sum(c * c for c in d))
+        fork((0, 0, trunk_h * random.uniform(0.85, 1.0)), tuple(c / n for c in d), spread, trunk_r * 0.55, 2)
+    for i, t in enumerate(tips):
         for k in range(3):
-            c = ico(f"clump{i}{k}", random.uniform(1.4, 2.0), (t[0] + random.uniform(-0.8, 0.8), t[1] + random.uniform(-0.8, 0.8), t[2] + random.uniform(0.2, 1.2)), "oak_leaves", 2)
-            displace(c, 0.55, 0.5)
+            c = ico(f"leaf{i}_{k}", random.uniform(*clump), (t[0] + random.uniform(-0.5, 0.5), t[1] + random.uniform(-0.5, 0.5), t[2] + random.uniform(-0.2, 0.5)), leaf_mat, 2)
+            displace(c, 0.3, 0.3)
             parts.append(c)
     A.join(name, parts, origin=(0, 0, 0))
     A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 1024)
 
 
+def oak(name):
+    _leafy_tree(name, 3.0, 0.5, 5, 2.2, "oak_leaves", "bark", (0.7, 1.15), 11)
+
+
 def birch(name):
-    A.clear_scene()
-    random.seed(12)
-    parts = [cone_between("trunk", (0, 0, -0.3), (0.3, 0, 9.0), 0.2, 0.06, "birch_bark", 12)]
-    for i in range(6):
-        z = 4.0 + i * 0.8
-        a = random.random() * 6.28
-        parts.append(cone_between(f"b{i}", (0.15, 0, z), (math.cos(a) * 1.4, math.sin(a) * 1.4, z + 1.0), 0.06, 0.02, "birch_bark", 8))
-        c = ico(f"leaf{i}", random.uniform(0.9, 1.3), (math.cos(a) * 1.4, math.sin(a) * 1.4, z + 1.3), "birch_leaves", 2, scale=(1, 1, 1.3))
-        displace(c, 0.4, 0.45)
-        parts.append(c)
-    top = ico("leaf_top", 1.3, (0.3, 0, 9.2), "birch_leaves", 2, scale=(1, 1, 1.4))
-    displace(top, 0.4, 0.45)
-    parts.append(top)
-    A.join(name, parts, origin=(0, 0, 0))
-    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 1024)
+    _leafy_tree(name, 5.5, 0.2, 4, 1.6, "birch_leaves", "birch_bark", (0.45, 0.75), 12)
 
 
 def dead_tree(name):

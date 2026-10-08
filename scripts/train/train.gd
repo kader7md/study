@@ -29,7 +29,16 @@ const MAX_WHEELS := 6
 const MIN_WHEELS_TO_MOVE := 3
 const WHEEL_BOLT_HITS := 3
 const CRASH_SPEED := 4.0
-const OIL_BUFF_TIME := 120.0
+
+## Train health = 100: BODY (cover pieces) 50 + MECHANICS 50 (wheels 6 x 2.5, engine 20, chassis 15).
+const BODY_MAX := 50.0
+## A wheel falls off when its wear reaches 2.5 (= 5 % of the mechanics bar). Tighten it with the wrench before that.
+const WHEEL_LIMIT := 2.5
+const ENGINE_MAX := 20.0     # damaged mostly by water (crashing into a river at a broken bridge); fixed with engine oil
+const CHASSIS_MAX := 15.0    # never falls off, only a value; welded at a station
+const MECH_MAX := WHEEL_LIMIT * 6 + ENGINE_MAX + CHASSIS_MAX
+const OIL_REPAIR := 10.0
+const WRENCH_REPAIR := 0.6
 
 ## Things the crew carries out of the cargo car and what each costs from the inventory.
 const CARRY_COST := {"plank": {"wood": 1}, "rail": {"scrap": 2}, "wheel": {"wheel": 1}, "panel": {"scrap": 2}}
@@ -39,10 +48,15 @@ var distance := 0.0
 var speed := 0.0
 var lever := 0
 var fuel := 60.0
-var health := 100.0
+## Total health 0..100 (body + mechanics), read only.
+var health: float:
+	get: return body_health + mech_health()
+var body_health := BODY_MAX
+var engine_damage := 0.0
+var chassis_damage := 0.0
+var wheel_wear: Array[float] = []
 var wheels := MAX_WHEELS
 var current_station := -1
-var oil_buff := 0.0
 var cars: Array[AnimatableBody3D] = []
 var total_length := 0.0
 
@@ -72,12 +86,18 @@ func setup(t: Track, front_distance: float) -> void:
 
 
 func save_state() -> Dictionary:
-	return {"health": health, "wheels": wheels, "fuel": fuel}
+	return {"body": body_health, "engine": engine_damage, "chassis": chassis_damage, "wear": wheel_wear.duplicate(),
+		"wheels": wheels, "fuel": fuel}
 
 
 func load_state(state: Dictionary) -> void:
-	health = state.get("health", health)
+	body_health = state.get("body", body_health)
+	engine_damage = state.get("engine", engine_damage)
+	chassis_damage = state.get("chassis", chassis_damage)
 	fuel = state.get("fuel", fuel)
+	var wear: Array = state.get("wear", [])
+	for i in mini(wear.size(), wheel_wear.size()):
+		wheel_wear[i] = wear[i]
 	var target := int(state.get("wheels", wheels))
 	while wheels > target:
 		lose_wheel(false)
@@ -90,16 +110,24 @@ func max_speed_now() -> float:
 	if wheels < MIN_WHEELS_TO_MOVE or health <= 0.0:
 		return 0.0
 	var s := MAX_SPEED
-	s *= 0.5 + 0.5 * health / 100.0
-	s *= 1.0 - 0.12 * (MAX_WHEELS - wheels)
+	s *= float(wheels) / MAX_WHEELS                       # each lost wheel: -1/6 of the speed
+	s *= 1.0 - 0.5 * engine_damage / ENGINE_MAX           # a hurt engine has less power
+	s *= 1.0 - 0.3 * chassis_damage / CHASSIS_MAX         # a bent chassis drags
 	# uphill is slow, downhill a bit faster (in the direction of travel)
 	var dir := 1.0 if lever >= 0 else -1.0
 	s *= clampf(1.0 - track.grade_at(center_distance()) * dir * 8.0, 0.45, 1.25)
 	if Game.wind_active:
 		s *= 0.6
-	if oil_buff > 0.0:
-		s *= 1.2
 	return s
+
+
+## Mechanics health 0..MECH_MAX: wheels (worn or missing) + engine + chassis.
+func mech_health() -> float:
+	var h := ENGINE_MAX - engine_damage + CHASSIS_MAX - chassis_damage
+	for i in _wheel_state.size():
+		if _wheel_state[i] == 0:
+			h += WHEEL_LIMIT - wheel_wear[i]
+	return h
 
 
 func rear_distance() -> float:
@@ -122,7 +150,6 @@ func _physics_process(delta: float) -> void:
 	if track == null:
 		return
 	_block_msg_cooldown = maxf(_block_msg_cooldown - delta, 0.0)
-	oil_buff = maxf(oil_buff - delta, 0.0)
 
 	var uphill := maxf(track.grade_at(center_distance()) * signf(speed), 0.0)
 	var burn := (0.12 + 0.06 * absf(speed)) * (1.6 if Game.wind_active else 1.0) * (1.0 + uphill * 15.0)
@@ -168,9 +195,10 @@ func _hit_gap() -> void:
 	speed = 0.0
 	if v > CRASH_SPEED:
 		take_damage((v - CRASH_SPEED) * 6.0 + 5.0)
-		if randf() < 0.5:
-			lose_wheel()
 		Game.say("CRASH! The train hit a broken rail!")
+		if track.is_bridge_at(distance + 2.0) or track.is_bridge_at(rear_distance() - 2.0):
+			engine_damage = minf(engine_damage + 6.0 + v, ENGINE_MAX)
+			Game.say("The engine dipped into the river! Engine damaged (fix it with engine oil)")
 	elif _block_msg_cooldown <= 0.0 and v > 0.05:
 		Game.say("Train stopped: broken track ahead. Rebuild it!")
 	_block_msg_cooldown = 3.0
@@ -185,12 +213,79 @@ func _update_station() -> void:
 		Game.on_train_stopped_at_station(s)
 
 
+## Damage is split: half to the body (pieces fly off), half to the mechanics
+## (two random wheels wear, the chassis bends, the engine suffers).
 func take_damage(amount: float) -> void:
-	health = maxf(health - amount, 0.0)
+	body_health = maxf(body_health - amount * 0.5, 0.0)
+	var mech := amount * 0.5
+	chassis_damage = minf(chassis_damage + mech * 0.4, CHASSIS_MAX)
+	engine_damage = minf(engine_damage + mech * 0.4, ENGINE_MAX)
+	var ok := _ok_wheels()
+	for k in mini(2, ok.size()):
+		add_wheel_wear(ok.pop_at(_rng.randi() % ok.size()), mech * 0.1)
 	damaged.emit(amount)
 	_sync_parts(true)
 	if health <= 0.0:
-		Game.say("The train is wrecked! Refit panels to move again.")
+		Game.say("The train is wrecked!")
+
+
+func _ok_wheels() -> Array[int]:
+	var ok: Array[int] = []
+	for i in _wheel_state.size():
+		if _wheel_state[i] == 0:
+			ok.append(i)
+	return ok
+
+
+## Wears a wheel; at WHEEL_LIMIT it comes off and drops to the ground.
+func add_wheel_wear(i: int, amount: float) -> void:
+	if _wheel_state[i] != 0:
+		return
+	wheel_wear[i] = minf(wheel_wear[i] + amount, WHEEL_LIMIT)
+	if wheel_wear[i] >= WHEEL_LIMIT:
+		_detach_wheel(i, true)
+
+
+## Wrench on a worn wheel: tightens it (less wear).
+func tighten_wheel(i: int) -> bool:
+	if _wheel_state[i] != 0 or wheel_wear[i] <= 0.0:
+		return false
+	wheel_wear[i] = maxf(wheel_wear[i] - WRENCH_REPAIR, 0.0)
+	if wheel_wear[i] <= 0.0:
+		Game.say("Wheel tightened")
+	return true
+
+
+## Engine oil (furnace [Q]) repairs the engine.
+func oil_engine() -> bool:
+	if engine_damage <= 0.0:
+		Game.say("The engine is fine")
+		return false
+	if not Game.take("engine_oil"):
+		Game.say("No engine oil (buy it at a station shop)")
+		return false
+	engine_damage = maxf(engine_damage - OIL_REPAIR, 0.0)
+	Game.say("Engine oiled (engine %d%%)" % int(100.0 - engine_damage / ENGINE_MAX * 100.0))
+	return true
+
+
+## Station welder on the chassis weld points.
+func weld_chassis(amount: float) -> void:
+	chassis_damage = maxf(chassis_damage - amount, 0.0)
+
+
+## Everything back to new (debug / tests).
+func full_repair() -> void:
+	weld_full()
+	engine_damage = 0.0
+	chassis_damage = 0.0
+	for i in wheel_wear.size():
+		wheel_wear[i] = 0.0
+		if _wheel_state[i] != 0:
+			_wheel_state[i] = 0
+			_wheel_nodes[i].visible = true
+			_wheel_nodes[i].position = _wheel_home[i]
+	wheels = MAX_WHEELS
 
 
 func add_coal() -> bool:
@@ -210,33 +305,45 @@ func lever_text() -> String:
 
 # --- Wheels: fall off, get carried back, placed and bolted ----------------------------
 
+## A random good wheel comes off (used by checkpoint loading and tests).
 func lose_wheel(announce := true) -> void:
-	var ok: Array[int] = []
-	for i in _wheel_state.size():
-		if _wheel_state[i] == 0:
-			ok.append(i)
-	if ok.is_empty():
-		return
-	var i := ok[_rng.randi() % ok.size()]
+	var ok := _ok_wheels()
+	if not ok.is_empty():
+		_detach_wheel(ok[_rng.randi() % ok.size()], announce)
+
+
+func _detach_wheel(i: int, announce: bool) -> void:
 	_wheel_state[i] = 1
+	wheel_wear[i] = 0.0
 	wheels -= 1
 	_wheel_nodes[i].visible = false
-	_wheel_slots[i].collision_layer = Build.LAYER_INTERACT
 	if announce:
-		_drop_wheel_visual(_wheel_nodes[i].global_transform)
+		_drop_wheel(i)
 		wheel_lost.emit(wheels)
-		Game.say("A wheel fell off! (%d/%d) New wheels are sold at stations." % [wheels, MAX_WHEELS])
+		Game.say("A wheel came off! (%d/%d, speed -%d%%) New wheels are sold at stations." % [wheels, MAX_WHEELS, int(100.0 / MAX_WHEELS)])
 
 
-func _drop_wheel_visual(from: Transform3D) -> void:
-	var w := Props.instance("wheel")
-	get_parent().add_child(w)
-	w.global_transform = from
-	var tween := w.create_tween()
-	tween.tween_property(w, "global_position", from.origin + from.basis.x * 3.0 + Vector3.DOWN * 0.3, 0.8)
-	tween.parallel().tween_property(w, "rotation:z", 1.4, 0.8)
-	tween.tween_interval(8.0)
-	tween.tween_callback(w.queue_free)
+## The broken wheel drops off the train and rolls away (physics debris, not reusable).
+func _drop_wheel(i: int) -> void:
+	var from := _wheel_nodes[i].global_transform
+	var body := RigidBody3D.new()
+	body.collision_layer = Build.LAYER_DEBRIS
+	body.collision_mask = Build.LAYER_WORLD | Build.LAYER_DEBRIS
+	body.mass = 60.0
+	get_parent().add_child(body)
+	body.global_transform = from
+	body.add_child(Props.instance("wheel"))
+	var shape := CylinderShape3D.new()
+	shape.radius = 0.45
+	shape.height = 0.14
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.rotation.z = PI * 0.5
+	body.add_child(cs)
+	var out := cars[0].global_basis.x * signf(_wheel_home[i].x)
+	body.linear_velocity = out * 2.0 + Vector3.UP * 2.0 - cars[0].global_basis.z * speed * 0.6
+	body.angular_velocity = cars[0].global_basis.x * speed
+	get_tree().create_timer(60.0).timeout.connect(body.queue_free)
 
 
 func wheel_state(i: int) -> int:
@@ -264,8 +371,8 @@ func place_wheel(i: int) -> void:
 
 func bolt_wheel(i: int) -> void:
 	_wheel_state[i] = 0
+	wheel_wear[i] = 0.0
 	wheels += 1
-	_wheel_slots[i].collision_layer = 0
 	Game.say("Wheel bolted on (%d/%d)" % [wheels, MAX_WHEELS])
 
 
@@ -275,7 +382,6 @@ func _make_wheel_slot(car: Node3D, i: int) -> void:
 	slot.index = i
 	slot.position = _wheel_home[i]
 	Build.collider(slot, Vector3(0.6, 1.1, 1.1), Vector3.ZERO)
-	slot.collision_layer = 0
 	car.add_child(slot)
 	_wheel_slots.append(slot)
 
@@ -290,7 +396,7 @@ func attached_count() -> int:
 func _sync_parts(fly := true) -> void:
 	if parts.is_empty():
 		return
-	var want := clampi(int(ceil(health / (100.0 / parts.size()) - 0.001)), 0, parts.size())
+	var want := clampi(int(ceil(body_health / (BODY_MAX / parts.size()) - 0.001)), 0, parts.size())
 	var attached: Array[BodyPart] = []
 	for p in parts:
 		if p.attached:
@@ -302,13 +408,13 @@ func _sync_parts(fly := true) -> void:
 
 ## A piece was put back and nailed / welded on.
 func on_part_refitted(part: BodyPart) -> void:
-	health = minf(health + part.value(), 100.0)
-	Game.say("Panel fixed (%d%%)" % int(health))
+	body_health = minf(body_health + part.value(), BODY_MAX)
+	Game.say("Panel fixed (body %d%%)" % int(body_health / BODY_MAX * 100.0))
 
 
 ## Instantly refits every piece (debug / tests).
 func weld_full() -> void:
-	health = 100.0
+	body_health = BODY_MAX
 	for p in parts:
 		p.refit_instantly()
 
@@ -334,7 +440,8 @@ func _build_car(type: String, length: float) -> AnimatableBody3D:
 	car.add_child(model)
 
 	# Floor (a bit longer than the car so players can walk across the gap). Walls come from the cover pieces.
-	Build.collider(car, Vector3(2.8, 0.3, length + CAR_GAP), Vector3(0, FLOOR_HEIGHT - 0.15, 0))
+	var floor_width := 3.2 if type == "locomotive" else 2.8  # the engine has wide running boards beside the boiler
+	Build.collider(car, Vector3(floor_width, 0.3, length + CAR_GAP), Vector3(0, FLOOR_HEIGHT - 0.15, 0))
 	for child in model.find_children("*", "MeshInstance3D", true, false):
 		if child.name.begins_with("Panel_") or child.name.begins_with("Door_"):
 			var part := BodyPart.new()
@@ -361,7 +468,7 @@ func _build_locomotive(car: Node3D, model: Node3D, length: float) -> void:
 	boiler.collision_layer = Build.LAYER_TRAIN
 	car.add_child(boiler)
 	# narrow enough to leave a walkway on each side from the cab front doors to the front of the engine
-	Build.collider(boiler, Vector3(1.8, 1.9, 4.6), Vector3(0, f + 1.0, -2.2))
+	Build.collider(boiler, Vector3(1.66, 1.9, 4.6), Vector3(0, f + 1.0, -2.2))
 	Build.collider(boiler, Vector3(1.4, 1.2, 0.9), Vector3(0, f + 0.2, -4.5))
 	_smoke = Build.sphere(car, 0.6, Vector3(0, f + 3.9, -4.0), Color(0.85, 0.85, 0.85, 0.6))
 
@@ -370,6 +477,7 @@ func _build_locomotive(car: Node3D, model: Node3D, length: float) -> void:
 		_wheel_nodes.append(node)
 		_wheel_home.append(node.position)
 		_wheel_state.append(0)
+		wheel_wear.append(0.0)
 		_make_wheel_slot(car, i)
 
 	# Furnace door (shovel coal)
@@ -382,14 +490,19 @@ func _build_locomotive(car: Node3D, model: Node3D, length: float) -> void:
 	glow_mat.emission_energy_multiplier = 2.5
 	glow.material_override = glow_mat
 	var furnace_prompt := func(_p):
-		var oil := "\n[Q] use engine oil (+20%% speed)" if Game.has("engine_oil") else ""
+		var oil := ""
+		if engine_damage > 0.0:
+			oil = "\nEngine %d%%: [Q] engine oil (have %d)" % [int(100.0 - engine_damage / ENGINE_MAX * 100.0), Game.count("engine_oil")]
 		return "Furnace %d%%: shovel coal (have %d)  [E]%s" % [int(fuel), Game.count("coal"), oil]
 	var furnace_spot := ActionSpot.create(car, Vector3(1.4, 1.2, 0.9), Vector3(0, f + 0.6, 0.6),
 		furnace_prompt, func(_p): add_coal())
-	furnace_spot.alt_fn = func(_p):
-		if Game.take("engine_oil"):
-			oil_buff = OIL_BUFF_TIME
-			Game.say("Engine oiled: faster for %d s" % int(OIL_BUFF_TIME))
+	furnace_spot.alt_fn = func(_p): oil_engine()
+	# chassis weld points under the cab, glowing while the chassis is damaged
+	for side in [-1.0, 1.0]:
+		var spot := ChassisSpot.new()
+		spot.train = self
+		spot.position = Vector3(side * 1.2, 0.95, 1.5)
+		car.add_child(spot)
 
 	# Lever
 	var lever_mesh := Build.box(car, Vector3(0.1, 0.9, 0.1), Vector3(-0.9, f + 0.55, 1.6), Color(0.95, 0.7, 0.2))

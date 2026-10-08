@@ -481,6 +481,8 @@ def build_locomotive():
     L = 10.0
     body = []
     underframe(L, body, buffer_beam="buffer_red")
+    # wider cab floor than the wagons (3.2 m) so there is room beside the boiler
+    body.append(box("cab_floor_wide", (3.2, 4.8, 0.08), (0, -2.6, FLOOR - 0.04), "wood_dark", 0.008))
     bogie("bogie_front", 4.3, body)
     plank_floor(4.8, body, material="wood_dark")
     for o in body[-21:]:
@@ -538,9 +540,9 @@ def build_locomotive():
         body.append(box(f"siderod{s}", (0.06, 7.4, 0.1), (1.18 * s, 0.0, 0.5), "steel", 0.01))
         body.append(rod(f"reach{s}", (1.15 * s, 0.4, 1.1), (1.15 * s, 2.6, 0.95), 0.025, "steel"))
         # running board along the boiler (walkable from the cab front doors), splashers over the wheels
-        body.append(box(f"runboard{s}", (0.5, 5.1, 0.05), (1.17 * s, 2.35, FLOOR - 0.02), "black_paint", 0.008))
-        body.append(box(f"valance{s}", (0.04, 5.1, 0.25), (1.42 * s, 2.35, FLOOR - 0.15), "loco_green", 0.006))
-        body.append(box(f"valance_line{s}", (0.045, 5.1, 0.03), (1.42 * s, 2.35, FLOOR - 0.08), "lining", 0.003))
+        body.append(box(f"runboard{s}", (0.75, 5.1, 0.05), (1.2 * s, 2.35, FLOOR - 0.02), "black_paint", 0.008))
+        body.append(box(f"valance{s}", (0.04, 5.1, 0.25), (1.57 * s, 2.35, FLOOR - 0.15), "loco_green", 0.006))
+        body.append(box(f"valance_line{s}", (0.045, 5.1, 0.03), (1.57 * s, 2.35, FLOOR - 0.08), "lining", 0.003))
         for yy in (0.0, 3.5):
             body.append(cyl(f"splasher{s}{yy}", 0.5, 0.12, (1.2 * s, yy, FLOOR - 0.05), "loco_green", axis="X", verts=32))
         body.append(rod(f"handrail{s}", (0.98 * s, -0.1, FLOOR + 1.5), (0.98 * s, 4.3, FLOOR + 1.5), 0.018, "steel"))
@@ -549,24 +551,24 @@ def build_locomotive():
         body.append(rod(f"smokebox_rail{s}", (0.98 * s, 4.3, FLOOR + 1.5), (0.6 * s, 5.05, FLOOR + 1.8), 0.018, "steel"))
         body.append(rod(f"steampipe{s}", (0.6 * s, 4.05, FLOOR + 1.2), (1.0 * s, 4.0, 1.0), 0.07, "black_paint", 16))
     # cab: fixed backhead plate behind the boiler with spectacle windows, corner posts, roof beams, steps
-    body.append(box("cab_front_mid", (1.8, 0.1, 2.55), (0, -0.25, FLOOR + 1.28), "loco_green", 0.02))
+    body.append(box("cab_front_mid", (1.66, 0.1, 2.55), (0, -0.25, FLOOR + 1.28), "loco_green", 0.02))
     for s in (-1, 1):
         body.append(cyl(f"spectacle{s}", 0.22, 0.12, (0.6 * s, -0.25, FLOOR + 2.15), "glass", axis="Y", verts=32))
         body.append(torus(f"spectacle_ring{s}", 0.23, 0.03, (0.6 * s, -0.31, FLOOR + 2.15), "brass", axis="Y"))
-        body.append(box(f"cab_front_top{s}", (0.5, 0.1, 0.55), (1.15 * s, -0.25, FLOOR + 2.27), "loco_green", 0.01))
+        body.append(box(f"cab_front_top{s}", (0.66, 0.1, 0.55), (1.17 * s, -0.25, FLOOR + 2.27), "loco_green", 0.01))
         for py in (-0.25, -3.9, -4.95):
-            body.append(box(f"cab_post{s}{py}", (0.1, 0.1, 2.6), (1.38 * s, py, FLOOR + 1.3), "loco_green", 0.01))
-        body.append(box(f"roof_beam{s}", (0.1, 4.7, 0.1), (1.38 * s, -2.6, FLOOR + 2.55), "loco_green", 0.01))
-        body.append(box(f"cab_step{s}", (0.45, 0.6, 0.05), (1.45 * s, -4.45, 0.78), "black_paint", 0.01))
-        body.append(box(f"cab_step2{s}", (0.45, 0.6, 0.05), (1.45 * s, -4.45, 0.35), "black_paint", 0.01))
-        body.append(rod(f"cab_grab{s}", (1.5 * s, -3.95, FLOOR + 0.2), (1.5 * s, -3.95, FLOOR + 1.6), 0.018, "brass", 8))
+            body.append(box(f"cab_post{s}{py}", (0.1, 0.1, 2.6), (1.48 * s, py, FLOOR + 1.3), "loco_green", 0.01))
+        body.append(box(f"roof_beam{s}", (0.1, 4.7, 0.1), (1.48 * s, -2.6, FLOOR + 2.55), "loco_green", 0.01))
+        body.append(box(f"cab_step{s}", (0.45, 0.6, 0.05), (1.55 * s, -4.45, 0.78), "black_paint", 0.01))
+        body.append(box(f"cab_step2{s}", (0.45, 0.6, 0.05), (1.55 * s, -4.45, 0.35), "black_paint", 0.01))
+        body.append(rod(f"cab_grab{s}", (1.6 * s, -3.95, FLOOR + 0.2), (1.6 * s, -3.95, FLOOR + 1.6), 0.018, "brass", 8))
     body += rivets_line("cabfront_riv", (-0.85, -0.31, FLOOR + 2.5), (0.85, -0.31, FLOOR + 2.5), 12)
     for k, x in enumerate((-0.35, 0.35)):
         body.append(cyl(f"gauge{k}", 0.11, 0.06, (x, -0.33, FLOOR + 1.55), "brass", axis="Y", verts=24))
         body.append(cyl(f"gaugeface{k}", 0.09, 0.02, (x, -0.37, FLOOR + 1.55), "dial", axis="Y", verts=24))
     body.append(rod("backhead_pipe", (-0.8, -0.34, FLOOR + 1.3), (0.8, -0.34, FLOOR + 1.3), 0.025, "copper"))
     # coal bunker at the back of the cab (it's a tank engine: no tender)
-    body.append(box("bunker", (2.6, 0.7, 1.1), (0, -4.6, FLOOR + 0.55), "loco_green", 0.02))
+    body.append(box("bunker", (2.2, 0.6, 1.1), (0, -4.65, FLOOR + 0.55), "loco_green", 0.02))
     body.append(sphere("bunker_coal", 0.7, (0, -4.6, FLOOR + 1.05), "coal", scale=(1.7, 0.45, 0.35)))
     join("Locomotive", body, origin=(0, 0, 0))
 
@@ -581,7 +583,7 @@ def build_locomotive():
         panel("Panel", "metal", n, parts)
         n += 1
     for s in (-1, 1):
-        x = 1.42 * s
+        x = 1.5 * s
         parts = [box(f"cab_low{s}", (0.07, 3.45, 0.95), (x, -2.12, FLOOR + 0.48), "loco_green", 0.01),
                  box(f"cab_top{s}", (0.07, 3.45, 0.4), (x, -2.12, FLOOR + 2.3), "loco_green", 0.01),
                  box(f"cab_mid_a{s}", (0.07, 0.6, 0.9), (x, -0.7, FLOOR + 1.4), "loco_green", 0.01),
@@ -597,15 +599,15 @@ def build_locomotive():
         parts += rivets_line(f"cabriv{s}", (x * 1.03, -3.8, FLOOR + 2.45), (x * 1.03, -0.45, FLOOR + 2.45), 14)
         panel("Panel", "metal", n, parts)
         n += 1
-    parts = [box("roof", (3.1, 4.7, 0.1), (0, -2.6, FLOOR + 2.67), "black_paint", 0.03),
-             box("roof_lip", (3.2, 4.8, 0.04), (0, -2.6, FLOOR + 2.6), "loco_green", 0.01),
+    parts = [box("roof", (3.25, 4.7, 0.1), (0, -2.6, FLOOR + 2.67), "black_paint", 0.03),
+             box("roof_lip", (3.35, 4.8, 0.04), (0, -2.6, FLOOR + 2.6), "loco_green", 0.01),
              box("roof_vent", (0.6, 0.8, 0.15), (0, -2.4, FLOOR + 2.78), "black_paint", 0.02)]
     for k in range(5):
-        parts.append(box(f"roof_rib{k}", (3.1, 0.05, 0.03), (0, -4.6 + k * 1.0, FLOOR + 2.73), "iron", 0.005))
+        parts.append(box(f"roof_rib{k}", (3.25, 0.05, 0.03), (0, -4.6 + k * 1.0, FLOOR + 2.73), "iron", 0.005))
     panel("Panel", "metal", n, parts)
     # rear side doors (hinge at the front edge)
     for k, s in enumerate((-1, 1)):
-        x = 1.42 * s
+        x = 1.5 * s
         panel("Door", "metal", k, [box(f"cab_door{s}", (0.06, 0.95, 1.9), (x, -4.43, FLOOR + 0.95), "loco_green", 0.01),
                                    box(f"door_win{s}", (0.08, 0.5, 0.45), (x, -4.43, FLOOR + 1.45), "glass", 0.005),
                                    box(f"door_winframe{s}", (0.07, 0.6, 0.55), (x * 0.999, -4.43, FLOOR + 1.45), "brass", 0.005),
@@ -613,7 +615,7 @@ def build_locomotive():
               origin=(x, -3.95, FLOOR + 0.95))
     # cab FRONT doors, one each side of the boiler, hinged at the outer edge, opening forward
     for k, s in enumerate((-1, 1)):
-        x0, x1 = 0.92 * s, 1.36 * s
+        x0, x1 = 0.84 * s, 1.46 * s
         xc = (x0 + x1) / 2
         w = abs(x1 - x0)
         panel("Door", "metal", 2 + k, [
@@ -814,6 +816,17 @@ def build_props():
              cyl("fitting", 0.012, 0.05, (0, -0.1, -0.16), "brass", verts=10)]
     join("NailGun", parts, origin=(0, -0.08, -0.06))
     bake_and_export(os.path.join(OUT_PROPS, "nail_gun.glb"), 512)
+
+    clear_scene()
+    # heavy adjustable wrench: long handle along Z, open jaw at the top
+    parts = [box("handle", (0.035, 0.018, 0.34), (0, 0, 0.0), "steel", 0.006),
+             box("grip", (0.042, 0.024, 0.16), (0, 0, -0.11), "red_paint", 0.008),
+             box("head", (0.09, 0.03, 0.07), (0.01, 0, 0.2), "steel", 0.008),
+             box("jaw_fixed", (0.025, 0.03, 0.07), (-0.035, 0, 0.26), "steel", 0.006),
+             box("jaw_move", (0.025, 0.03, 0.06), (0.045, 0, 0.255), "steel", 0.006),
+             cyl("worm", 0.012, 0.05, (0.0, 0, 0.215), "brass", axis="X", verts=10)]
+    join("Wrench", parts, origin=(0, 0, -0.12))
+    bake_and_export(os.path.join(OUT_PROPS, "wrench.glb"), 512)
 
 
 if __name__ == "__main__":

@@ -108,15 +108,19 @@ a **cable** (30 m): walk too far and it stops you, go much further and it pulls 
 **Wheels:** a fallen wheel is gone. Buy a new one at a station, carry it from the cargo car, **lift it into place** (animated),
 then **bolt it on with 3 hammer hits**.
 
-**Train body (cover):** at full health every car is fully covered: walls, roofs, doors and the locomotive's boiler plates.
-Damage makes pieces **break off and fly away**, leaving the bare frame (and gaps you can fall out of). To fix one:
-**pick up the fallen piece** (free) or take a **new panel** from the cargo car (2 scrap), carry it to the ghost, place it, then
-- **wood** panels: **nail** them (anywhere)
-- **metal** panels (boiler plates, cab walls, roofs): **weld** them, **only at a station**.
+### Train damage: two bars (100 % = 50 % body + 50 % mechanics)
+HUD top centre: 🟩 **body bar** and 🟧 **mechanics bar**, plus a line with engine / chassis / wheels.
+Every hit is split **half to the body, half to the mechanics** (two random wheels wear, the chassis bends, the engine suffers).
 
-So a train that lost its metal plates has to **limp to the next station**.
+| Part | Share | What damage does | How to fix |
+|------|-------|------------------|------------|
+| **Body / cover** | 50 % | Panels, roofs, doors, boiler plates **break off and fly away** (bare frame, gaps you can fall out of) | Pick up the piece or take a new panel (2 scrap), place it: **wood → nails** (anywhere), **metal → weld** (station) |
+| **Wheels** (6) | 15 % (2.5 % each) | Each wheel has its own wear. At **2.5 % (5 % of the mechanics bar)** it **comes off and drops to the ground**; each lost wheel = **-1/6 speed** (with N wheels: -1/N) | **Wrench**: tighten a loose wheel before it falls. Lost: buy a new wheel, lift it in, bolt with the hammer |
+| **Engine** | 20 % | Less power (up to -50 % speed). Big damage when the engine **goes into water** (crash at a broken bridge) | **Engine oil** at the furnace [Q] (shop) |
+| **Chassis** | 15 % | Only a value (it never falls off), makes the train drag (up to -30 % speed) | **Welder at a station**: glowing weld points on the frame |
+
 **Doors** open with E. The locomotive cab has **two front doors** (one each side of the boiler) that swing forward: open them
-to see where you're going and to walk out along the running boards to the front of the engine.
+to see where you're going and walk out along the wide running boards to the front of the engine.
 
 ### The train (reference: GWR 7822 "Foxcote Manor" photos)
 Realistic steam engine look: black smokebox with a numberplate, green boiler and cab with orange-black lining,

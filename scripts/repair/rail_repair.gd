@@ -23,14 +23,14 @@ func setup(t: Track, piece_index: int) -> void:
 
 func _ready() -> void:
 	_label = Build.label(self, "", Vector3(0, 2.0, 0), 40)
-	Build.box(self, Vector3(2.8, 0.03, Track.PIECE_LENGTH - 0.2), Vector3(0, 0.0, 0), Color(1.0, 0.45, 0.1, 0.3))
+	Build.box(self, Vector3(2.8, 0.03, Track.PIECE_LENGTH - 0.2), Vector3(0, Track.SLEEPER_Y - 0.07, 0), Color(1.0, 0.45, 0.1, 0.3))
 	for k in 2:
 		var z := (k - 0.5) * Track.PIECE_LENGTH * 0.5
-		var slot := PlaceSlot.create(self, "plank", Vector3(0, 0.06, z), Vector3(2.4, 0.5, 0.6), Props.instance("plank"))
+		var slot := PlaceSlot.create(self, "plank", Vector3(0, Track.SLEEPER_Y, z), Vector3(2.4, 0.5, 0.6), Props.instance("plank"))
 		slot.placed.connect(_on_plank_placed.bind(z))
 	for side in 2:
 		var x := (side - 0.5) * Track.GAUGE
-		var slot := PlaceSlot.create(self, "rail", Vector3(x, 0.2, 0), Vector3(0.45, 0.45, Track.PIECE_LENGTH - 0.6), Props.instance("rail"))
+		var slot := PlaceSlot.create(self, "rail", Vector3(x, Track.RAIL_Y, 0), Vector3(0.45, 0.45, Track.PIECE_LENGTH - 0.6), Props.instance("rail"))
 		slot.enabled = false
 		slot.hint = "Place and nail both planks first"
 		slot.placed.connect(_on_rail_placed.bind(x))
@@ -60,14 +60,14 @@ func _update_label() -> void:
 
 func _on_plank_placed(_player: Node, z: float) -> void:
 	var plank := Props.instance("plank")
-	plank.position = Vector3(0, 0.06, z)
+	plank.position = Vector3(0, Track.SLEEPER_Y, z)
 	add_child(plank)
 	plank.scale = Vector3.ONE * 0.6
 	create_tween().tween_property(plank, "scale", Vector3.ONE, 0.15)
 	_planks_placed += 1
 	for x in [-0.95, 0.95]:
 		var nail := NailSpot.new()
-		nail.position = Vector3(x, 0.08, z)
+		nail.position = Vector3(x, Track.SLEEPER_Y + 0.02, z)
 		add_child(nail)
 		nail.done.connect(_on_nail_done)
 	_update_label()
@@ -83,13 +83,13 @@ func _on_nail_done() -> void:
 
 func _on_rail_placed(_player: Node, x: float) -> void:
 	var rail := Props.instance("rail")
-	rail.position = Vector3(x, 0.6, 0)
+	rail.position = Vector3(x, Track.RAIL_Y + 0.4, 0)
 	add_child(rail)
-	create_tween().tween_property(rail, "position:y", 0.2, 0.2).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	create_tween().tween_property(rail, "position:y", Track.RAIL_Y, 0.2).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	for z in [-Track.PIECE_LENGTH * 0.5 + 0.25, Track.PIECE_LENGTH * 0.5 - 0.25]:
 		var bolt := NailSpot.new()
 		bolt.style = "bolt"
-		bolt.position = Vector3(x + (0.06 if x > 0 else -0.06), 0.2, z)
+		bolt.position = Vector3(x + (0.06 if x > 0 else -0.06), Track.RAIL_Y, z)
 		if x < 0:
 			bolt.rotation.y = PI
 		add_child(bolt)

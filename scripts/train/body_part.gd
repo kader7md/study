@@ -35,7 +35,10 @@ func setup(t: Train, car_body: Node3D, mesh_node: MeshInstance3D) -> void:
 	_body = StaticBody3D.new()
 	_body.collision_layer = Build.LAYER_TRAIN
 	node.add_child(_body)
-	Build.collider(_body, aabb.size.max(Vector3(0.08, 0.08, 0.08)), aabb.get_center())
+	# round pieces (boiler plates) are wide AND tall: a box would block the walkway beside the boiler,
+	# so they rely on the boiler's own collider instead
+	if not (aabb.size.x > 1.2 and aabb.size.y > 1.2):
+		Build.collider(_body, aabb.size.max(Vector3(0.08, 0.08, 0.08)), aabb.get_center())
 	if is_door:
 		_door_spot = ActionSpot.create(node, aabb.size + Vector3(0.2, 0.0, 0.0), aabb.get_center(),
 			func(_p): return "%s door  [E]" % ("Close" if door_open else "Open"),
@@ -43,7 +46,7 @@ func setup(t: Train, car_body: Node3D, mesh_node: MeshInstance3D) -> void:
 
 
 func value() -> float:
-	return 100.0 / train.parts.size()
+	return Train.BODY_MAX / train.parts.size()
 
 
 func toggle_door() -> void:

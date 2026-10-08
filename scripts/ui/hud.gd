@@ -6,13 +6,15 @@ extends CanvasLayer
 ## bottom right the impostor's sabotage panel, plus the station shop window.
 
 const HELP := """[F1] help   WASD move · Shift sprint · Space jump · E use / place · Q alt · G put item back
-Tools: 1 hammer · 2 nail gun · 3 welder (take the torch from a STATION welder) · LMB use tool
+Tools: 1 hammer · 2 wrench (tighten loose wheels) · 3 nail gun · 4 welder (torch from a STATION welder) · LMB use
 Broken track: take planks → place → nail → take rails → place → bolt the joints · Cab front doors: E
 F2 play as impostor ([Tab] sabotage menu) · F3 world sabotage on/off · F5 last checkpoint · F6 new game"""
 
 var player: Player
 
 var _train_bar: ProgressBar
+var _mech_bar: ProgressBar
+var _damage_label: Label
 var _progress_bar: ProgressBar
 var _progress_label: Label
 var _status_label: Label
@@ -42,7 +44,13 @@ func _ready() -> void:
 	var top := VBoxContainer.new()
 	root.add_child(top)
 	_place(top, 0.5, 0.0, Vector2(-260, 12), Vector2(520, 0))
-	_train_bar = _bar(top, Color(0.2, 0.75, 0.3), Vector2(520, 22))
+	# train health = body (green, the cover pieces) + mechanics (orange: wheels, engine, chassis), 50 % each
+	var bars := HBoxContainer.new()
+	top.add_child(bars)
+	_train_bar = _bar(bars, Color(0.2, 0.75, 0.3), Vector2(258, 20))
+	_mech_bar = _bar(bars, Color(0.95, 0.55, 0.15), Vector2(258, 20))
+	_damage_label = _label(top, "", 15)
+	_damage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_progress_bar = _bar(top, Color(0.25, 0.55, 0.95), Vector2(520, 14))
 	_progress_label = _label(top, "", 18)
 	_progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -114,7 +122,17 @@ func _process(_delta: float) -> void:
 	var train := Game.train
 	var track := Game.track
 	if train and track:
-		_train_bar.value = train.health
+		_train_bar.value = train.body_health / Train.BODY_MAX * 100.0
+		_mech_bar.value = train.mech_health() / Train.MECH_MAX * 100.0
+		var worst := 0.0
+		for w in train.wheel_wear:
+			worst = maxf(worst, w)
+		_damage_label.text = "Body %d%%   ·   Engine %d%%  ·  Chassis %d%%  ·  Wheels %d/%d%s" % [
+			int(train.body_health / Train.BODY_MAX * 100.0),
+			int(100.0 - train.engine_damage / Train.ENGINE_MAX * 100.0),
+			int(100.0 - train.chassis_damage / Train.CHASSIS_MAX * 100.0),
+			train.wheels, Train.MAX_WHEELS,
+			("  (a wheel is %d%% loose!)" % int(worst / Train.WHEEL_LIMIT * 100.0)) if worst > 0.0 else ""]
 		var next := mini(Game.next_station, Game.STATION_COUNT)
 		var from := track.station_distances[next - 1]
 		var to := track.station_distances[next]
@@ -125,7 +143,7 @@ func _process(_delta: float) -> void:
 		else:
 			_progress_label.text = "Next: Station %d / %d · %d m" % [next, Game.STATION_COUNT, maxi(int(to - center), 0)]
 		var wind := "\n❄ FREEZING WIND" if Game.wind_active else ""
-		var oil := "\nEngine oiled %ds" % int(train.oil_buff) if train.oil_buff > 0.0 else ""
+		var oil := ""
 		_status_label.text = "Speed %d km/h · Lever %s\nFuel %d%% · Wheels %d/%d%s%s" % [
 			int(absf(train.speed) * 3.6), train.lever_text(), int(train.fuel), train.wheels, Train.MAX_WHEELS, wind, oil]
 

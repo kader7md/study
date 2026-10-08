@@ -17,8 +17,8 @@ const HAMMER_DAMAGE := 20.0
 const NAIL_GUN_DAMAGE := 8.0
 const WARM_RADIUS := 7.0
 const SKIN := Color(1.0, 0.76, 0.6)
-const TOOLS := ["hammer", "nail_gun", "welder"]
-const TOOL_NAMES := {"hammer": "Hammer", "welder": "Welder", "nail_gun": "Nail gun"}
+const TOOLS := ["hammer", "wrench", "nail_gun", "welder"]
+const TOOL_NAMES := {"hammer": "Hammer", "wrench": "Wrench", "welder": "Welder", "nail_gun": "Nail gun"}
 
 var health := 100.0
 var frost := 0.0
@@ -61,7 +61,7 @@ func _ready() -> void:
 	# Train cars are carried by our own ride logic (exact, also on hills); other platforms the normal way
 	platform_floor_layers = Build.LAYER_WORLD
 	var shape := CapsuleShape3D.new()
-	shape.radius = 0.35
+	shape.radius = 0.28
 	shape.height = 1.8
 	var cs := CollisionShape3D.new()
 	cs.shape = shape
@@ -125,7 +125,10 @@ func _build_hands() -> void:
 	welder.scale = Vector3.ONE * 0.8
 	var gun := Props.instance("nail_gun")
 	gun.position = Vector3(0, 0.0, -0.04)
-	for pair in [["hammer", hammer], ["welder", welder], ["nail_gun", gun]]:
+	var wrench := Props.instance("wrench")
+	wrench.rotation = Vector3(-0.3, 0.2, 0.15)
+	wrench.scale = Vector3.ONE * 0.8
+	for pair in [["hammer", hammer], ["wrench", wrench], ["welder", welder], ["nail_gun", gun]]:
 		_right.add_child(pair[1])
 		_tool_models[pair[0]] = pair[1]
 
@@ -167,7 +170,7 @@ func _arm(pivot: Node3D) -> void:
 
 
 func available_tools() -> Array[String]:
-	var list: Array[String] = ["hammer"]
+	var list: Array[String] = ["hammer", "wrench"]
 	if Game.has("nail_gun"):
 		list.append("nail_gun")
 	if is_instance_valid(welder_source):
@@ -341,6 +344,15 @@ func use_tool() -> void:
 			return
 		if hit and hit.has_method("take_hit"):
 			hit.take_hit(HAMMER_DAMAGE)
+	elif current_tool == "wrench":
+		_tool_cd = 0.35
+		var tween := create_tween()
+		tween.tween_property(_right, "rotation:z", -0.9, 0.12)
+		tween.tween_property(_right, "rotation:z", 0.0, 0.18)
+		if hit is Interactable and hit.on_tool_hit("wrench", self):
+			return
+		if hit and hit.has_method("take_hit"):
+			hit.take_hit(HAMMER_DAMAGE * 0.75)
 	elif current_tool == "nail_gun":
 		_tool_cd = 0.25
 		var tween := create_tween()

@@ -158,6 +158,41 @@ func _run() -> void:
 		slot.on_tool_hit("hammer", player)
 	check(train.wheel_state(missing) == 0 and train.wheels == wheels_before, "3 hammer hits bolt it on")
 
+	print("Damage model: body bar + mechanics bar")
+	train.full_repair()
+	check(is_equal_approx(train.health, 100.0) and is_equal_approx(train.body_health, 50.0) and is_equal_approx(train.mech_health(), 50.0), "health = body 50 + mechanics 50")
+	train.take_damage(20.0)
+	check(is_equal_approx(train.body_health, 40.0), "half the damage hits the body (%.1f)" % train.body_health)
+	check(is_equal_approx(train.mech_health(), 40.0) and train.engine_damage > 0.0 and train.chassis_damage > 0.0, "the other half hits wheels, engine and chassis (mech %.1f)" % train.mech_health())
+	train.full_repair()
+	var w0 := -1
+	for i in Train.MAX_WHEELS:
+		if train.wheel_state(i) == 0 and w0 == -1:
+			w0 = i
+	train.add_wheel_wear(w0, 2.0)
+	check(train.wheel_state(w0) == 0, "a worn wheel stays on below its limit")
+	var wear0: float = train.wheel_wear[w0]
+	train.wheel_slot(w0).on_tool_hit("wrench", player)
+	check(train.wheel_wear[w0] < wear0, "the wrench tightens a loose wheel (%.1f → %.1f)" % [wear0, train.wheel_wear[w0]])
+	var top_all := train.max_speed_now()
+	var n_before := train.wheels
+	train.add_wheel_wear(w0, Train.WHEEL_LIMIT)
+	check(train.wheel_state(w0) == 1 and train.wheels == n_before - 1, "at 2.5 wear (5 % of the mechanics bar) the wheel comes off")
+	check(absf(train.max_speed_now() / top_all - float(train.wheels) / n_before) < 0.02, "each lost wheel takes 1/%d of the speed" % n_before)
+	await _frames(2)
+	check(main.find_children("*", "RigidBody3D", true, false).size() > 0, "the lost wheel drops to the ground")
+	Game.add("wheel", 1)
+	train.take_item(player, "wheel")
+	train.wheel_slot(w0).interact(player)
+	for k in Train.WHEEL_BOLT_HITS:
+		train.wheel_slot(w0).on_tool_hit("hammer", player)
+	check(train.wheel_state(w0) == 0 and player.carried_item == "", "new wheel fitted and bolted")
+	train.engine_damage = 15.0
+	Game.add("engine_oil", 1)
+	var top_hurt := train.max_speed_now()
+	check(train.oil_engine() and is_equal_approx(train.engine_damage, 5.0) and train.max_speed_now() > top_hurt, "engine oil repairs the engine and gives power back")
+	train.full_repair()
+
 	print("Sabotage")
 	var sab := Game.sabotage
 	var hp := train.health
@@ -297,6 +332,12 @@ func _run() -> void:
 	for seam in train.find_children("*", "WeldSeam", true, false).filter(func(n): return n.has_meta("part") and n.get_meta("part") == high):
 		player.weld_tick(seam, WeldSeam.WELD_TIME + 0.1)
 	check(high.attached and train.health > hp_station, "another metal panel welded at the station")
+	train.chassis_damage = 10.0
+	var chassis: Array = train.cars[0].find_children("*", "ChassisSpot", true, false)
+	check(chassis.size() == 2, "the chassis has weld points")
+	for k in 10:
+		player.weld_tick(chassis[0], 1.0)
+	check(train.chassis_damage == 0.0, "the chassis is welded at the station")
 	var gold := Game.count("gold")
 	Game.buy("nails")
 	check(Game.count("gold") == gold - Game.SHOP.nails.price, "shop takes gold")
@@ -328,7 +369,7 @@ func _run() -> void:
 	train.lever = 0
 	await _wait_until(func(): return train.is_stopped(), 20.0)
 	_clear_gaps(train.distance, train.distance + 300.0)
-	train.health = 100.0
+	train.full_repair()
 	train.fuel = 100.0
 	var car := train.cars[2]
 	player.global_position = car.global_position + car.global_basis.y * (Train.FLOOR_HEIGHT + 0.3) - car.global_basis.x * 0.3
@@ -345,6 +386,29 @@ func _run() -> void:
 		print("    debug: ", local_before, " -> ", local_after, " floor=", player.is_on_floor(), " wheels=", train.wheels)
 	check(train.speed > 5.0, "train is moving fast (%.1f m/s)" % train.speed)
 	check(local_before.distance_to(local_after) < 1.5, "player stays in place on the moving car (drift %.2f m)" % local_before.distance_to(local_after))
+
+	print("Walk from the cab to the front of the engine")
+	train.lever = 0
+	await _wait_until(func(): return train.is_stopped(), 20.0)
+	train.weld_full()
+	var loco := train.cars[0]
+	var front_door: BodyPart = null
+	for p in train.parts:
+		if p.is_door and p.car == loco and p.node.get_aabb().size.x > p.node.get_aabb().size.z and p._home.origin.x > 0:
+			front_door = p
+	front_door.toggle_door()
+	await _wait(0.5)
+	player.global_position = loco.to_global(Vector3(1.15, Train.FLOOR_HEIGHT + 0.1, 1.3))
+	player.velocity = Vector3.ZERO
+	player.global_basis = Basis.looking_at(-loco.global_basis.z, Vector3.UP)
+	await _wait(0.3)
+	Engine.time_scale = 1.0
+	Input.action_press("move_forward")
+	await _wait(1.1)
+	Input.action_release("move_forward")
+	Engine.time_scale = 4.0
+	var where := loco.to_local(player.global_position)
+	check(where.z < -1.5 and where.y > Train.FLOOR_HEIGHT - 0.2, "walk through the cab front door along the running board (now at %.1f m)" % -where.z)
 
 	print("Final station")
 	train.lever = 0

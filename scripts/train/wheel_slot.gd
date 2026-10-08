@@ -1,7 +1,7 @@
 class_name WheelSlot
 extends Interactable
 ## Where a locomotive wheel goes. Missing: carry a wheel here and place it [E].
-## Placed: bolt it on with the hammer (3 hits).
+## Placed: bolt it on with the hammer (3 hits). Fitted but worn: tighten it with the wrench before it falls off.
 
 var train: Train
 var index := 0
@@ -16,7 +16,10 @@ func get_prompt(player: Node) -> String:
 			return "Missing wheel: carry a wheel here (buy at a station, take from the cargo car)"
 		2:
 			return "Bolt the wheel: hammer [LMB] %d/%d" % [_hits, Train.WHEEL_BOLT_HITS]
-	return ""
+	var wear: float = train.wheel_wear[index] / Train.WHEEL_LIMIT * 100.0
+	if wear > 0.0:
+		return "Wheel worn %d%%: tighten it with the wrench [LMB] before it falls off" % int(wear)
+	return "Wheel OK"
 
 
 func interact(player: Node) -> void:
@@ -27,6 +30,8 @@ func interact(player: Node) -> void:
 
 
 func on_tool_hit(tool: String, _player: Node) -> bool:
+	if tool == "wrench" and train.wheel_state(index) == 0:
+		return train.tighten_wheel(index)
 	if train.wheel_state(index) != 2 or not tool in ["hammer", "nail_gun"]:
 		return false
 	_hits += 1

@@ -12,6 +12,7 @@ const PATHS := {
 	"hammer": "res://assets/models/props/hammer.glb",
 	"welder": "res://assets/models/props/welder_torch.glb",
 	"nail_gun": "res://assets/models/props/nail_gun.glb",
+	"wrench": "res://assets/models/props/wrench.glb",
 	"welder_machine": "res://assets/models/props/welder_machine.glb",
 }
 

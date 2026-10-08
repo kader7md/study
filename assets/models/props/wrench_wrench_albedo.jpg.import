@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cnbbglti30uhv"
-path="res://.godot/imported/cargo_wagon_cargo_wagon_albedo.jpg-ac37159a0273acdbbba2a281e86572aa.ctex"
+uid="uid://d2xgtyontao1v"
+path="res://.godot/imported/wrench_wrench_albedo.jpg-6a643f8d8b8d4f11bf4b617b02b87caa.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "a5f778ac0fad18681585f1e65d6888a5"
+"md5": "355947d4e90b981e0adc8152ab0b3250"
 }
 
 [deps]
 
-source_file="res://assets/models/train/cargo_wagon_cargo_wagon_albedo.jpg"
-dest_files=["res://.godot/imported/cargo_wagon_cargo_wagon_albedo.jpg-ac37159a0273acdbbba2a281e86572aa.ctex"]
+source_file="res://assets/models/props/wrench_wrench_albedo.jpg"
+dest_files=["res://.godot/imported/wrench_wrench_albedo.jpg-6a643f8d8b8d4f11bf4b617b02b87caa.ctex"]
 
 [params]
 

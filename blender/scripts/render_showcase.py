@@ -73,19 +73,19 @@ def track(length=60):
     b = bpy.data.materials.new("ballast")
     b.use_nodes = True
     b.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.22, 0.2, 0.18, 1)
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, -0.1))
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, -0.35))
     o = bpy.context.active_object
     o.scale = (3.4, length, 0.25)
     o.data.materials.append(b)
     y = -length / 2
     while y < length / 2:
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(0, y, 0.06))
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(0, y, -0.16))
         o = bpy.context.active_object
         o.scale = (2.4, 0.25, 0.12)
         o.data.materials.append(m)
         y += 0.65
-    for x in (-0.75, 0.75):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(x, 0, 0.2))
+    for x in (-0.85, 0.85):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(x, 0, -0.025))
         o = bpy.context.active_object
         o.scale = (0.08, length, 0.15)
         o.data.materials.append(r)

@@ -15,7 +15,11 @@ const LEAD_IN := 80.0
 const TAIL := 160.0
 const STATION_LENGTH := 60.0
 const POINT_STEP := 30.0
-const GAUGE := 1.5
+## Distance between the two rails (matches the train's wheels at x = ±0.85).
+const GAUGE := 1.7
+## Rail and sleeper heights relative to the track line (rail TOP is at +0.05, where the wheels touch).
+const RAIL_Y := -0.025
+const SLEEPER_Y := -0.16
 const WATER_LEVEL := -4.0
 ## A piece is a bridge when the natural ground under it is this far below the rails.
 const BRIDGE_DEPTH := 2.5
@@ -394,11 +398,11 @@ func _set_piece_visible(index: int, visible_now: bool) -> void:
 	var t := global_transform.affine_inverse() * transform_at(piece_center(index))
 	var hide := Basis().scaled(Vector3.ZERO)
 	for side in 2:
-		var rail := t.translated_local(Vector3((side - 0.5) * GAUGE, 0.2, 0))
+		var rail := t.translated_local(Vector3((side - 0.5) * GAUGE, RAIL_Y, 0))
 		if not visible_now:
 			rail.basis = hide
 		_rails.set_instance_transform(index * 2 + side, rail)
-		var sleeper := t.translated_local(Vector3(0, 0.06, (side - 0.5) * PIECE_LENGTH * 0.5))
+		var sleeper := t.translated_local(Vector3(0, SLEEPER_Y, (side - 0.5) * PIECE_LENGTH * 0.5))
 		if not visible_now:
 			sleeper.basis = hide
 		_sleepers.set_instance_transform(index * 2 + side, sleeper)
@@ -414,13 +418,13 @@ func _build_bridges() -> void:
 		var d := piece_center(i)
 		var t := global_transform.affine_inverse() * transform_at(d)
 		for side in [-1.0, 1.0]:
-			beams.append(t.translated_local(Vector3(side * 1.25, -0.15, 0)))
+			beams.append(t.translated_local(Vector3(side * 1.25, -0.37, 0)))
 		if i % 2 == 0:
-			var top := point_at(d).y - 0.3
+			var top := point_at(d).y - 0.52
 			var bottom := natural_height(d, 0.0) - 1.0
 			var height := maxf(top - bottom, 0.5)
 			for side in [-1.0, 1.0]:
-				var post := t.translated_local(Vector3(side * 1.1, -0.3 - height * 0.5, 0))
+				var post := t.translated_local(Vector3(side * 1.1, -0.52 - height * 0.5, 0))
 				post.basis = Basis().scaled(Vector3(1, height, 1))
 				posts.append(post)
 	var beam_mesh := BoxMesh.new()
@@ -441,6 +445,6 @@ func _build_bridges() -> void:
 	for i in piece_count:
 		if is_bridge(i):
 			var cs := Build.collider(deck, Vector3(2.8, 0.2, PIECE_LENGTH), Vector3.ZERO)
-			cs.transform = global_transform.affine_inverse() * transform_at(piece_center(i)).translated_local(Vector3(0, -0.05, 0))
+			cs.transform = global_transform.affine_inverse() * transform_at(piece_center(i)).translated_local(Vector3(0, -0.2, 0))
 			cs.set_meta("piece", i)
 			_deck_shapes[i] = cs

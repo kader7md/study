@@ -15,13 +15,13 @@ signal ui_changed(open: bool)
 const STATION_COUNT := 5
 const SAVE_PATH := "user://checkpoint.json"
 
-const START_INVENTORY := {"coal": 14, "wood": 10, "scrap": 10, "gold": 15, "nails": 20, "wheel": 1}
+const START_INVENTORY := {"coal": 14, "wood": 10, "scrap": 10, "gold": 15, "nails": 20, "wheel": 1, "engine_oil": 1}
 
 ## Station shop. "gives" is added to the crew inventory.
 const SHOP := {
 	"nails": {"label": "Nails x10", "price": 5, "gives": {"nails": 10}},
 	"wheel": {"label": "Train wheel", "price": 8, "gives": {"wheel": 1}},
-	"engine_oil": {"label": "Engine oil", "price": 6, "gives": {"engine_oil": 1}},
+	"engine_oil": {"label": "Engine oil (repairs the engine)", "price": 6, "gives": {"engine_oil": 1}},
 	"nail_gun": {"label": "Nail gun (faster rail repair)", "price": 15, "gives": {"nail_gun": 1}},
 	"medkit": {"label": "Medkit", "price": 7, "gives": {"medkit": 1}},
 	"grappler": {"label": "Grappling hook", "price": 12, "gives": {"grappler": 1}},
@@ -31,7 +31,7 @@ const SHOP := {
 const INPUTS := {
 	"move_forward": [KEY_W], "move_back": [KEY_S], "move_left": [KEY_A], "move_right": [KEY_D],
 	"jump": [KEY_SPACE], "sprint": [KEY_SHIFT], "interact": [KEY_E], "interact_alt": [KEY_Q],
-	"tool_1": [KEY_1], "tool_2": [KEY_2], "tool_3": [KEY_3], "drop": [KEY_G],
+	"tool_1": [KEY_1], "tool_2": [KEY_2], "tool_3": [KEY_3], "tool_4": [KEY_4], "drop": [KEY_G],
 	"sabotage_menu": [KEY_TAB],
 	"sabotage_1": [KEY_1], "sabotage_2": [KEY_2], "sabotage_3": [KEY_3], "sabotage_4": [KEY_4],
 	"toggle_role": [KEY_F2], "toggle_world_sabotage": [KEY_F3],
