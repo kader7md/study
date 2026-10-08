@@ -4,8 +4,8 @@ extends Node3D
 ##   1. place 2 wooden planks (sleepers)      → carry planks from the cargo car
 ##   2. nail each plank down (2 nails each)   → hammer (3 hits) or nail gun (1 shot)
 ##   3. place the 2 steel rails                → carry rails from the cargo car
-##   4. weld both ends of each rail            → welder (hold LMB), cable from the train's welder machine
-## When every joint is welded the piece is fixed and the train can pass.
+##   4. bolt a fishplate at both ends of each rail → hammer (3 hits) or nail gun (1 shot)
+## When every joint is bolted the piece is fixed and the train can pass. (Welding only exists at stations.)
 
 var track: Track
 var index := 0
@@ -54,7 +54,7 @@ func _update_label() -> void:
 		1: lines.append("1/4 Place planks (%d/2)" % _planks_placed)
 		2: lines.append("2/4 Nail the planks (%d left)" % _nails_left)
 		3: lines.append("3/4 Place the rails")
-		4: lines.append("4/4 Weld the rails (%d joints left)" % _seams_left)
+		4: lines.append("4/4 Bolt the rail joints (%d left)" % _seams_left)
 	_label.text = "\n".join(lines)
 
 
@@ -86,11 +86,14 @@ func _on_rail_placed(_player: Node, x: float) -> void:
 	rail.position = Vector3(x, 0.6, 0)
 	add_child(rail)
 	create_tween().tween_property(rail, "position:y", 0.2, 0.2).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	for z in [-Track.PIECE_LENGTH * 0.5 + 0.1, Track.PIECE_LENGTH * 0.5 - 0.1]:
-		var seam := WeldSeam.new()
-		seam.position = Vector3(x, 0.22, z)
-		add_child(seam)
-		seam.done.connect(_on_seam_done)
+	for z in [-Track.PIECE_LENGTH * 0.5 + 0.25, Track.PIECE_LENGTH * 0.5 - 0.25]:
+		var bolt := NailSpot.new()
+		bolt.style = "bolt"
+		bolt.position = Vector3(x + (0.06 if x > 0 else -0.06), 0.2, z)
+		if x < 0:
+			bolt.rotation.y = PI
+		add_child(bolt)
+		bolt.done.connect(_on_seam_done)
 	_update_label()
 
 

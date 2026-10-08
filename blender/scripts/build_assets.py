@@ -1,0 +1,825 @@
+"""Builds the Trust Issues train, repair items and tools in Blender, bakes worn PBR-style textures, exports .glb.
+
+Run headless:
+    blender --background --python blender/scripts/build_assets.py -- <repo_root> [only=train,props]
+Or open Blender → Scripting tab → open this file → Run Script.
+
+Style: stylized realism (Sea of Thieves / Valheim direction): real proportions, rivets, bolts, iron straps,
+worn paint with chipped edges, dirt in the corners, rust, wood grain. The wear is made with shader nodes and then
+BAKED into one texture per model (Cycles), so it also shows up in Godot.
+
+Axes: Blender +Y = front of the train (becomes -Z in Godot), Z up. Rail top is Z = 0.
+Train deck (walkable floor) top is Z = 1.35 = Train.FLOOR_HEIGHT in train.gd.
+Names the game relies on: Wheel_0..5 (locomotive), Panel_<wood|metal>_<n> and Door_<wood|metal>_<n> (breakable cover).
+"""
+import math
+import os
+import random
+import sys
+
+import bpy
+
+argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+ROOT = argv[0] if argv else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ONLY = next((a.split("=", 1)[1].split(",") for a in argv if a.startswith("only=")), None)
+OUT_TRAIN = os.path.join(ROOT, "assets", "models", "train")
+OUT_PROPS = os.path.join(ROOT, "assets", "models", "props")
+os.makedirs(OUT_TRAIN, exist_ok=True)
+os.makedirs(OUT_PROPS, exist_ok=True)
+
+FLOOR = 1.35
+random.seed(7)
+
+# --- Materials (procedural wear → baked) ---------------------------------------------
+# kind: paint (chipped edges), iron (rust), brass (tarnish), wood (grain), plain, canvas, glass, lamp, rubber
+MATS = {
+    "red_paint": ("paint", (0.42, 0.07, 0.05), 0.35, 0.45),
+    "green_paint": ("paint", (0.12, 0.27, 0.18), 0.3, 0.5),
+    "black_paint": ("paint", (0.035, 0.035, 0.04), 0.5, 0.55),
+    "cream_paint": ("paint", (0.72, 0.66, 0.52), 0.2, 0.6),
+    "orange_paint": ("paint", (0.75, 0.3, 0.05), 0.3, 0.5),
+    "iron": ("iron", (0.13, 0.13, 0.14), 0.85, 0.6),
+    "steel": ("iron", (0.45, 0.46, 0.48), 0.95, 0.35),
+    "rust": ("iron", (0.32, 0.13, 0.06), 0.4, 0.85),
+    "brass": ("brass", (0.78, 0.55, 0.2), 1.0, 0.3),
+    "wood": ("wood", (0.36, 0.21, 0.11), 0.0, 0.8),
+    "wood_dark": ("wood", (0.2, 0.12, 0.06), 0.0, 0.85),
+    "wood_grey": ("wood", (0.33, 0.29, 0.24), 0.0, 0.9),
+    "canvas": ("canvas", (0.62, 0.55, 0.4), 0.0, 0.95),
+    "glass": ("plain", (0.25, 0.35, 0.38), 0.0, 0.08),
+    "lamp": ("lamp", (1.0, 0.85, 0.5), 0.0, 0.2),
+    "rubber": ("plain", (0.04, 0.04, 0.045), 0.0, 0.8),
+    "leather": ("canvas", (0.23, 0.12, 0.06), 0.0, 0.7),
+    "coal": ("plain", (0.03, 0.03, 0.035), 0.0, 0.4),
+    "blue_paint": ("paint", (0.08, 0.18, 0.35), 0.3, 0.5),
+    "dial": ("plain", (0.85, 0.82, 0.72), 0.0, 0.4),
+    # GWR-style locomotive livery (reference: 7822 "Foxcote Manor" photos)
+    "loco_green": ("paint", (0.035, 0.13, 0.06), 0.3, 0.35),
+    "lining": ("paint", (0.75, 0.38, 0.06), 0.2, 0.4),
+    "copper": ("brass", (0.62, 0.27, 0.13), 1.0, 0.3),
+    "buffer_red": ("paint", (0.5, 0.04, 0.03), 0.3, 0.45),
+    "van_brown": ("paint", (0.25, 0.09, 0.05), 0.4, 0.6),
+    "roof_grey": ("paint", (0.42, 0.42, 0.4), 0.3, 0.7),
+    # nature
+    "bark": ("wood", (0.17, 0.11, 0.07), 0.0, 0.95),
+    "birch_bark": ("bark_birch", (0.82, 0.8, 0.74), 0.0, 0.8),
+    "pine_needles": ("foliage", (0.05, 0.15, 0.07), 0.0, 0.85),
+    "oak_leaves": ("foliage", (0.13, 0.25, 0.06), 0.0, 0.85),
+    "birch_leaves": ("foliage", (0.3, 0.42, 0.1), 0.0, 0.85),
+    "bush_leaves": ("foliage", (0.09, 0.21, 0.06), 0.0, 0.85),
+    "rock": ("rock", (0.3, 0.29, 0.27), 0.0, 0.9),
+    "cliff": ("rock", (0.36, 0.31, 0.25), 0.0, 0.9),
+    "snow": ("plain", (0.88, 0.9, 0.94), 0.0, 0.6),
+}
+_mats = {}
+
+
+def _n(nt, kind, loc=(0, 0)):
+    node = nt.nodes.new(kind)
+    node.location = loc
+    return node
+
+
+def _mix(nt, a, b, fac):
+    m = _n(nt, "ShaderNodeMix")
+    m.data_type = "RGBA"
+    nt.links.new(fac, m.inputs[0])
+    if isinstance(a, tuple):
+        m.inputs[6].default_value = (*a, 1.0)
+    else:
+        nt.links.new(a, m.inputs[6])
+    if isinstance(b, tuple):
+        m.inputs[7].default_value = (*b, 1.0)
+    else:
+        nt.links.new(b, m.inputs[7])
+    return m.outputs[2]
+
+
+def _ramp(nt, src, lo, hi):
+    r = _n(nt, "ShaderNodeValToRGB")
+    r.color_ramp.elements[0].position = lo
+    r.color_ramp.elements[1].position = hi
+    nt.links.new(src, r.inputs[0])
+    return r.outputs[0]
+
+
+def _noise(nt, coord, scale, detail=6.0):
+    t = _n(nt, "ShaderNodeTexNoise")
+    t.inputs["Scale"].default_value = scale
+    t.inputs["Detail"].default_value = detail
+    nt.links.new(coord, t.inputs["Vector"])
+    return t.outputs["Fac"]
+
+
+def mat(name):
+    if name in _mats:
+        return _mats[name]
+    kind, base, metal, rough = MATS[name]
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = _n(nt, "ShaderNodeOutputMaterial", (900, 0))
+    bsdf = _n(nt, "ShaderNodeBsdfPrincipled", (600, 0))
+    bsdf.inputs["Metallic"].default_value = metal
+    bsdf.inputs["Roughness"].default_value = rough
+    nt.links.new(bsdf.outputs[0], out.inputs["Surface"])
+    coord = _n(nt, "ShaderNodeTexCoord").outputs["Object"]
+    ao = _n(nt, "ShaderNodeAmbientOcclusion")
+    ao.inputs["Distance"].default_value = 0.25
+    geo = _n(nt, "ShaderNodeNewGeometry")
+    dirt = _ramp(nt, ao.outputs["AO"], 0.35, 1.0)          # 0 in corners, 1 in the open
+    grime = _ramp(nt, _noise(nt, coord, 6.0), 0.45, 0.75)
+
+    color = base
+    if kind == "wood":
+        wave = _n(nt, "ShaderNodeTexWave")
+        wave.bands_direction = "X"
+        wave.inputs["Scale"].default_value = 2.5
+        wave.inputs["Distortion"].default_value = 8.0
+        wave.inputs["Detail"].default_value = 4.0
+        nt.links.new(coord, wave.inputs["Vector"])
+        dark = tuple(c * 0.55 for c in base)
+        light = tuple(min(c * 1.35, 1.0) for c in base)
+        color = _mix(nt, dark, light, _ramp(nt, wave.outputs["Fac"], 0.2, 0.8))
+        color = _mix(nt, color, (0.12, 0.1, 0.08), _ramp(nt, _noise(nt, coord, 25.0), 0.6, 0.8))
+    elif kind == "iron":
+        rust = _ramp(nt, _noise(nt, coord, 4.0, 10.0), 0.55, 0.72)
+        color = _mix(nt, base, (0.3, 0.12, 0.04), rust)
+    elif kind == "brass":
+        color = _mix(nt, base, (0.2, 0.15, 0.06), _ramp(nt, _noise(nt, coord, 12.0), 0.55, 0.8))
+    elif kind == "canvas":
+        color = _mix(nt, base, tuple(c * 0.6 for c in base), _ramp(nt, _noise(nt, coord, 3.0, 4.0), 0.4, 0.75))
+    elif kind == "foliage":
+        color = _mix(nt, tuple(c * 0.6 for c in base), tuple(min(c * 1.5, 1.0) for c in base), _ramp(nt, _noise(nt, coord, 1.5, 4.0), 0.3, 0.7))
+        color = _mix(nt, color, (0.25, 0.22, 0.06), _ramp(nt, _noise(nt, coord, 7.0), 0.65, 0.8))
+    elif kind == "bark_birch":
+        stripes = _ramp(nt, _noise(nt, coord, 9.0, 3.0), 0.62, 0.66)
+        color = _mix(nt, base, (0.06, 0.05, 0.05), stripes)
+    elif kind == "rock":
+        color = _mix(nt, tuple(c * 0.7 for c in base), tuple(min(c * 1.25, 1.0) for c in base), _ramp(nt, _noise(nt, coord, 1.2, 8.0), 0.3, 0.7))
+        sep = _n(nt, "ShaderNodeSeparateXYZ")
+        nt.links.new(geo.outputs["Normal"], sep.inputs[0])
+        moss = _ramp(nt, sep.outputs["Z"], 0.55, 0.85)
+        mul = _n(nt, "ShaderNodeMath")
+        mul.operation = "MULTIPLY"
+        nt.links.new(moss, mul.inputs[0])
+        nt.links.new(_ramp(nt, _noise(nt, coord, 3.0), 0.35, 0.6), mul.inputs[1])
+        color = _mix(nt, color, (0.12, 0.22, 0.05), mul.outputs[0])
+    elif kind == "paint":
+        # subtle colour variation, then bare metal on chipped edges
+        color = _mix(nt, tuple(c * 0.8 for c in base), base, _ramp(nt, _noise(nt, coord, 2.0), 0.3, 0.7))
+        edge = _ramp(nt, geo.outputs["Pointiness"], 0.52, 0.6)
+        chip = _ramp(nt, _noise(nt, coord, 30.0, 2.0), 0.45, 0.6)
+        mul = _n(nt, "ShaderNodeMath")
+        mul.operation = "MULTIPLY"
+        nt.links.new(edge, mul.inputs[0])
+        nt.links.new(chip, mul.inputs[1])
+        color = _mix(nt, color, (0.32, 0.31, 0.3), mul.outputs[0])
+        bsdf.inputs["Metallic"].default_value = 0.15
+    if kind not in ("lamp", "glass"):
+        # dirt and soot collect in corners, streaks of grime everywhere
+        inv = _n(nt, "ShaderNodeInvert")
+        nt.links.new(dirt, inv.inputs["Color"])
+        dirty = tuple(c * 0.3 for c in base) if kind != "brass" else (0.12, 0.08, 0.03)
+        color = _mix(nt, color, dirty, inv.outputs[0])
+        color = _mix(nt, color, (0.08, 0.07, 0.06), _ramp(nt, grime, 0.75, 1.0))
+    if isinstance(color, tuple):
+        rgb = _n(nt, "ShaderNodeRGB")
+        rgb.outputs[0].default_value = (*color, 1.0)
+        color = rgb.outputs[0]
+    # a reroute marks the final colour so the bake step can find it
+    reroute = _n(nt, "NodeReroute")
+    reroute.name = "COLOR_OUT"
+    nt.links.new(color, reroute.inputs[0])
+    nt.links.new(reroute.outputs[0], bsdf.inputs["Base Color"])
+    if kind == "lamp":
+        bsdf.inputs["Emission Color"].default_value = (*base, 1.0)
+        bsdf.inputs["Emission Strength"].default_value = 6.0
+    m["kind"] = kind
+    _mats[name] = m
+    return m
+
+
+# --- Geometry helpers --------------------------------------------------------------------
+
+def _finish(obj, name, material, bevel, segments=2):
+    obj.name = name
+    obj.data.materials.append(mat(material))
+    if bevel > 0.0:
+        mod = obj.modifiers.new("Bevel", "BEVEL")
+        mod.width = bevel
+        mod.segments = segments
+        mod.limit_method = "ANGLE"
+    for poly in obj.data.polygons:
+        poly.use_smooth = True
+    obj.modifiers.new("WN", "WEIGHTED_NORMAL").keep_sharp = True
+    return obj
+
+
+def box(name, size, loc, material, bevel=0.015, rot=(0, 0, 0)):
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=loc, rotation=rot)
+    obj = bpy.context.active_object
+    obj.scale = size
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    return _finish(obj, name, material, bevel)
+
+
+def cyl(name, radius, depth, loc, material, axis="Z", verts=32, bevel=0.01, radius2=None, rot=None):
+    r = {"X": (0, math.pi / 2, 0), "Y": (math.pi / 2, 0, 0), "Z": (0, 0, 0)}[axis] if rot is None else rot
+    if radius2 is None:
+        bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=radius, depth=depth, location=loc, rotation=r)
+    else:
+        bpy.ops.mesh.primitive_cone_add(vertices=verts, radius1=radius, radius2=radius2, depth=depth, location=loc, rotation=r)
+    obj = bpy.context.active_object
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    return _finish(obj, name, material, bevel)
+
+
+def sphere(name, radius, loc, material, scale=(1, 1, 1), seg=24):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=seg, ring_count=seg // 2, radius=radius, location=loc)
+    obj = bpy.context.active_object
+    obj.scale = scale
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    return _finish(obj, name, material, 0.0)
+
+
+def torus(name, major, minor, loc, material, axis="X", seg=32):
+    r = {"X": (0, math.pi / 2, 0), "Y": (math.pi / 2, 0, 0), "Z": (0, 0, 0)}[axis]
+    bpy.ops.mesh.primitive_torus_add(major_radius=major, minor_radius=minor, major_segments=seg, minor_segments=8,
+                                     location=loc, rotation=r)
+    obj = bpy.context.active_object
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    return _finish(obj, name, material, 0.0)
+
+
+def rod(name, a, b, radius, material, verts=12):
+    """Cylinder from point a to point b (pipes, handrails, rods)."""
+    ax, ay, az = a
+    bx, by, bz = b
+    dx, dy, dz = bx - ax, by - ay, bz - az
+    length = math.sqrt(dx * dx + dy * dy + dz * dz)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=radius, depth=length,
+                                        location=((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2))
+    obj = bpy.context.active_object
+    obj.rotation_mode = "QUATERNION"
+    from mathutils import Vector
+    obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(Vector((dx, dy, dz)).normalized())
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    return _finish(obj, name, material, 0.0)
+
+
+def rivets_line(name, a, b, count, material="iron", radius=0.022):
+    out = []
+    for i in range(count):
+        t = i / max(count - 1, 1)
+        p = tuple(a[k] + (b[k] - a[k]) * t for k in range(3))
+        out.append(sphere(f"{name}{i}", radius, p, material, scale=(1, 1, 0.7), seg=8))
+    return out
+
+
+def rivets_ring(name, center, radius, count, axis="Y", material="iron", r=0.022):
+    out = []
+    cx, cy, cz = center
+    for i in range(count):
+        a = i * 2 * math.pi / count
+        if axis == "Y":
+            p = (cx + math.cos(a) * radius, cy, cz + math.sin(a) * radius)
+        else:
+            p = (cx, cy + math.cos(a) * radius, cz + math.sin(a) * radius)
+        out.append(sphere(f"{name}{i}", r, p, material, seg=8))
+    return out
+
+
+def apply_all(obj):
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    for mod in list(obj.modifiers):
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+def join(name, objects, origin=None, bounds_origin=False):
+    for o in objects:
+        apply_all(o)
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objects:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objects[0]
+    bpy.ops.object.join()
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.data.name = name
+    if origin is not None:
+        bpy.context.scene.cursor.location = origin
+        bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+        bpy.context.scene.cursor.location = (0, 0, 0)
+    elif bounds_origin:
+        bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
+    return obj
+
+
+def clear_scene():
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete()
+    for block in (bpy.data.meshes, bpy.data.materials, bpy.data.images):
+        for item in list(block):
+            if item.users == 0:
+                block.remove(item)
+    _mats.clear()
+
+
+# --- Bake: procedural wear → one texture per model ---------------------------------
+
+def bake_and_export(path, size=2048):
+    objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    for o in objs:
+        apply_all(o)
+    # one shared UV atlas for all objects of this model
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.003)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    img = bpy.data.images.new(os.path.splitext(os.path.basename(path))[0] + "_albedo", size, size)
+    used = {s.material for o in objs for s in o.material_slots if s.material}
+    for m in used:
+        nt = m.node_tree
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = img
+        tex.name = "BAKE_TARGET"
+        nt.nodes.active = tex
+        emit = nt.nodes.new("ShaderNodeEmission")
+        emit.name = "BAKE_EMIT"
+        nt.links.new(nt.nodes["COLOR_OUT"].outputs[0] if "COLOR_OUT" in nt.nodes else nt.nodes["Principled BSDF"].inputs[0], emit.inputs[0])
+        out = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
+        nt.links.new(emit.outputs[0], out.inputs["Surface"])
+
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = 16
+    scene.render.bake.margin = 4
+    bpy.ops.object.bake(type="EMIT")
+    img.pack()
+
+    # rebuild simple game materials: baked colour + the original metal / roughness
+    for m in used:
+        nt = m.node_tree
+        kind = m.get("kind", "plain")
+        bsdf_old = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+        metal = bsdf_old.inputs["Metallic"].default_value
+        rough = bsdf_old.inputs["Roughness"].default_value
+        nt.nodes.clear()
+        out = nt.nodes.new("ShaderNodeOutputMaterial")
+        bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = img
+        bsdf.inputs["Metallic"].default_value = metal
+        bsdf.inputs["Roughness"].default_value = rough
+        nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        if kind == "lamp":
+            nt.links.new(tex.outputs["Color"], bsdf.inputs["Emission Color"])
+            bsdf.inputs["Emission Strength"].default_value = 4.0
+        nt.links.new(bsdf.outputs[0], out.inputs["Surface"])
+    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", export_apply=True, export_yup=True,
+                              export_image_format="JPEG", export_jpeg_quality=88)
+    print("exported", path)
+
+
+# --- Train parts ------------------------------------------------------------------------
+
+def loco_wheel(name, loc, radius=0.45, paint="loco_green"):
+    """Cast spoked driving wheel with a steel tyre, counterweight and crank pin. Origin at the centre."""
+    x, y, z = loc
+    s = 1 if x >= 0 else -1
+    parts = [
+        torus(name + "_tyre", radius - 0.03, 0.045, loc, "steel", axis="X", seg=40),
+        cyl(name + "_rim", radius - 0.05, 0.1, loc, paint, axis="X", verts=40),
+        cyl(name + "_hubdisc", 0.13, 0.16, loc, paint, axis="X"),
+        cyl(name + "_hub", 0.07, 0.2, (x + 0.03 * s, y, z), "steel", axis="X", verts=16),
+        cyl(name + "_crank", 0.04, 0.12, (x + 0.08 * s, y + 0.2, z), "steel", axis="X", verts=12),
+    ]
+    # counterweight crescent
+    parts.append(box(name + "_cw", (0.09, 0.32, 0.12), (x + 0.01 * s, y - 0.17, z - 0.17), paint, 0.03,
+                     rot=(math.radians(-45), 0, 0)))
+    for i in range(12):
+        a = i * math.pi / 6
+        parts.append(rod(name + f"_spoke{i}", (x, y + math.cos(a) * 0.12, z + math.sin(a) * 0.12),
+                         (x, y + math.cos(a) * (radius - 0.07), z + math.sin(a) * (radius - 0.07)), 0.022, paint, 8))
+    # the disc behind the spokes is hollow in reality; a thin dark backing keeps it readable from afar
+    parts.append(cyl(name + "_back", radius - 0.06, 0.02, (x - 0.03 * s, y, z), "iron", axis="X", verts=40))
+    return join(name, parts, origin=loc)
+
+
+def wagon_wheel(name, loc):
+    x, y, z = loc
+    return join(name, [torus(name + "_t", 0.33, 0.04, loc, "steel", axis="X"),
+                       cyl(name + "_d", 0.33, 0.08, loc, "iron", axis="X"),
+                       cyl(name + "_h", 0.08, 0.18, loc, "steel", axis="X", verts=12)], origin=loc)
+
+
+def bogie(name, y, parts):
+    for s in (-1, 1):
+        parts.append(box(f"{name}side{s}", (0.1, 1.8, 0.25), (1.0 * s, y, 0.45), "iron", 0.02))
+        parts.append(cyl(f"{name}spring{s}", 0.07, 0.18, (1.0 * s, y, 0.68), "steel", verts=10))
+    parts.append(box(f"{name}bolster", (2.1, 0.3, 0.15), (0, y, 0.72), "iron", 0.02))
+
+
+def underframe(length, parts, buffer_beam="red_paint"):
+    for s in (-1, 1):
+        parts.append(box(f"sill{s}", (0.18, length, 0.32), (1.05 * s, 0, 0.92), "iron", 0.02))
+        parts += rivets_line(f"sillriv{s}", (1.15 * s, -length / 2 + 0.2, 1.02), (1.15 * s, length / 2 - 0.2, 1.02), int(length * 3))
+    parts.append(box("frame_mid", (1.6, length - 0.4, 0.15), (0, 0, 0.85), "iron", 0.02))
+    for e in (-1, 1):
+        parts.append(box(f"beam{e}", (2.7, 0.2, 0.36), (0, e * length / 2, 0.95), buffer_beam, 0.02))
+        for s in (-1, 1):
+            parts.append(cyl(f"buf{e}{s}", 0.06, 0.3, (0.75 * s, e * (length / 2 + 0.15), 0.95), "steel", axis="Y", verts=12))
+            parts.append(cyl(f"bufhead{e}{s}", 0.15, 0.04, (0.75 * s, e * (length / 2 + 0.3), 0.95), "steel", axis="Y", verts=20))
+        parts.append(box(f"hook{e}", (0.08, 0.3, 0.08), (0, e * (length / 2 + 0.15), 0.9), "iron", 0.01))
+
+
+def plank_floor(length, parts, width=2.8, material="wood"):
+    n = int(length / 0.25)
+    for i in range(n):
+        y = -length / 2 + 0.125 + i * 0.25
+        parts.append(box(f"fplank{i}", (width, 0.24, 0.08), (0, y, FLOOR - 0.04), material if i % 3 else "wood_dark", 0.008))
+    parts.append(box("deck_base", (width - 0.05, length, 0.2), (0, 0, FLOOR - 0.18), "iron", 0.01))
+
+
+def panel(kind, mat_kind, n, parts, origin=None):
+    """Joins parts into one breakable cover piece: Panel_<wood|metal>_<n> or Door_<wood|metal>_<n>."""
+    return join(f"{kind}_{mat_kind}_{n}", parts, origin=origin, bounds_origin=origin is None)
+
+
+def plank_wall(name, s, y, length, height=2.25, z0=FLOOR, x=1.42):
+    """Wooden wall panel: vertical boards with two iron straps and bolts."""
+    parts = []
+    boards = int(length / 0.2)
+    for k in range(boards):
+        by = y - length / 2 + 0.1 + k * 0.2
+        parts.append(box(f"{name}b{k}", (0.06, 0.19, height), (x * s, by, z0 + height / 2), "van_brown", 0.006))
+    for h in (0.35, height - 0.35):
+        parts.append(box(f"{name}strap{h}", (0.025, length - 0.05, 0.08), ((x + 0.04) * s, y, z0 + h), "iron", 0.005))
+        parts += rivets_line(f"{name}bolt{h}", ((x + 0.06) * s, y - length / 2 + 0.1, z0 + h), ((x + 0.06) * s, y + length / 2 - 0.1, z0 + h), boards // 2, "iron", 0.018)
+    return parts
+
+
+# --- Train cars ----------------------------------------------------------------------------
+
+def build_locomotive():
+    """GWR-style 4-6-0 tank-engine look (reference photos of 7822): black smokebox, green boiler and cab with orange
+    lining, brass safety-valve bonnet, copper-capped chimney, red riveted buffer beam with big buffers.
+    The cab front has two doors (one each side of the boiler) that open FORWARD: you see where you're going and can
+    walk out along the running boards to the front."""
+    clear_scene()
+    L = 10.0
+    body = []
+    underframe(L, body, buffer_beam="buffer_red")
+    bogie("bogie_front", 4.3, body)
+    plank_floor(4.8, body, material="wood_dark")
+    for o in body[-21:]:
+        o.location.y -= 2.6
+    # red buffer beam with a rivet grid, big buffers, vacuum hose, coupling, lamp irons
+    body.append(box("bufferbeam", (2.8, 0.18, 0.55), (0, 5.05, 0.95), "buffer_red", 0.015))
+    for row in (0.75, 1.15):
+        body += rivets_line(f"bbriv{row}", (-1.3, 5.15, row), (1.3, 5.15, row), 16)
+    for s in (-1, 1):
+        body.append(cyl(f"buf_body{s}", 0.11, 0.35, (0.85 * s, 5.3, 0.95), "black_paint", axis="Y", verts=20))
+        body.append(sphere(f"buf_head{s}", 0.2, (0.85 * s, 5.5, 0.95), "black_paint", scale=(1.0, 0.35, 0.85)))
+        body.append(box(f"lampiron{s}", (0.06, 0.05, 0.16), (0.6 * s, 5.16, 1.32), "iron", 0.005))
+    body.append(rod("vac_hose", (0.35, 5.15, 1.05), (0.25, 5.5, 0.55), 0.04, "rubber"))
+    body.append(box("coupling", (0.1, 0.35, 0.08), (0, 5.3, 0.88), "iron", 0.01))
+    body.append(box("guard_iron", (2.0, 0.06, 0.25), (0, 5.12, 0.35), "black_paint", 0.01))
+    # boiler core (visible when the jacket plates are knocked off) + black smokebox
+    body.append(cyl("boiler_core", 0.92, 4.6, (0, 2.0, FLOOR + 1.0), "iron", axis="Y", verts=48))
+    body.append(cyl("smokebox", 1.02, 1.0, (0, 4.5, FLOOR + 1.0), "black_paint", axis="Y", verts=48, bevel=0.03))
+    body.append(box("smokebox_saddle", (1.4, 0.9, 0.6), (0, 4.5, FLOOR + 0.2), "black_paint", 0.02))
+    body.append(cyl("smokedoor", 0.84, 0.1, (0, 5.02, FLOOR + 1.0), "black_paint", axis="Y", verts=48, bevel=0.03))
+    body.append(torus("smokedoor_ring", 0.86, 0.03, (0, 5.0, FLOOR + 1.0), "black_paint", axis="Y", seg=48))
+    body += rivets_ring("doorriv", (0, 5.08, FLOOR + 1.0), 0.8, 24)
+    for i, zz in enumerate((0.42, -0.42)):
+        body.append(box(f"hinge{i}", (1.0, 0.05, 0.07), (-0.35, 5.08, FLOOR + 1.0 + zz), "black_paint", 0.01))
+    body.append(cyl("dart", 0.03, 0.2, (0, 5.15, FLOOR + 1.0), "steel", axis="Y", verts=10))
+    for a in (0.6, 2.2):
+        body.append(box(f"dart_handle{a}", (0.32, 0.03, 0.035), (0, 5.24, FLOOR + 1.0), "steel", 0.004, rot=(0, a, 0)))
+    body.append(box("numberplate", (0.6, 0.03, 0.18), (0, 5.08, FLOOR + 1.55), "black_paint", 0.005))
+    body.append(box("numberplate_rim", (0.64, 0.025, 0.22), (0, 5.07, FLOOR + 1.55), "brass", 0.005))
+    body.append(cyl("shedplate", 0.08, 0.02, (0, 5.09, FLOOR + 0.55), "dial", axis="Y", verts=16))
+    # copper-capped chimney, brass safety-valve bonnet, top feed, whistles, lamp on top of the smokebox
+    body.append(cyl("chimney_base", 0.42, 0.18, (0, 4.4, FLOOR + 1.92), "black_paint", verts=32, bevel=0.03))
+    body.append(cyl("chimney", 0.24, 0.85, (0, 4.4, FLOOR + 2.4), "black_paint", verts=32))
+    body.append(cyl("chimney_cap", 0.3, 0.25, (0, 4.4, FLOOR + 2.9), "copper", verts=32, radius2=0.33, bevel=0.02))
+    body.append(cyl("chimney_rim", 0.34, 0.06, (0, 4.4, FLOOR + 3.05), "black_paint", verts=32))
+    body.append(cyl("bonnet", 0.32, 0.55, (0, 1.6, FLOOR + 2.15), "brass", verts=32, radius2=0.22, bevel=0.02))
+    body.append(cyl("bonnet_top", 0.22, 0.06, (0, 1.6, FLOOR + 2.45), "brass", verts=32))
+    body.append(box("topfeed", (0.5, 0.35, 0.25), (0, 3.0, FLOOR + 1.98), "loco_green", 0.03))
+    for k, x in enumerate((-0.25, 0.25)):
+        body.append(rod(f"feedpipe{k}", (x, 3.0, FLOOR + 1.95), (x * 3.4, 3.0, FLOOR + 1.6), 0.025, "copper"))
+        body.append(cyl(f"whistle{k}", 0.04, 0.3, (x, -0.12, FLOOR + 2.65), "brass", verts=12))
+    body.append(box("lamp_body", (0.32, 0.28, 0.38), (0, 5.0, FLOOR + 2.05), "black_paint", 0.03))
+    body.append(cyl("lamp_glass", 0.11, 0.03, (0, 5.15, FLOOR + 2.05), "lamp", axis="Y", verts=20))
+    body.append(rod("lamp_handle", (-0.1, 5.0, FLOOR + 2.27), (0.1, 5.0, FLOOR + 2.27), 0.012, "iron", 6))
+    # running gear: cylinders, slide bars, crossheads, rods, valve gear
+    for s in (-1, 1):
+        body.append(cyl(f"cylinder{s}", 0.32, 1.1, (1.05 * s, 4.0, 0.7), "loco_green", axis="Y", verts=32, bevel=0.02))
+        body.append(cyl(f"cyl_cap{s}", 0.34, 0.06, (1.05 * s, 4.56, 0.7), "steel", axis="Y", verts=32))
+        body += rivets_ring(f"capriv{s}", (1.05 * s, 4.6, 0.7), 0.28, 10)
+        body.append(rod(f"piston{s}", (1.05 * s, 3.45, 0.7), (1.05 * s, 2.85, 0.7), 0.04, "steel"))
+        body.append(box(f"crosshead{s}", (0.1, 0.25, 0.18), (1.05 * s, 2.8, 0.7), "steel", 0.01))
+        for zz in (0.62, 0.78):
+            body.append(box(f"slidebar{s}{zz}", (0.05, 1.2, 0.04), (1.05 * s, 2.9, zz), "steel", 0.005))
+        body.append(rod(f"mainrod{s}", (1.12 * s, 2.8, 0.7), (1.12 * s, 0.2, 0.5), 0.045, "steel"))
+        body.append(box(f"siderod{s}", (0.06, 7.4, 0.1), (1.18 * s, 0.0, 0.5), "steel", 0.01))
+        body.append(rod(f"reach{s}", (1.15 * s, 0.4, 1.1), (1.15 * s, 2.6, 0.95), 0.025, "steel"))
+        # running board along the boiler (walkable from the cab front doors), splashers over the wheels
+        body.append(box(f"runboard{s}", (0.5, 5.1, 0.05), (1.17 * s, 2.35, FLOOR - 0.02), "black_paint", 0.008))
+        body.append(box(f"valance{s}", (0.04, 5.1, 0.25), (1.42 * s, 2.35, FLOOR - 0.15), "loco_green", 0.006))
+        body.append(box(f"valance_line{s}", (0.045, 5.1, 0.03), (1.42 * s, 2.35, FLOOR - 0.08), "lining", 0.003))
+        for yy in (0.0, 3.5):
+            body.append(cyl(f"splasher{s}{yy}", 0.5, 0.12, (1.2 * s, yy, FLOOR - 0.05), "loco_green", axis="X", verts=32))
+        body.append(rod(f"handrail{s}", (0.98 * s, -0.1, FLOOR + 1.5), (0.98 * s, 4.3, FLOOR + 1.5), 0.018, "steel"))
+        for yy in (0.4, 1.7, 3.0, 4.1):
+            body.append(rod(f"stanchion{s}{yy}", (0.9 * s, yy, FLOOR + 1.45), (0.98 * s, yy, FLOOR + 1.5), 0.014, "steel", 8))
+        body.append(rod(f"smokebox_rail{s}", (0.98 * s, 4.3, FLOOR + 1.5), (0.6 * s, 5.05, FLOOR + 1.8), 0.018, "steel"))
+        body.append(rod(f"steampipe{s}", (0.6 * s, 4.05, FLOOR + 1.2), (1.0 * s, 4.0, 1.0), 0.07, "black_paint", 16))
+    # cab: fixed backhead plate behind the boiler with spectacle windows, corner posts, roof beams, steps
+    body.append(box("cab_front_mid", (1.8, 0.1, 2.55), (0, -0.25, FLOOR + 1.28), "loco_green", 0.02))
+    for s in (-1, 1):
+        body.append(cyl(f"spectacle{s}", 0.22, 0.12, (0.6 * s, -0.25, FLOOR + 2.15), "glass", axis="Y", verts=32))
+        body.append(torus(f"spectacle_ring{s}", 0.23, 0.03, (0.6 * s, -0.31, FLOOR + 2.15), "brass", axis="Y"))
+        body.append(box(f"cab_front_top{s}", (0.5, 0.1, 0.55), (1.15 * s, -0.25, FLOOR + 2.27), "loco_green", 0.01))
+        for py in (-0.25, -3.9, -4.95):
+            body.append(box(f"cab_post{s}{py}", (0.1, 0.1, 2.6), (1.38 * s, py, FLOOR + 1.3), "loco_green", 0.01))
+        body.append(box(f"roof_beam{s}", (0.1, 4.7, 0.1), (1.38 * s, -2.6, FLOOR + 2.55), "loco_green", 0.01))
+        body.append(box(f"cab_step{s}", (0.45, 0.6, 0.05), (1.45 * s, -4.45, 0.78), "black_paint", 0.01))
+        body.append(box(f"cab_step2{s}", (0.45, 0.6, 0.05), (1.45 * s, -4.45, 0.35), "black_paint", 0.01))
+        body.append(rod(f"cab_grab{s}", (1.5 * s, -3.95, FLOOR + 0.2), (1.5 * s, -3.95, FLOOR + 1.6), 0.018, "brass", 8))
+    body += rivets_line("cabfront_riv", (-0.85, -0.31, FLOOR + 2.5), (0.85, -0.31, FLOOR + 2.5), 12)
+    for k, x in enumerate((-0.35, 0.35)):
+        body.append(cyl(f"gauge{k}", 0.11, 0.06, (x, -0.33, FLOOR + 1.55), "brass", axis="Y", verts=24))
+        body.append(cyl(f"gaugeface{k}", 0.09, 0.02, (x, -0.37, FLOOR + 1.55), "dial", axis="Y", verts=24))
+    body.append(rod("backhead_pipe", (-0.8, -0.34, FLOOR + 1.3), (0.8, -0.34, FLOOR + 1.3), 0.025, "copper"))
+    # coal bunker at the back of the cab (it's a tank engine: no tender)
+    body.append(box("bunker", (2.6, 0.7, 1.1), (0, -4.6, FLOOR + 0.55), "loco_green", 0.02))
+    body.append(sphere("bunker_coal", 0.7, (0, -4.6, FLOOR + 1.05), "coal", scale=(1.7, 0.45, 0.35)))
+    join("Locomotive", body, origin=(0, 0, 0))
+
+    # --- breakable cover ---
+    n = 0
+    for i, (y0, y1) in enumerate(((-0.25, 1.3), (1.3, 2.75), (2.75, 4.0))):
+        yc = (y0 + y1) / 2
+        parts = [cyl(f"jacket{i}", 1.0, y1 - y0 - 0.03, (0, yc, FLOOR + 1.0), "loco_green", axis="Y", verts=48, bevel=0.01),
+                 cyl(f"band{i}", 1.02, 0.08, (0, y0 + 0.06, FLOOR + 1.0), "black_paint", axis="Y", verts=48),
+                 cyl(f"line_a{i}", 1.022, 0.015, (0, y0 + 0.015, FLOOR + 1.0), "lining", axis="Y", verts=48),
+                 cyl(f"line_b{i}", 1.022, 0.015, (0, y0 + 0.105, FLOOR + 1.0), "lining", axis="Y", verts=48)]
+        panel("Panel", "metal", n, parts)
+        n += 1
+    for s in (-1, 1):
+        x = 1.42 * s
+        parts = [box(f"cab_low{s}", (0.07, 3.45, 0.95), (x, -2.12, FLOOR + 0.48), "loco_green", 0.01),
+                 box(f"cab_top{s}", (0.07, 3.45, 0.4), (x, -2.12, FLOOR + 2.3), "loco_green", 0.01),
+                 box(f"cab_mid_a{s}", (0.07, 0.6, 0.9), (x, -0.7, FLOOR + 1.4), "loco_green", 0.01),
+                 box(f"cab_mid_b{s}", (0.07, 0.6, 0.9), (x, -3.55, FLOOR + 1.4), "loco_green", 0.01)]
+        # orange-black-orange lining panel on the cab side
+        for (zc, h) in ((FLOOR + 0.48, 0.7),):
+            for k, (inset, mtl) in enumerate(((0.0, "lining"), (0.03, "black_paint"), (0.06, "lining"))):
+                w = 3.1 - inset * 2
+                hh = h - inset * 2
+                for (dz, dy, sz) in ((hh / 2, 0, (0.08, w, 0.015)), (-hh / 2, 0, (0.08, w, 0.015)),
+                                     (0, w / 2, (0.08, 0.015, hh)), (0, -w / 2, (0.08, 0.015, hh))):
+                    parts.append(box(f"cabline{s}{k}{dz}{dy}", sz, (x * 1.005, -2.12 + dy, zc + dz), mtl, 0.0))
+        parts += rivets_line(f"cabriv{s}", (x * 1.03, -3.8, FLOOR + 2.45), (x * 1.03, -0.45, FLOOR + 2.45), 14)
+        panel("Panel", "metal", n, parts)
+        n += 1
+    parts = [box("roof", (3.1, 4.7, 0.1), (0, -2.6, FLOOR + 2.67), "black_paint", 0.03),
+             box("roof_lip", (3.2, 4.8, 0.04), (0, -2.6, FLOOR + 2.6), "loco_green", 0.01),
+             box("roof_vent", (0.6, 0.8, 0.15), (0, -2.4, FLOOR + 2.78), "black_paint", 0.02)]
+    for k in range(5):
+        parts.append(box(f"roof_rib{k}", (3.1, 0.05, 0.03), (0, -4.6 + k * 1.0, FLOOR + 2.73), "iron", 0.005))
+    panel("Panel", "metal", n, parts)
+    # rear side doors (hinge at the front edge)
+    for k, s in enumerate((-1, 1)):
+        x = 1.42 * s
+        panel("Door", "metal", k, [box(f"cab_door{s}", (0.06, 0.95, 1.9), (x, -4.43, FLOOR + 0.95), "loco_green", 0.01),
+                                   box(f"door_win{s}", (0.08, 0.5, 0.45), (x, -4.43, FLOOR + 1.45), "glass", 0.005),
+                                   box(f"door_winframe{s}", (0.07, 0.6, 0.55), (x * 0.999, -4.43, FLOOR + 1.45), "brass", 0.005),
+                                   sphere(f"door_knob{s}", 0.045, (x + 0.05 * s, -4.78, FLOOR + 0.95), "brass")],
+              origin=(x, -3.95, FLOOR + 0.95))
+    # cab FRONT doors, one each side of the boiler, hinged at the outer edge, opening forward
+    for k, s in enumerate((-1, 1)):
+        x0, x1 = 0.92 * s, 1.36 * s
+        xc = (x0 + x1) / 2
+        w = abs(x1 - x0)
+        panel("Door", "metal", 2 + k, [
+            box(f"front_door{s}", (w, 0.05, 1.95), (xc, -0.25, FLOOR + 0.98), "loco_green", 0.01),
+            box(f"front_door_win{s}", (w - 0.12, 0.06, 0.55), (xc, -0.25, FLOOR + 1.5), "glass", 0.005),
+            box(f"front_door_frame{s}", (w - 0.06, 0.055, 0.62), (xc, -0.249, FLOOR + 1.5), "brass", 0.005),
+            box(f"front_door_line{s}", (w - 0.1, 0.06, 0.015), (xc, -0.25, FLOOR + 0.5), "lining", 0.0),
+            sphere(f"front_door_knob{s}", 0.04, (x0 + 0.06 * s, -0.19, FLOOR + 1.0), "brass")],
+            origin=(x1, -0.25, FLOOR + 0.98))
+    idx = 0
+    for y in (3.5, 0.0, -3.5):
+        for s in (-1, 1):
+            loco_wheel(f"Wheel_{idx}", (0.85 * s, y, 0.5))
+            idx += 1
+    bake_and_export(os.path.join(OUT_TRAIN, "locomotive.glb"), 2048)
+
+
+def build_wagon(kind):
+    clear_scene()
+    L = 8.0
+    body = []
+    underframe(L, body, buffer_beam="iron")
+    bogie("b1", 2.8, body)
+    bogie("b2", -2.8, body)
+    plank_floor(L, body)
+    later = []
+    if kind == "cargo":
+        for s in (-1, 1):
+            for py in (-3.0, -1.0, 1.0, 3.0):
+                body.append(box(f"post{s}{py}", (0.12, 0.12, 2.4), (1.44 * s, py, FLOOR + 1.2), "iron", 0.01))
+                body += rivets_line(f"postriv{s}{py}", (1.51 * s, py, FLOOR + 0.2), (1.51 * s, py, FLOOR + 2.2), 6)
+            body.append(box(f"top_beam{s}", (0.12, 6.2, 0.12), (1.44 * s, 0, FLOOR + 2.37), "iron", 0.01))
+            for e in (-1, 1):
+                body.append(box(f"step{s}{e}", (0.45, 0.6, 0.05), (1.45 * s, e * 3.5, 0.78), "iron", 0.01))
+        for i in range(4):
+            body.append(box(f"rib{i}", (2.95, 0.1, 0.1), (0, -3.0 + i * 2.0, FLOOR + 2.45), "iron", 0.01))
+        # brake wheel on one end
+        body.append(rod("brake_shaft", (1.1, -4.05, 0.9), (1.1, -4.05, FLOOR + 1.6), 0.03, "iron"))
+        body.append(torus("brake_wheel", 0.22, 0.025, (1.1, -4.05, FLOOR + 1.6), "iron", axis="Z"))
+        for i, (x, y) in enumerate([(-0.6, -2.0), (0.6, -1.0), (-0.5, 1.2), (0.55, 2.2)]):
+            body.append(box(f"crate{i}", (0.9, 0.9, 0.8), (x, y, FLOOR + 0.4), "wood", 0.02))
+            for zz in (0.12, 0.68):
+                body.append(box(f"crate_band{i}{zz}", (0.93, 0.93, 0.06), (x, y, FLOOR + zz), "iron", 0.005))
+        body.append(sphere("coal_pile", 0.7, (0.4, -0.2, FLOOR + 0.1), "coal", scale=(1.2, 1.4, 0.55)))
+        for s in (-1, 1):
+            for y in (-2.0, 2.0):
+                later.append(("Panel", "wood", plank_wall(f"w{s}{y}", s, y, 1.9), None))
+            door = plank_wall(f"d{s}", s, 0.0, 1.9)
+            door.append(rod(f"door_x{s}", (1.49 * s, -0.85, FLOOR + 0.3), (1.49 * s, 0.85, FLOOR + 2.0), 0.03, "wood_dark", 6))
+            door.append(box(f"door_handle{s}", (0.05, 0.05, 0.3), (1.52 * s, 0.8, FLOOR + 1.1), "iron", 0.005))
+            later.append(("Door", "wood", door, (1.42 * s, -0.95, FLOOR + 1.15)))
+        for y in (-1.6, 1.6):
+            roof = [box(f"roof{y}", (3.1, 3.2, 0.06), (0, y, FLOOR + 2.55), "roof_grey", 0.02)]
+            for k in range(6):
+                roof.append(box(f"roofseam{y}{k}", (3.1, 0.04, 0.03), (0, y - 1.5 + k * 0.6, FLOOR + 2.6), "iron", 0.005))
+            later.append(("Panel", "metal", roof, None))
+    elif kind == "utility":
+        for s in (-1, 1):
+            for py in (-3.0, 0.0, 3.0):
+                body.append(box(f"post{s}{py}", (0.1, 0.1, 2.6), (1.38 * s, py, FLOOR + 1.3), "iron", 0.01))
+            body.append(box(f"top_beam{s}", (0.1, 6.1, 0.1), (1.38 * s, 0, FLOOR + 2.55), "iron", 0.01))
+            for e in (-1, 1):
+                body.append(box(f"step{s}{e}", (0.45, 0.6, 0.05), (1.45 * s, e * 3.5, 0.78), "iron", 0.01))
+            for y in (-1.5, 1.5):
+                boards = []
+                for k in range(3):
+                    boards.append(box(f"board{s}{y}{k}", (0.06, 2.9, 0.22), (1.4 * s, y, FLOOR + 0.13 + k * 0.25), "wood" if k % 2 else "wood_grey", 0.006))
+                boards += rivets_line(f"boardriv{s}{y}", (1.44 * s, y - 1.35, FLOOR + 0.4), (1.44 * s, y + 1.35, FLOOR + 0.4), 8)
+                later.append(("Panel", "wood", boards, None))
+        # tool rack and hanging tools
+        body.append(box("rack", (0.08, 1.6, 0.9), (1.25, -1.6, FLOOR + 1.5), "wood_dark", 0.01))
+        for k in range(4):
+            body.append(rod(f"tool{k}", (1.2, -2.2 + k * 0.4, FLOOR + 1.9), (1.2, -2.2 + k * 0.4, FLOOR + 1.2), 0.02, "wood", 8))
+        body.append(box("toolbox", (0.6, 0.35, 0.3), (-0.9, 3.4, FLOOR + 0.15), "red_paint", 0.02))
+        for y in (-1.6, 1.6):
+            canvas = [box(f"canopy{y}", (3.0, 3.2, 0.05), (0, y, FLOOR + 2.65), "canvas", 0.02)]
+            for k in range(4):
+                canvas.append(rod(f"canopy_bow{y}{k}", (-1.45, y - 1.2 + k * 0.8, FLOOR + 2.62), (1.45, y - 1.2 + k * 0.8, FLOOR + 2.62), 0.02, "wood_dark", 6))
+            later.append(("Panel", "metal", canvas, None))
+    elif kind == "container":
+        body.append(box("inner", (2.3, 6.2, 2.15), (0, 0, FLOOR + 1.1), "wood_dark", 0.01))
+        for s in (-1, 1):
+            for py in (-3.2, -1.07, 1.07, 3.2):
+                body.append(box(f"cpost{s}{py}", (0.12, 0.12, 2.35), (1.28 * s, py, FLOOR + 1.17), "rust", 0.01))
+        for e in (-3.25, 3.25):
+            for zz in (FLOOR + 0.05, FLOOR + 2.3):
+                body.append(box(f"crail{e}{zz}", (2.6, 0.12, 0.12), (0, e, zz), "rust", 0.01))
+        for s in (-1, 1):
+            for j, yc in enumerate((-2.13, 0.0, 2.13)):
+                parts = [box(f"cpan{s}{j}", (0.04, 2.0, 2.1), (1.27 * s, yc, FLOOR + 1.12), "rust", 0.005)]
+                for r in range(10):
+                    parts.append(box(f"crib{s}{j}{r}", (0.05, 0.08, 2.05), (1.3 * s, yc - 0.9 + r * 0.2, FLOOR + 1.12), "rust", 0.004))
+                later.append(("Panel", "metal", parts, None))
+        later.append(("Panel", "metal", [box("croof", (2.6, 6.5, 0.06), (0, 0, FLOOR + 2.33), "rust", 0.01)], None))
+        doors = [box("doors", (2.3, 0.05, 2.1), (0, -3.25, FLOOR + 1.12), "rust", 0.005),
+                 box("door_split", (0.03, 0.06, 2.1), (0, -3.28, FLOOR + 1.12), "iron", 0.003),
+                 box("padlock", (0.2, 0.1, 0.25), (0.15, -3.36, FLOOR + 1.1), "brass", 0.02),
+                 torus("shackle", 0.07, 0.02, (0.15, -3.36, FLOOR + 1.27), "steel", axis="Y")]
+        for sx in (-0.6, -0.2, 0.2, 0.6):
+            doors.append(rod(f"lockbar{sx}", (sx, -3.32, FLOOR + 0.1), (sx, -3.32, FLOOR + 2.15), 0.025, "steel", 8))
+        for k in range(5):
+            doors.append(torus(f"chain{k}", 0.06, 0.015, (-1.0 + k * 0.12, -3.36, FLOOR + 1.3 - abs(k - 2) * 0.05), "steel", axis="Z" if k % 2 else "Y", seg=12))
+        later.append(("Panel", "metal", doors, None))
+    join(kind.capitalize(), body, origin=(0, 0, 0))
+    counters = {}
+    for kind_name, mat_kind, parts, origin in later:
+        counters[kind_name] = counters.get(kind_name, 0)
+        panel(kind_name, mat_kind, counters[kind_name], parts, origin)
+        counters[kind_name] += 1
+    m = 0
+    for y in (2.8, -2.8):
+        for yy in (y - 0.6, y + 0.6):
+            for s in (-1, 1):
+                wagon_wheel(f"WagonWheel_{m}", (0.85 * s, yy, 0.38))
+                m += 1
+    bake_and_export(os.path.join(OUT_TRAIN, f"{kind}_wagon.glb"), 2048)
+
+
+# --- Props and tools ----------------------------------------------------------------------
+
+def build_props():
+    clear_scene()
+    loco_wheel("Wheel", (0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "wheel.glb"), 1024)
+
+    clear_scene()
+    parts = [box("plank", (2.4, 0.3, 0.12), (0, 0, 0), "wood_grey", 0.01)]
+    for x in (-0.95, 0.95):
+        parts.append(box(f"plate{x}", (0.25, 0.32, 0.02), (x, 0, 0.065), "iron", 0.004))
+    join("Plank", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "plank.glb"), 512)
+
+    clear_scene()
+    join("Rail", [box("rail_head", (0.08, 4.0, 0.05), (0, 0, 0.05), "steel", 0.008),
+                  box("rail_web", (0.03, 4.0, 0.08), (0, 0, 0.0), "rust", 0.004),
+                  box("rail_foot", (0.15, 4.0, 0.025), (0, 0, -0.05), "rust", 0.004)], origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "rail.glb"), 512)
+
+    clear_scene()
+    # forged claw hammer: hickory handle with leather grip, steel head with curved claw
+    parts = [cyl("handle", 0.022, 0.5, (0, 0, 0.02), "wood", verts=16, radius2=0.018),
+             cyl("grip", 0.027, 0.18, (0, 0, -0.16), "leather", verts=16),
+             box("head", (0.14, 0.045, 0.05), (0.03, 0, 0.29), "steel", 0.008),
+             cyl("face", 0.03, 0.04, (0.12, 0, 0.29), "steel", axis="X", verts=16),
+             box("wedge", (0.02, 0.046, 0.02), (0.0, 0, 0.32), "wood_dark", 0.002)]
+    for k in range(4):
+        a = math.radians(-10 - k * 14)
+        parts.append(box(f"claw{k}", (0.04, 0.04, 0.025), (-0.06 - k * 0.03, 0, 0.3 - k * k * 0.006), "steel", 0.004, rot=(0, a, 0)))
+    for k in range(5):
+        parts.append(torus(f"wrap{k}", 0.028, 0.004, (0, 0, -0.24 + k * 0.035), "leather", axis="Z", seg=16))
+    join("Hammer", parts, origin=(0, 0, -0.2))
+    bake_and_export(os.path.join(OUT_PROPS, "hammer.glb"), 512)
+
+    clear_scene()
+    # welding torch (stinger): insulated grip, clamp jaws, cable stub; nozzle points forward (+Y)
+    parts = [cyl("grip", 0.035, 0.2, (0, -0.06, 0), "rubber", axis="Y", verts=16),
+             cyl("guard", 0.05, 0.02, (0, 0.05, 0), "blue_paint", axis="Y", verts=16),
+             cyl("neck", 0.018, 0.2, (0, 0.15, 0.02), "brass", axis="Y", verts=12),
+             box("jaw_top", (0.03, 0.07, 0.015), (0, 0.27, 0.035), "brass", 0.003),
+             box("jaw_bot", (0.03, 0.07, 0.015), (0, 0.27, 0.005), "brass", 0.003),
+             rod("electrode", (0, 0.28, 0.02), (0, 0.42, 0.02), 0.004, "steel", 6),
+             cyl("cable_stub", 0.02, 0.1, (0, -0.2, 0), "rubber", axis="Y", verts=12)]
+    for k in range(4):
+        parts.append(torus(f"ridge{k}", 0.035, 0.004, (0, -0.13 + k * 0.04, 0), "rubber", axis="Y", seg=16))
+    join("WelderTorch", parts, origin=(0, -0.1, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "welder_torch.glb"), 512)
+
+    clear_scene()
+    # diesel welding generator on a tubular frame with gauges, exhaust and cable reel
+    parts = [box("case", (0.9, 0.55, 0.55), (0, 0, 0.42), "orange_paint", 0.02),
+             box("panel", (0.6, 0.03, 0.32), (0, -0.29, 0.45), "black_paint", 0.005),
+             cyl("exhaust", 0.03, 0.25, (0.32, 0.12, 0.8), "iron", verts=10),
+             box("vents", (0.4, 0.02, 0.15), (-0.15, 0.285, 0.45), "black_paint", 0.003)]
+    for k, x in enumerate((-0.18, 0.05)):
+        parts.append(cyl(f"gauge{k}", 0.06, 0.03, (x, -0.31, 0.5), "brass", axis="Y", verts=20))
+        parts.append(cyl(f"gface{k}", 0.05, 0.01, (x, -0.33, 0.5), "dial", axis="Y", verts=20))
+    parts.append(cyl("knob", 0.035, 0.04, (0.22, -0.32, 0.42), "black_paint", axis="Y", verts=12))
+    for s in (-1, 1):
+        parts.append(rod(f"frame_a{s}", (0.5 * s, -0.33, 0.1), (0.5 * s, -0.33, 0.78), 0.02, "iron"))
+        parts.append(rod(f"frame_b{s}", (0.5 * s, 0.33, 0.1), (0.5 * s, 0.33, 0.78), 0.02, "iron"))
+        parts.append(rod(f"frame_c{s}", (0.5 * s, -0.33, 0.78), (0.5 * s, 0.33, 0.78), 0.02, "iron"))
+        parts.append(rod(f"skid{s}", (0.5 * s, -0.33, 0.1), (0.5 * s, 0.33, 0.1), 0.025, "iron"))
+    parts.append(rod("handle", (-0.5, 0, 0.78), (0.5, 0, 0.78), 0.02, "iron"))
+    parts.append(cyl("reel", 0.24, 0.2, (0, 0.5, 0.42), "iron", axis="X", verts=24))
+    parts.append(torus("cable_coil", 0.19, 0.045, (0, 0.5, 0.42), "rubber", axis="X"))
+    parts.append(torus("cable_coil2", 0.14, 0.04, (0, 0.5, 0.42), "rubber", axis="X"))
+    join("WelderMachine", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "welder_machine.glb"), 1024)
+
+    clear_scene()
+    # pneumatic nail gun: body, handle, magazine, nose, hose fitting
+    parts = [box("body", (0.07, 0.3, 0.12), (0, 0.0, 0.06), "orange_paint", 0.02),
+             cyl("cap", 0.065, 0.06, (0, -0.1, 0.11), "black_paint", verts=20),
+             box("handle", (0.05, 0.08, 0.16), (0, -0.08, -0.06), "rubber", 0.015),
+             box("trigger", (0.015, 0.03, 0.04), (0, -0.02, -0.02), "black_paint", 0.003),
+             box("nose", (0.04, 0.06, 0.12), (0, 0.16, 0.0), "steel", 0.005),
+             box("magazine", (0.035, 0.28, 0.04), (0, 0.04, -0.07), "black_paint", 0.005),
+             cyl("fitting", 0.012, 0.05, (0, -0.1, -0.16), "brass", verts=10)]
+    join("NailGun", parts, origin=(0, -0.08, -0.06))
+    bake_and_export(os.path.join(OUT_PROPS, "nail_gun.glb"), 512)
+
+
+if __name__ == "__main__":
+    if ONLY is None or "train" in ONLY:
+        build_locomotive()
+        for k in ("cargo", "utility", "container"):
+            build_wagon(k)
+    if ONLY is None or "props" in ONLY:
+        build_props()
+    print("done")

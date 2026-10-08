@@ -1,7 +1,7 @@
 class_name Station
 extends Node3D
-## A station on the right side of the track: platform, sign, shop, the big station welder
-## (the only way to weld the train body back to 100 %) and the grave (revive comes in M5).
+## A station on the right side of the track: platform, sign, shop, the station welder
+## (the only welder in the game: metal train panels are welded back on here) and the grave (revive comes in M5).
 ## Index 0 is the departure station. 1..5 are checkpoints; 5 is the last one (the port).
 
 signal shop_requested(station: Station)
@@ -47,11 +47,8 @@ func _build() -> void:
 		func(_p): shop_requested.emit(self))
 
 	# Big welder machine: welds the train body up to 100 % (the train's own welder stops at 60 %)
-	WelderSource.create(self, "station", 25.0, Vector3(3.2, 1.2, 0))
+	WelderSource.create(self, "station", 30.0, Vector3(3.2, 1.2, 0))
 	Build.label(self, "STATION WELDER", Vector3(3.2, 3.2, 0), 40)
-	ActionSpot.create(self, Vector3(1.6, 1.4, 1.2), Vector3(3.2, 1.9, 0),
-		func(_p): return "Station welder (cable 25 m): pick the welder [2] near it, weld metal panels back on up to 100%",
-		func(_p): pass)
 
 	# Grave (revive dead players here, M5)
 	Build.box(self, Vector3(0.8, 1.0, 0.25), Vector3(5.2, 1.7, 15), Color(0.5, 0.5, 0.52))

@@ -28,10 +28,8 @@ const COAL_FUEL := 12.0
 const MAX_WHEELS := 6
 const MIN_WHEELS_TO_MOVE := 3
 const WHEEL_BOLT_HITS := 3
-const PATCH_LIMIT := 60.0         # the train's own welder can't weld metal panels above this; station welder can
 const CRASH_SPEED := 4.0
 const OIL_BUFF_TIME := 120.0
-const WELDER_CABLE := 35.0
 
 ## Things the crew carries out of the cargo car and what each costs from the inventory.
 const CARRY_COST := {"plank": {"wood": 1}, "rail": {"scrap": 2}, "wheel": {"wheel": 1}, "panel": {"scrap": 2}}
@@ -47,7 +45,6 @@ var current_station := -1
 var oil_buff := 0.0
 var cars: Array[AnimatableBody3D] = []
 var total_length := 0.0
-var welder: WelderSource
 
 var _furnace: Node3D
 var _wheel_nodes: Array[Node3D] = []
@@ -363,7 +360,9 @@ func _build_locomotive(car: Node3D, model: Node3D, length: float) -> void:
 	var boiler := StaticBody3D.new()
 	boiler.collision_layer = Build.LAYER_TRAIN
 	car.add_child(boiler)
-	Build.collider(boiler, Vector3(2.0, 2.0, 4.8), Vector3(0, f + 1.0, -2.3))
+	# narrow enough to leave a walkway on each side from the cab front doors to the front of the engine
+	Build.collider(boiler, Vector3(1.8, 1.9, 4.6), Vector3(0, f + 1.0, -2.2))
+	Build.collider(boiler, Vector3(1.4, 1.2, 0.9), Vector3(0, f + 0.2, -4.5))
 	_smoke = Build.sphere(car, 0.6, Vector3(0, f + 3.9, -4.0), Color(0.85, 0.85, 0.85, 0.6))
 
 	for i in MAX_WHEELS:
@@ -436,10 +435,6 @@ func take_item(player: Node, item: String) -> bool:
 
 func _build_utility(car: Node3D, length: float) -> void:
 	var f := FLOOR_HEIGHT
-	welder = WelderSource.create(car, "train", WELDER_CABLE, Vector3(0.7, f, 2.4))
-	ActionSpot.create(car, Vector3(1.2, 1.2, 1.0), Vector3(0.7, f + 0.5, 2.4),
-		func(_p): return "Welder machine (cable %d m). Pick the welder [2] near it to plug in" % int(WELDER_CABLE),
-		func(_p): pass)
 	Build.box(car, Vector3(1.4, 0.9, 0.9), Vector3(-0.5, f + 0.45, -2.5), Color(0.5, 0.35, 0.2))
 	ActionSpot.create(car, Vector3(1.6, 1.2, 1.2), Vector3(-0.5, f + 0.6, -2.5),
 		func(_p): return "Crafting table (spear, blueprints): coming in M7", func(_p): pass)

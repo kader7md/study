@@ -122,83 +122,99 @@ func _build_water() -> void:
 	add_child(mi)
 
 
-## Big mountains beyond the edge of the ribbon; tall and snowy in the mountain pass.
+## Mesh of a Blender nature model (assets/models/nature/<id>.glb), for MultiMesh scattering.
+static func nature_mesh(id: String) -> Mesh:
+	var scene: Node = load("res://assets/models/nature/%s.glb" % id).instantiate()
+	var mi: MeshInstance3D = scene.find_children("*", "MeshInstance3D", true, false)[0]
+	var mesh := mi.mesh
+	scene.free()
+	return mesh
+
+
+func _scatter(mesh: Mesh, transforms: Array[Transform3D], shadows := true) -> void:
+	if transforms.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = transforms.size()
+	for i in transforms.size():
+		mm.set_instance_transform(i, transforms[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	if not shadows:
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mmi)
+
+
+func _place(p: Vector3, scale: float, rng: RandomNumberGenerator, squash := 1.0) -> Transform3D:
+	var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(scale, scale * squash, scale))
+	return Transform3D(basis, p)
+
+
+## Big rocky mountains beyond the edge of the ribbon (the boulder model scaled up), tall in the mountain pass.
 func _build_mountains(rng: RandomNumberGenerator) -> void:
-	var rock := CylinderMesh.new()
-	rock.top_radius = 0.0
-	rock.bottom_radius = 1.0
-	rock.height = 1.0
-	rock.radial_segments = 7
-	rock.material = Build.material(Color(0.33, 0.34, 0.31))
-	var snow := CylinderMesh.new()
-	snow.top_radius = 0.0
-	snow.bottom_radius = 1.0
-	snow.height = 1.0
-	snow.radial_segments = 7
-	snow.material = Build.material(SNOW)
-	var rocks: Array[Transform3D] = []
-	var caps: Array[Transform3D] = []
+	var mesh := nature_mesh("boulder")
+	var list: Array[Transform3D] = []
 	var d := 0.0
 	while d < track.get_length():
-		var walls: float = track.theme_at(d).walls
+		var theme := track.theme_at(d)
+		var walls: float = theme.walls
 		for side in [-1.0, 1.0]:
-			if track.theme_at(d).has("lake") and side == float(track.theme_at(d).lake[2]):
+			if theme.has("lake") and side == float(theme.lake[2]):
 				continue
-			var height := walls * rng.randf_range(0.8, 1.7) + rng.randf_range(10.0, 30.0)
-			var radius := height * rng.randf_range(0.7, 1.0)
-			# keep the whole mountain beyond the ribbon so it never hangs over the track
-			var u: float = side * (190.0 + radius * 0.9 + rng.randf_range(0.0, 80.0))
+			var height := walls * rng.randf_range(0.8, 1.7) + rng.randf_range(15.0, 35.0)
+			var radius := height * rng.randf_range(0.8, 1.2)
+			var u: float = side * (190.0 + radius * 0.8 + rng.randf_range(0.0, 80.0))
 			var base: Vector3 = track.point_at(d) + track.flat_right(d) * u
-			base.y = track.natural_height(d, signf(u) * 175.0) - 5.0
-			rocks.append(Transform3D(Basis().scaled(Vector3(radius, height, radius)), base + Vector3.UP * height * 0.5))
-			if height > 70.0:
-				var cap_h := height * 0.3
-				caps.append(Transform3D(Basis().scaled(Vector3(radius * 0.31, cap_h, radius * 0.31)),
-					base + Vector3.UP * (height - cap_h * 0.5 + 0.2)))
-		d += rng.randf_range(60.0, 110.0)
-	for pair in [[rock, rocks], [snow, caps]]:
-		var list: Array[Transform3D] = pair[1]
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = pair[0]
-		mm.instance_count = list.size()
-		for i in list.size():
-			mm.set_instance_transform(i, list[i])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		add_child(mmi)
+			base.y = track.natural_height(d, signf(u) * 175.0) - height * 0.15
+			# boulder.glb is about 3.8 m wide and 2.4 m high
+			var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(radius / 1.9, height / 2.4, radius / 1.9))
+			list.append(Transform3D(basis, base))
+		d += rng.randf_range(70.0, 120.0)
+	_scatter(mesh, list)
 
 
+## Trees, bushes, rocks and cliffs from the Blender nature models, chosen per landscape theme.
 func _build_trees(rng: RandomNumberGenerator) -> void:
-	var trunk := CylinderMesh.new()
-	trunk.top_radius = 0.25
-	trunk.bottom_radius = 0.32
-	trunk.height = 2.0
-	trunk.material = Build.material(Color(0.4, 0.27, 0.15))
-	var crown := CylinderMesh.new()
-	crown.top_radius = 0.0
-	crown.bottom_radius = 1.9
-	crown.height = 4.8
-	crown.radial_segments = 8
-	crown.material = Build.material(Color(0.18, 0.46, 0.24))
-	var transforms: Array[Transform3D] = []
-	var count := int(track.get_length() / 3.0)
+	var ids := ["pine", "pine_snow", "oak", "birch", "dead_tree", "bush", "rock_small", "boulder", "cliff"]
+	var lists := {}
+	for id in ids:
+		var empty: Array[Transform3D] = []
+		lists[id] = empty
+	var count := int(track.get_length() / 2.5)
 	for i in count:
 		var d := rng.randf_range(0.0, track.get_length())
-		var u := (1.0 if rng.randf() < 0.5 else -1.0) * rng.randf_range(10.0, 160.0)
+		var u := (1.0 if rng.randf() < 0.5 else -1.0) * rng.randf_range(9.0, 165.0)
 		var p := track.ground_point(d, u)
-		if p.y < Track.WATER_LEVEL + 1.0 or p.y > 65.0 or track.station_at(d) != -1 and absf(u) < 20.0:
+		if p.y < Track.WATER_LEVEL + 1.0 or (track.station_at(d) != -1 and absf(u) < 20.0):
 			continue
-		var s := rng.randf_range(0.8, 1.7)
-		transforms.append(Transform3D(Basis().scaled(Vector3.ONE * s), p))
-	for part in [[trunk, 1.0], [crown, 4.3]]:
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = part[0]
-		mm.instance_count = transforms.size()
-		for i in transforms.size():
-			var tr := transforms[i]
-			mm.set_instance_transform(i, tr.translated(Vector3.UP * part[1] * tr.basis.get_scale().y))
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		add_child(mmi)
+		var theme: String = track.theme_at(d).name
+		var r := rng.randf()
+		var id := "pine"
+		if p.y > 45.0:
+			id = "pine_snow" if r < 0.8 else "dead_tree"
+		elif theme == "Mountain pass":
+			id = "pine" if r < 0.6 else ("pine_snow" if r < 0.8 else ("dead_tree" if r < 0.9 else "boulder"))
+		elif theme == "River valley" or theme == "The lake":
+			id = "oak" if r < 0.35 else ("birch" if r < 0.6 else ("pine" if r < 0.8 else ("bush" if r < 0.93 else "rock_small")))
+		elif theme == "The coast":
+			id = "pine" if r < 0.4 else ("bush" if r < 0.7 else ("rock_small" if r < 0.85 else "boulder"))
+		else:
+			id = "pine" if r < 0.55 else ("oak" if r < 0.7 else ("bush" if r < 0.85 else ("rock_small" if r < 0.95 else "boulder")))
+		var sc := rng.randf_range(0.75, 1.35)
+		if id == "boulder":
+			sc = rng.randf_range(0.5, 1.6)
+		lists[id].append(_place(p - Vector3.UP * 0.1, sc, rng))
+	# cliffs along the mountain pass and the coast, away from the track
+	var d2 := 0.0
+	while d2 < track.get_length():
+		var theme2: String = track.theme_at(d2).name
+		if theme2 == "Mountain pass" or theme2 == "The coast" or theme2 == "River valley":
+			var u2 := (1.0 if rng.randf() < 0.5 else -1.0) * rng.randf_range(35.0, 120.0)
+			var p2 := track.ground_point(d2, u2)
+			if p2.y > Track.WATER_LEVEL + 0.5:
+				lists["cliff"].append(_place(p2 - Vector3.UP * 1.0, rng.randf_range(1.0, 2.2), rng, rng.randf_range(0.8, 1.6)))
+		d2 += rng.randf_range(25.0, 60.0)
+	for id in ids:
+		_scatter(nature_mesh(id), lists[id], id != "bush" and id != "rock_small")

@@ -22,7 +22,6 @@ const SHOP := {
 	"nails": {"label": "Nails x10", "price": 5, "gives": {"nails": 10}},
 	"wheel": {"label": "Train wheel", "price": 8, "gives": {"wheel": 1}},
 	"engine_oil": {"label": "Engine oil", "price": 6, "gives": {"engine_oil": 1}},
-	"repair_hammer": {"label": "Repair hammer (faster welding)", "price": 12, "gives": {"repair_hammer": 1}},
 	"nail_gun": {"label": "Nail gun (faster rail repair)", "price": 15, "gives": {"nail_gun": 1}},
 	"medkit": {"label": "Medkit", "price": 7, "gives": {"medkit": 1}},
 	"grappler": {"label": "Grappling hook", "price": 12, "gives": {"grappler": 1}},

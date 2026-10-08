@@ -1,8 +1,7 @@
 class_name WelderSource
 extends Node3D
-## A welder machine the welding torch plugs into. The cable has a fixed length.
-## kind "train" = small machine on the utility car (rails; metal body panels only while the body is under Train.PATCH_LIMIT)
-## kind "station" = big station machine (anything, body up to 100 %)
+## A station welder machine. Players take its welding torch [E]; the cable has a fixed length.
+## Welding only happens at stations: metal train panels go back on here (wood panels can be nailed anywhere).
 
 var kind := "train"
 var cable_length := 30.0
@@ -23,6 +22,15 @@ func _ready() -> void:
 	if kind == "station":
 		model.scale = Vector3.ONE * 1.5
 	add_child(model)
+	var spot := ActionSpot.create(self, Vector3(1.6, 1.6, 1.4), Vector3(0, 0.6, 0),
+		func(p):
+			if p and p.welder_source == self:
+				return "Welder (cable %d m): switch tools to put the torch back" % int(cable_length)
+			return "Station welder: take the welding torch  [E]  (cable %d m)" % int(cable_length),
+		func(p):
+			if p and p.welder_source != self:
+				p.take_welder(self))
+	spot.name = "TakeTorch"
 
 
 ## Where the cable comes out.

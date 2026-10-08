@@ -96,24 +96,32 @@ Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations 
 - **Sacrifice altar** on the train, for reviving (see 8).
 
 ### Hands-on repair (RV There Yet style: you do it with your hands, no "hold E")
-**Broken track**, step by step:
-1. Take **planks** from the cargo car (1 wood each) and carry them in both hands. Place them on the 2 glowing ghost sleepers.
-2. **Nail** each plank: 2 nails per plank, **3 hammer hits** per nail (or 1 shot with the **nail gun**). Each nail uses 1 nail.
+**Broken track**, step by step (anywhere on the line):
+1. Take **planks** from the cargo car (1 wood each), carry them in both hands, place them on the 2 glowing ghost sleepers.
+2. **Nail** each plank: 2 nails per plank, **3 hammer hits** per nail (or 1 shot with the **nail gun**).
 3. Take **rails** (2 scrap each) and place them on the 2 rail ghosts.
-4. **Weld** both ends of each rail with the **welder** (hold LMB). The torch is plugged into a **welder machine by a cable**
-   (35 m from the train's machine). Walk too far and the cable stops you; go much further and it unplugs.
+4. **Bolt a fishplate** at both ends of each rail (hammer / nail gun).
+
+**Welding only exists at stations.** Every station has a welder machine. Take its **welding torch** [E]; the torch is on
+a **cable** (30 m): walk too far and it stops you, go much further and it pulls out.
 
 **Wheels:** a fallen wheel is gone. Buy a new one at a station, carry it from the cargo car, **lift it into place** (animated),
 then **bolt it on with 3 hammer hits**.
 
-**Train body (cover):** at full health every car is fully covered: walls, roofs, doors and the locomotive's boiler plates
-(30 breakable pieces in total). Damage makes pieces **break off and fly away**, leaving the bare frame (and gaps you
-can fall out of). To fix one: **pick up the fallen piece** (free) or take a **new panel** from the cargo car (2 scrap),
-carry it to the ghost, place it, then **nail it** (wood: 2 nails) or **weld it** (metal: 2 welds).
-The train's own welder can only weld metal panels while the body is under **60 %**. Above that you need the big
-**station welder**, so a badly damaged train has to **limp to the next station**. Doors open and close with E.
+**Train body (cover):** at full health every car is fully covered: walls, roofs, doors and the locomotive's boiler plates.
+Damage makes pieces **break off and fly away**, leaving the bare frame (and gaps you can fall out of). To fix one:
+**pick up the fallen piece** (free) or take a **new panel** from the cargo car (2 scrap), carry it to the ghost, place it, then
+- **wood** panels: **nail** them (anywhere)
+- **metal** panels (boiler plates, cab walls, roofs): **weld** them, **only at a station**.
 
-Special items found only at stations: **engine oil, repair hammer, nail gun, wheels**.
+So a train that lost its metal plates has to **limp to the next station**.
+**Doors** open with E. The locomotive cab has **two front doors** (one each side of the boiler) that swing forward: open them
+to see where you're going and to walk out along the running boards to the front of the engine.
+
+### The train (reference: GWR 7822 "Foxcote Manor" photos)
+Realistic steam engine look: black smokebox with a numberplate, green boiler and cab with orange-black lining,
+brass safety-valve bonnet, copper-capped chimney, red riveted buffer beam with big buffers, coal bunker at the back of the cab.
+Brown goods van with a grey roof, an open workshop wagon, and the rusty locked container.
 
 ### Landscape between stations
 Stations are **1.5 km apart** (longer in the full game), each stretch with its own theme:

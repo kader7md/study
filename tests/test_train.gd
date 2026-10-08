@@ -122,34 +122,21 @@ func _run() -> void:
 		s.interact(player)
 	await _frames(2)
 	check(Game.count("scrap") == scrap - 4, "two rails cost 4 scrap")
-	check(repair.step() == 4, "rails placed → step 4 (welding)")
-	# Weld from next to the track: plug into the train's welder (in cable range)
-	player.global_position = track.ground_point(track.piece_center(gap_piece), 2.5) + Vector3.UP
+	check(repair.step() == 4, "rails placed → step 4 (bolting the joints)")
+	var bolts := repair.find_children("*", "NailSpot", true, false).filter(func(n): return n.style == "bolt")
+	check(bolts.size() == 4, "4 rail joints to bolt with fishplates")
 	player.select_tool("welder")
-	var seams := repair.find_children("*", "WeldSeam", true, false)
-	check(seams.size() == 4, "4 rail joints to weld")
-	for seam in seams:
-		player.weld_tick(seam, WeldSeam.WELD_TIME + 0.1)
-	check(is_instance_valid(player.welder_source) and player.welder_source.kind == "train", "welder plugged into the train's welder machine")
+	check(player.current_tool == "hammer", "no welder on the track (welders are only at stations)")
+	for b in bolts:
+		for k in NailSpot.HAMMER_HITS:
+			b.on_tool_hit("hammer", player)
 	await _frames(3)
-	check(not track.is_broken(gap_piece), "all joints welded → track rebuilt")
+	check(not track.is_broken(gap_piece), "all joints bolted → track rebuilt")
 	train.lever = 1
 	await _wait(2.0)
 	check(train.speed > 0.5, "train moves on after the repair")
 	train.lever = 0
 	await _wait_until(func(): return train.is_stopped(), 10.0)
-
-	print("Welder cable limit")
-	var plug := train.welder.plug_position()
-	var away := (Vector3(player.global_position.x - plug.x, 0, player.global_position.z - plug.z)).normalized()
-	player.global_position = Vector3(plug.x, player.global_position.y, plug.z) + away * (Train.WELDER_CABLE + 2.0)
-	await _frames(3)
-	var flat := Vector3(player.global_position.x - plug.x, 0, player.global_position.z - plug.z).length()
-	check(flat <= Train.WELDER_CABLE + 0.1 and is_instance_valid(player.welder_source), "the cable stops you at its length (%.1f m)" % flat)
-	player.global_position = Vector3(plug.x, player.global_position.y, plug.z) + away * (Train.WELDER_CABLE + 10.0)
-	await _frames(3)
-	check(not is_instance_valid(player.welder_source), "walking too far unplugs the cable")
-	player.select_tool("hammer")
 
 	print("Wheels: fall off, lift in, bolt on")
 	var wheels_before := train.wheels
@@ -208,6 +195,17 @@ func _run() -> void:
 		door.toggle_door()
 		check(door.door_open, "doors open with E")
 		door.toggle_door()
+	# cab front doors (one each side of the boiler) swing FORWARD so you can see ahead and walk to the front
+	var front_doors := train.parts.filter(func(p): return p.is_door and p.car == train.cars[0] and p.node.get_aabb().size.x > p.node.get_aabb().size.z)
+	check(front_doors.size() == 2, "the cab has 2 front doors")
+	if front_doors.size() > 0:
+		var fd: BodyPart = front_doors[0]
+		var before := fd.node.transform * fd.node.get_aabb().get_center()
+		fd.toggle_door()
+		await _wait(0.5)
+		var after := fd.node.transform * fd.node.get_aabb().get_center()
+		check(after.z < before.z - 0.1, "the front door swings forward (towards the front of the engine)")
+		fd.toggle_door()
 	# Refit a wooden panel: pick up a fallen one, place it, nail it
 	train.weld_full()
 	train.take_damage(train.parts[0].value() * 3.0)
@@ -236,30 +234,22 @@ func _run() -> void:
 	wpanel.slot().interact(player)
 	await _frames(2)
 	check(wpanel.is_pending(), "panel placed, needs nails")
-	var nails := train.find_children("*", "NailSpot", true, false).filter(func(n): return n.get_meta("part", null) == wpanel)
+	var nails := train.find_children("*", "NailSpot", true, false).filter(func(n): return n.has_meta("part") and n.get_meta("part") == wpanel)
 	check(nails.size() == 2, "a wooden panel takes 2 nails")
 	for n in nails:
 		for k in NailSpot.HAMMER_HITS:
 			n.on_tool_hit("hammer", player)
 	check(wpanel.attached and train.health > hp_before, "nailed on → panel fixed, health %.0f → %.0f" % [hp_before, train.health])
-	# Refit a metal panel: new one from the cargo car (2 scrap), weld it
+	# A metal panel can be put in place anywhere, but welding needs a station welder
 	Game.add("scrap", 20)
 	var scrap2 := Game.count("scrap")
 	train.take_item(player, "panel")
 	check(Game.count("scrap") == scrap2 - 2, "a new panel from the cargo car costs 2 scrap")
 	metal.slot().interact(player)
 	await _frames(2)
-	var seams2 := train.find_children("*", "WeldSeam", true, false).filter(func(n): return n.get_meta("part", null) == metal)
+	var seams2 := train.find_children("*", "WeldSeam", true, false).filter(func(n): return n.has_meta("part") and n.get_meta("part") == metal)
 	check(seams2.size() == 2, "a metal panel takes 2 welds")
-	player.welder_source = train.welder
-	var health_now := train.health
-	train.health = Train.PATCH_LIMIT + 5.0
-	check(not player.weld_tick(seams2[0], 0.5), "the train's welder can't weld metal above %d%%" % int(Train.PATCH_LIMIT))
-	train.health = minf(health_now, Train.PATCH_LIMIT - 10.0)
-	for seam in seams2:
-		player.weld_tick(seam, WeldSeam.WELD_TIME + 0.1)
-	check(metal.attached, "welded on → metal panel fixed")
-	player.select_tool("hammer")
+	check(not player.weld_tick(seams2[0], 0.5), "no welding away from a station")
 
 	print("Station checkpoint + station welder")
 	_clear_gaps(track.station_distances[1] - 200.0, track.station_distances[1] + 40.0)
@@ -268,8 +258,25 @@ func _run() -> void:
 	var arrived := await _wait_until(func(): return Game.next_station == 2, 10.0)
 	check(arrived and Game.checkpoint.get("station", -1) == 1, "stopping in station 1 saves a checkpoint")
 	var station_welder: WelderSource = main.get_node("Station1").find_children("*", "WelderSource", true, false)[0]
-	train.health = Train.PATCH_LIMIT + 5.0
-	train._sync_parts(false)
+	# weld the metal panel we placed before
+	player.global_position = station_welder.global_position + Vector3.UP
+	station_welder.get_node("TakeTorch").interact(player)
+	check(player.current_tool == "welder" and player.welder_source == station_welder, "take the welding torch from the station welder")
+	for seam in seams2:
+		player.weld_tick(seam, WeldSeam.WELD_TIME + 0.1)
+	check(metal.attached, "welded on at the station → metal panel fixed")
+	# cable limit
+	var plug := station_welder.plug_position()
+	var away := Vector3(1, 0, 0)
+	player.global_position = Vector3(plug.x, player.global_position.y, plug.z) + away * (station_welder.cable_length + 2.0)
+	await _frames(3)
+	var flat := Vector3(player.global_position.x - plug.x, 0, player.global_position.z - plug.z).length()
+	check(flat <= station_welder.cable_length + 0.1 and player.current_tool == "welder", "the cable stops you at its length (%.1f m)" % flat)
+	player.global_position = Vector3(plug.x, player.global_position.y, plug.z) + away * (station_welder.cable_length + 10.0)
+	await _frames(3)
+	check(not is_instance_valid(player.welder_source) and player.current_tool == "hammer", "walking too far pulls the cable out")
+	train.weld_full()
+	train.take_damage(40.0)
 	var high: BodyPart = null
 	for p in train.parts:
 		if not p.attached and p.material == "metal" and p.slot() != null and high == null:
@@ -284,10 +291,12 @@ func _run() -> void:
 	train.take_item(player, "panel")
 	high.slot().interact(player)
 	await _frames(2)
-	player.welder_source = station_welder
-	for seam in train.find_children("*", "WeldSeam", true, false).filter(func(n): return n.get_meta("part", null) == high):
+	player.global_position = station_welder.global_position + Vector3.UP
+	await _frames(2)
+	station_welder.get_node("TakeTorch").interact(player)
+	for seam in train.find_children("*", "WeldSeam", true, false).filter(func(n): return n.has_meta("part") and n.get_meta("part") == high):
 		player.weld_tick(seam, WeldSeam.WELD_TIME + 0.1)
-	check(high.attached and train.health > hp_station, "the station welder welds metal panels above %d%%" % int(Train.PATCH_LIMIT))
+	check(high.attached and train.health > hp_station, "another metal panel welded at the station")
 	var gold := Game.count("gold")
 	Game.buy("nails")
 	check(Game.count("gold") == gold - Game.SHOP.nails.price, "shop takes gold")

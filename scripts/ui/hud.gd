@@ -6,8 +6,8 @@ extends CanvasLayer
 ## bottom right the impostor's sabotage panel, plus the station shop window.
 
 const HELP := """[F1] help   WASD move · Shift sprint · Space jump · E use / place · Q alt · G put item back
-Tools: 1 hammer · 2 welder (hold LMB, plug in near a welder machine) · 3 nail gun · LMB use tool
-Broken track: take planks → place → nail → take rails → place → weld · Lever: E forward / Q back
+Tools: 1 hammer · 2 nail gun · 3 welder (take the torch from a STATION welder) · LMB use tool
+Broken track: take planks → place → nail → take rails → place → bolt the joints · Cab front doors: E
 F2 play as impostor ([Tab] sabotage menu) · F3 world sabotage on/off · F5 last checkpoint · F6 new game"""
 
 var player: Player
@@ -158,7 +158,7 @@ func _process(_delta: float) -> void:
 			if is_instance_valid(player.welder_source):
 				line += "\nCable %d%%%s" % [int(player.cable_tension * 100.0), "  ⚠ LIMIT" if player.cable_tension > 0.95 else ""]
 			else:
-				line += "\nWelder not plugged in: go near a welder machine (train utility car or station)"
+				line += "\nNo torch: take one from a station welder"
 		_hotbar.text = line
 
 	_sabotage_label.visible = Game.role == "impostor"

@@ -2,8 +2,8 @@ class_name Player
 extends CharacterBody3D
 ## First-person player (big cartoony hands, RV There Yet style):
 ## walk, sprint, jump, ride the train, use things ([E]/[Q], hold [E]),
-## tools on keys 1-3: hammer (hit nails, bolt wheels, fight), welder (hold LMB, plugged into a welder
-## machine by a cable with a length limit), nail gun (if bought).
+## tools on keys 1-3: hammer (nails, bolts, wheels, fight), nail gun (if bought), welder (only while holding the
+## torch taken from a STATION welder machine: hold LMB, the cable has a length limit).
 ## Carry repair items (plank, rail, wheel) in both hands; [G] puts them back.
 ## Debug impostor (F2): [Tab] opens the sabotage menu, then keys 1-4; meteor is aimed (LMB drop, RMB cancel).
 
@@ -17,7 +17,7 @@ const HAMMER_DAMAGE := 20.0
 const NAIL_GUN_DAMAGE := 8.0
 const WARM_RADIUS := 7.0
 const SKIN := Color(1.0, 0.76, 0.6)
-const TOOLS := ["hammer", "welder", "nail_gun"]
+const TOOLS := ["hammer", "nail_gun", "welder"]
 const TOOL_NAMES := {"hammer": "Hammer", "welder": "Welder", "nail_gun": "Nail gun"}
 
 var health := 100.0
@@ -123,10 +123,8 @@ func _build_hands() -> void:
 	var welder := Props.instance("welder")
 	welder.position = Vector3(0, 0.02, -0.06)
 	welder.scale = Vector3.ONE * 0.8
-	var gun := Node3D.new()
-	Build.box(gun, Vector3(0.1, 0.14, 0.32), Vector3(0, 0.05, -0.12), Color(0.95, 0.5, 0.1))
-	Build.box(gun, Vector3(0.07, 0.16, 0.08), Vector3(0, -0.06, -0.02), Color(0.15, 0.15, 0.15))
-	Build.cylinder(gun, 0.025, 0.1, Vector3(0, 0.08, -0.32), Color(0.6, 0.6, 0.62)).rotation.x = PI * 0.5
+	var gun := Props.instance("nail_gun")
+	gun.position = Vector3(0, 0.0, -0.04)
 	for pair in [["hammer", hammer], ["welder", welder], ["nail_gun", gun]]:
 		_right.add_child(pair[1])
 		_tool_models[pair[0]] = pair[1]
@@ -169,16 +167,30 @@ func _arm(pivot: Node3D) -> void:
 
 
 func available_tools() -> Array[String]:
-	var list: Array[String] = ["hammer", "welder"]
+	var list: Array[String] = ["hammer"]
 	if Game.has("nail_gun"):
 		list.append("nail_gun")
+	if is_instance_valid(welder_source):
+		list.append("welder")
 	return list
+
+
+## Takes the welding torch from a station welder machine (the only welders in the game).
+func take_welder(source: WelderSource) -> void:
+	if carried_item != "":
+		Game.say("Hands full")
+		return
+	welder_source = source
+	select_tool("welder")
+	Game.say("Welding torch in hand (cable %d m). Switch tools or walk away to put it back." % int(source.cable_length))
 
 
 func select_tool(tool: String) -> void:
 	if not tool in available_tools():
 		if tool == "nail_gun":
 			Game.say("No nail gun yet (buy one at a station shop)")
+		elif tool == "welder":
+			Game.say("Welding torches are only at stations: take one from the station welder")
 		return
 	current_tool = tool
 	for id: String in _tool_models:
@@ -422,13 +434,13 @@ func _update_focus(delta: float) -> void:
 		hold_progress = 0.0
 
 
-## Welder: plug into the nearest welder machine in range, keep the player inside the cable length,
+## Welder (torch from a station machine): keep the player inside the cable length,
 ## weld whatever the torch points at while LMB is held.
 func _update_welder(delta: float) -> void:
 	welding = false
+	if current_tool == "welder" and not is_instance_valid(welder_source):
+		select_tool("hammer")
 	var holding := current_tool == "welder" and carried_item == "" and not downed
-	if holding and not is_instance_valid(welder_source):
-		_plug_nearest()
 	if not holding or not is_instance_valid(welder_source):
 		_cable.visible = false
 		_set_weld_fx(false)
@@ -439,6 +451,7 @@ func _update_welder(delta: float) -> void:
 	var limit := welder_source.cable_length
 	if flat.length() > limit + 4.0:
 		_unplug(true)
+		select_tool("hammer")
 		return
 	if flat.length() > limit:
 		var back := plug + flat.normalized() * limit
@@ -464,28 +477,13 @@ func _update_welder(delta: float) -> void:
 func weld_tick(target: Interactable, delta: float) -> bool:
 	## Test helper: weld `target` for `delta` seconds as if aiming at it with LMB held.
 	if not is_instance_valid(welder_source):
-		_plug_nearest()
-	if not is_instance_valid(welder_source):
 		return false
 	return target.on_weld(delta, self, welder_source)
 
 
-func _plug_nearest() -> void:
-	var best: WelderSource = null
-	var best_d := INF
-	for s in get_tree().get_nodes_in_group("welder_source"):
-		var d: float = s.plug_position().distance_to(global_position)
-		if d < s.cable_length and d < best_d:
-			best = s
-			best_d = d
-	welder_source = best
-	if best:
-		Game.say("Welder plugged into the %s welder (cable %d m)" % [best.kind, int(best.cable_length)])
-
-
 func _unplug(announce: bool) -> void:
 	if is_instance_valid(welder_source) and announce:
-		Game.say("The welder cable came unplugged!")
+		Game.say("The welder cable pulled out: the torch is back at the station welder")
 	welder_source = null
 	if _cable:
 		_cable.visible = false

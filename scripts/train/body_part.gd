@@ -3,7 +3,8 @@ extends Node
 ## One breakable piece of a train car's cover: a wall panel, roof panel, boiler plate or door
 ## (a "Panel_<wood|metal>_<n>" / "Door_<wood|metal>_<n>" node in the Blender model).
 ## Attached: visible and solid. Broken off: it flies away as a FallenPart and leaves the frame open.
-## Refit: carry a panel to the ghost, place it, then nail it (wood: 2 nails) or weld it (metal: 2 seams).
+## Refit: carry a panel to the ghost, place it, then nail it (wood: 2 nails, anywhere) or weld it
+## (metal: 2 seams, only with a station welder's torch).
 
 signal attached_changed(part: BodyPart)
 
@@ -50,7 +51,10 @@ func toggle_door() -> void:
 		return
 	door_open = not door_open
 	var side := signf(_home.origin.x) if absf(_home.origin.x) > 0.1 else 1.0
-	var target := _home.basis.rotated(Vector3.UP, side * DOOR_OPEN_ANGLE if door_open else 0.0)
+	# side doors swing outwards; cab FRONT doors (thin along the track) swing forwards
+	var size := node.get_aabb().size
+	var angle := side * DOOR_OPEN_ANGLE if size.x <= size.z else -side * DOOR_OPEN_ANGLE
+	var target := _home.basis.rotated(Vector3.UP, angle if door_open else 0.0)
 	var tween := node.create_tween()
 	tween.tween_property(node, "basis", target, 0.3).set_trans(Tween.TRANS_BACK)
 
@@ -131,9 +135,6 @@ func _add_fasteners() -> void:
 			f = nail
 		else:
 			var seam := WeldSeam.new()
-			seam.allow_fn = func(source: Node) -> bool:
-				return source.kind == "station" or train.health < Train.PATCH_LIMIT
-			seam.refuse_text = "The train's welder can't weld the body above %d%%: use a station welder" % int(Train.PATCH_LIMIT)
 			seam.done.connect(_on_fastened)
 			f = seam
 		f.position = pos
@@ -166,7 +167,7 @@ func refit_instantly() -> void:
 		_slot.queue_free()
 	_slot = null
 	for f in car.get_children():
-		if f.get_meta("part", null) == self:
+		if f.has_meta("part") and f.get_meta("part") == self:
 			f.queue_free()
 	node.transform = _home
 	node.visible = true

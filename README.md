@@ -14,13 +14,15 @@ Open the folder in **Godot 4.7** (standard build, 4.7.2), then press **F5** (Run
 What's in it:
 - **Landscape**: 6 stations 1.5 km apart, through forest hills, a river valley, a mountain pass, a lake and the coast.
   Hills slow the train, and wooden trestle bridges cross the rivers and the lake
-- **Train made in Blender** (`blender/scripts/build_train.py` → `assets/models/`): steam locomotive, cargo wagon,
-  utility wagon (welder machine), locked container. Furnace + coal, 3-way lever
-- **Hands-on track repair**: take planks → place → nail (hammer 3 hits / nail gun) → take rails → place → weld both ends
-- **Welder** with a **cable** to a welder machine (train: 35 m, rails + body up to 60 %; station: body up to 100 %)
+- **Detailed models made in Blender** (stylized realism, baked worn textures): steam locomotive with rivets, pistons and
+  rods, boxcar, workshop wagon, rusty container, tools (hammer, nail gun, welder, welding machine), trees, rocks, cliffs.
+  Furnace + coal, 3-way lever
+- **Hands-on track repair**: take planks → place → nail (hammer 3 hits / nail gun) → take rails → place → bolt the fishplates
+- **Welder only at stations**: take the torch from the station welder machine (30 m cable). Metal panels are welded there
 - **Wheels** fall off in crashes: carry a new one, lift it into place, bolt it with the hammer
 - **Breakable train cover**: walls, roofs, doors and boiler plates fly off when damaged. Pick them up (or take a new panel),
-  place them, then nail (wood) or weld (metal). Doors open with E
+  place them, then nail (wood, anywhere) or weld (metal, at a station). Doors open with E; the cab front doors swing
+  forward so you can see ahead and walk to the front of the engine
 - **Shop** at every station, **checkpoints**, back to the last checkpoint if everyone dies
 - **Sabotage**: meteor (aimed), zombies, eagles (steal cargo), freezing wind
 - First-person player with cartoony hands, a tool hotbar, and carrying items; can ride the moving train
@@ -30,16 +32,18 @@ What's in it:
 |-----|--------|
 | WASD / Shift / Space | Move / sprint / jump |
 | Mouse · LMB | Look · use tool (hammer hit, nail gun shot, hold to weld) |
-| 1 / 2 / 3 (or mouse wheel) | Hammer / welder / nail gun |
+| 1 / 2 / 3 (or mouse wheel) | Hammer / nail gun / welder (only while holding a station torch) |
 | E · Q · G | Use / place carried item · alternative use · put the carried item back |
 | F1 | Show/hide help |
 | F2 | Debug: play as **impostor** (**Tab** = sabotage menu, then 1–4; meteor: aim + LMB) |
 | F3 | Debug: world sabotage on/off |
 | F5 / F6 | Last checkpoint / new game |
 
-### Rebuilding the train models
+### Rebuilding the models
 ```bash
-blender --background --python blender/scripts/build_train.py -- .
+blender --background --python blender/scripts/build_assets.py -- .      # train, tools, repair items
+blender --background --python blender/scripts/build_nature.py -- .      # trees, rocks, cliffs, bushes
+blender --background --python blender/scripts/render_showcase.py -- . renders   # preview pictures
 ```
 
 ### Tests
