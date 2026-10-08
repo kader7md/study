@@ -73,8 +73,7 @@ func _repair_shots(track: Track, train: Train, player: Player) -> void:
 		return
 	await get_tree().process_frame
 	player.carry("plank")
-	var slots := repair.find_children("*", "PlaceSlot", true, false)
-	slots[0].interact(player)
+	repair.place_plank(1, player)
 	await get_tree().process_frame
 	for n in repair.find_children("*", "NailSpot", true, false).slice(0, 1):
 		for k in 3:

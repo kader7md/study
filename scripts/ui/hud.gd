@@ -6,14 +6,16 @@ extends CanvasLayer
 ## bottom right the impostor's sabotage panel, plus the station shop window.
 
 const HELP := """[F1] help   WASD move · Shift sprint · Space jump · E use / place · Q alt · G put item back
-Tools: 1 hammer · 2 wrench (tighten loose wheels) · 3 nail gun · 4 welder (torch from a STATION welder) · LMB use
-Broken track: take planks → place → nail → take rails → place → bolt the joints · Cab front doors: E
+Tools: 1 hammer · 2 wrench · 3 nail gun (joins planks) · 4 welder (station torch) · 5 come-along · LMB use
+Broken track: place planks (nail on ground, NAIL GUN over water) → rails → bolt · tilt > 8° tips the train!
 F2 play as impostor ([Tab] sabotage menu) · F3 world sabotage on/off · F5 last checkpoint · F6 new game"""
 
 var player: Player
 
 var _train_bar: ProgressBar
-var _mech_bar: ProgressBar
+var _wheel_boxes: Array[ProgressBar] = []
+var _engine_bar: ProgressBar
+var _chassis_bar: ProgressBar
 var _damage_label: Label
 var _progress_bar: ProgressBar
 var _progress_label: Label
@@ -44,11 +46,17 @@ func _ready() -> void:
 	var top := VBoxContainer.new()
 	root.add_child(top)
 	_place(top, 0.5, 0.0, Vector2(-260, 12), Vector2(520, 0))
-	# train health = body (green, the cover pieces) + mechanics (orange: wheels, engine, chassis), 50 % each
-	var bars := HBoxContainer.new()
-	top.add_child(bars)
-	_train_bar = _bar(bars, Color(0.2, 0.75, 0.3), Vector2(258, 20))
-	_mech_bar = _bar(bars, Color(0.95, 0.55, 0.15), Vector2(258, 20))
+	# train health: green = body (cover pieces); mechanics: one yellow square per wheel, red = engine, blue = chassis
+	_train_bar = _bar(top, Color(0.2, 0.75, 0.3), Vector2(520, 18))
+	var mech := HBoxContainer.new()
+	mech.add_theme_constant_override("separation", 6)
+	top.add_child(mech)
+	for i in Train.MAX_WHEELS:
+		var sq := _bar(mech, Color(1.0, 0.85, 0.15), Vector2(22, 22))
+		sq.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
+		_wheel_boxes.append(sq)
+	_engine_bar = _bar(mech, Color(0.9, 0.15, 0.12), Vector2(165, 22))
+	_chassis_bar = _bar(mech, Color(0.2, 0.5, 0.95), Vector2(165, 22))
 	_damage_label = _label(top, "", 15)
 	_damage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_progress_bar = _bar(top, Color(0.25, 0.55, 0.95), Vector2(520, 14))
@@ -123,15 +131,20 @@ func _process(_delta: float) -> void:
 	var track := Game.track
 	if train and track:
 		_train_bar.value = train.body_health / Train.BODY_MAX * 100.0
-		_mech_bar.value = train.mech_health() / Train.MECH_MAX * 100.0
+		for i in _wheel_boxes.size():
+			var state := train.wheel_state(i)
+			_wheel_boxes[i].value = 0.0 if state != 0 else (1.0 - train.wheel_wear[i] / Train.WHEEL_LIMIT) * 100.0
+			_wheel_boxes[i].modulate = Color(1, 1, 1, 0.35) if state != 0 else Color.WHITE
+		_engine_bar.value = 100.0 - train.engine_damage / Train.ENGINE_MAX * 100.0
+		_chassis_bar.value = 100.0 - train.chassis_damage / Train.CHASSIS_MAX * 100.0
 		var worst := 0.0
 		for w in train.wheel_wear:
 			worst = maxf(worst, w)
-		_damage_label.text = "Body %d%%   ·   Engine %d%%  ·  Chassis %d%%  ·  Wheels %d/%d%s" % [
+		_damage_label.text = "Body %d%%  ·  Wheels %d/%d (yellow)  ·  Engine %d%% (red)  ·  Chassis %d%% (blue)%s" % [
 			int(train.body_health / Train.BODY_MAX * 100.0),
+			train.wheels, Train.MAX_WHEELS,
 			int(100.0 - train.engine_damage / Train.ENGINE_MAX * 100.0),
 			int(100.0 - train.chassis_damage / Train.CHASSIS_MAX * 100.0),
-			train.wheels, Train.MAX_WHEELS,
 			("  (a wheel is %d%% loose!)" % int(worst / Train.WHEEL_LIMIT * 100.0)) if worst > 0.0 else ""]
 		var next := mini(Game.next_station, Game.STATION_COUNT)
 		var from := track.station_distances[next - 1]

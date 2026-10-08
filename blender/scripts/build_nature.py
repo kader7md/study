@@ -122,20 +122,20 @@ def _leafy_tree(name, trunk_h, trunk_r, limbs, spread, leaf_mat, bark_mat, clump
         n = math.sqrt(sum(c * c for c in d))
         fork((0, 0, trunk_h * random.uniform(0.85, 1.0)), tuple(c / n for c in d), spread, trunk_r * 0.55, 2)
     for i, t in enumerate(tips):
-        for k in range(3):
-            c = ico(f"leaf{i}_{k}", random.uniform(*clump), (t[0] + random.uniform(-0.5, 0.5), t[1] + random.uniform(-0.5, 0.5), t[2] + random.uniform(-0.2, 0.5)), leaf_mat, 2)
-            displace(c, 0.3, 0.3)
+        for k in range(6):
+            c = ico(f"leaf{i}_{k}", random.uniform(*clump), (t[0] + random.uniform(-0.7, 0.7), t[1] + random.uniform(-0.7, 0.7), t[2] + random.uniform(-0.3, 0.6)), leaf_mat, 1)
+            displace(c, 0.22, 0.25, subdiv=1)
             parts.append(c)
     A.join(name, parts, origin=(0, 0, 0))
     A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 1024)
 
 
 def oak(name):
-    _leafy_tree(name, 3.0, 0.5, 5, 2.2, "oak_leaves", "bark", (0.7, 1.15), 11)
+    _leafy_tree(name, 3.0, 0.5, 6, 2.0, "oak_leaves", "bark", (0.45, 0.75), 11)
 
 
 def birch(name):
-    _leafy_tree(name, 5.5, 0.2, 4, 1.6, "birch_leaves", "birch_bark", (0.45, 0.75), 12)
+    _leafy_tree(name, 5.5, 0.2, 5, 1.5, "birch_leaves", "birch_bark", (0.3, 0.5), 12)
 
 
 def dead_tree(name):

@@ -93,50 +93,127 @@ func _run() -> void:
 	check(stopped and train.distance <= gap_piece * Track.PIECE_LENGTH, "train stops at the broken track and doesn't pass it")
 	train.lever = 0
 
-	print("Rebuilding the track by hand")
+	print("Rebuilding the track by hand (free building)")
 	var repair := track.repair_at(gap_piece)
 	check(repair != null and repair.step() == 1, "broken piece starts at step 1 (planks)")
 	var wood := Game.count("wood")
 	check(train.take_item(player, "plank") and player.carried_item == "plank", "take a plank from the cargo car")
 	check(Game.count("wood") == wood - 1, "a plank costs 1 wood")
 	check(not train.take_item(player, "plank"), "can't carry two things")
-	var plank_slots := repair.find_children("*", "PlaceSlot", true, false).filter(func(s): return s.item == "plank")
-	plank_slots[0].interact(player)
-	check(player.carried_item == "" and repair._planks_placed == 1, "place the plank")
-	train.take_item(player, "plank")
-	plank_slots[1].interact(player)
+	check(repair.placement_kind(1) == "ground", "on the embankment a plank rests on the ground")
+	check(repair.place_plank(1, player) == "ground" and player.carried_item == "", "place the plank where you aim")
+	for k in [0, 2, 3]:
+		train.take_item(player, "plank")
+		repair.place_plank(k, player)
 	await _frames(2)
-	check(repair.step() == 2, "both planks placed → step 2 (nails)")
 	var nails_before := Game.count("nails")
 	var nail_spots := repair.find_children("*", "NailSpot", true, false)
-	check(nail_spots.size() == 4, "4 nails to drive in")
+	check(nail_spots.size() == 8, "4 planks × 2 nails")
 	for n in nail_spots:
 		for k in NailSpot.HAMMER_HITS:
 			n.on_tool_hit("hammer", player)
-	check(Game.count("nails") == nails_before - 4, "each nail uses 1 nail")
-	check(repair.step() == 3, "all nailed → step 3 (rails)")
+	check(Game.count("nails") == nails_before - 8 and repair.fixed_count() == 4, "all planks nailed down")
+	check(repair.step() == 2, "→ step 2 (rails)")
 	var scrap := Game.count("scrap")
-	var rail_slots := repair.find_children("*", "PlaceSlot", true, false).filter(func(s): return s.item == "rail" and not s.is_queued_for_deletion())
-	for s in rail_slots:
+	for s2 in repair.find_children("*", "PlaceSlot", true, false).filter(func(x): return x.item == "rail"):
 		train.take_item(player, "rail")
-		s.interact(player)
+		s2.interact(player)
 	await _frames(2)
-	check(Game.count("scrap") == scrap - 4, "two rails cost 4 scrap")
-	check(repair.step() == 4, "rails placed → step 4 (bolting the joints)")
+	check(Game.count("scrap") == scrap - 4 and repair.step() == 3, "two rails placed (4 scrap) → step 3 (bolts)")
 	var bolts := repair.find_children("*", "NailSpot", true, false).filter(func(n): return n.style == "bolt")
-	check(bolts.size() == 4, "4 rail joints to bolt with fishplates")
+	check(bolts.size() == 4, "4 rail joints to bolt")
 	player.select_tool("welder")
 	check(player.current_tool == "hammer", "no welder on the track (welders are only at stations)")
-	for b in bolts:
+	for b2 in bolts:
 		for k in NailSpot.HAMMER_HITS:
-			b.on_tool_hit("hammer", player)
+			b2.on_tool_hit("hammer", player)
 	await _frames(3)
-	check(not track.is_broken(gap_piece), "all joints bolted → track rebuilt")
+	check(not track.is_broken(gap_piece) and absf(track.piece_roll(gap_piece)) < Train.BUMP_ROLL, "track rebuilt, level (tilt %.1f°)" % absf(track.piece_roll(gap_piece)))
 	train.lever = 1
 	await _wait(2.0)
-	check(train.speed > 0.5, "train moves on after the repair")
+	check(train.speed > 0.5 and not train.tipped, "train moves on over the rebuilt track")
 	train.lever = 0
 	await _wait_until(func(): return train.is_stopped(), 10.0)
+
+	print("Over a river: build a platform with the nail gun")
+	var bi := -1
+	for i in range(track.piece_at(track.station_distances[0] + 200.0), track.piece_count - 2):
+		if track.is_bridge(i) and track.is_bridge(i + 1) and track.is_bridge(i - 1) and not track.is_broken(i) and not track.is_broken(i - 1) and not track.is_broken(i + 1):
+			if track.natural_height(track.piece_center(i), 0.0) < track.point_at(track.piece_center(i)).y - 3.0:
+				bi = i
+				break
+	check(bi > 0, "found a bridge over water")
+	track.break_piece(bi)
+	track.break_piece(bi + 1)
+	var br := track.repair_at(bi)
+	Game.add("wood", 10)
+	var wood2 := Game.count("wood")
+	train.take_item(player, "plank")
+	check(br.placement_kind(0) == "fall" and br.place_plank(0, player) == "fall", "a plank with nothing under it and no neighbour falls into the river")
+	check(Game.count("wood") == wood2 - 1, "…and the wood is lost")
+	train.take_item(player, "plank")
+	check(br.place_plank(3, player) == "join", "next to the intact bridge it can be placed, to be joined")
+	await _frames(2)
+	var joint: NailSpot = br.find_children("*", "NailSpot", true, false)[0]
+	check(joint.require_tool == "nail_gun" and not joint.on_tool_hit("hammer", player), "joining planks needs the nail gun, not the hammer")
+	Game.add("nail_gun", 1)
+	check(joint.on_tool_hit("nail_gun", player) and br.is_supported(3), "nail gun joins it: supported")
+	for k in [2, 1, 0]:
+		train.take_item(player, "plank")
+		check(br.place_plank(k, player) == "join", "plank %d builds out from its neighbour" % k)
+		await _frames(1)
+		for j in br.find_children("*", "NailSpot", true, false).filter(func(n): return not n.finished):
+			j.on_tool_hit("nail_gun", player)
+	check(br.fixed_count() == 4, "a platform of 4 joined planks over the water")
+	br.finish_instantly()
+	track.repair_at(bi + 1).finish_instantly()
+
+	print("Build quality: tilted planks, levelling, tipping over")
+	var ci := track.piece_at(train.distance + 30.0)
+	_clear_gaps(ci - 2, ci + 2)
+	track.break_piece(ci, true)
+	var cr := track.repair_at(ci)
+	var max_tilt := 0.0
+	for k in 4:
+		max_tilt = maxf(max_tilt, absf(cr.ground_under(k).roll))
+	check(max_tilt > 2.0, "meteor craters make the ground bumpy (up to %.0f° tilt)" % max_tilt)
+	train.take_item(player, "plank")
+	cr.place_plank(0, player)
+	await _frames(1)
+	for n in cr.find_children("*", "NailSpot", true, false):
+		for k in NailSpot.HAMMER_HITS:
+			n.on_tool_hit("hammer", player)
+	var tilt0: float = absf(cr.planks[0].roll)
+	var spot0 = cr.planks[0].spot
+	for k in 10:
+		spot0.on_tool_hit("hammer", player)
+	check(absf(cr.planks[0].roll) < maxf(tilt0, 0.6), "hammer taps level the plank (%.1f° → %.1f°)" % [tilt0, absf(cr.planks[0].roll)])
+	cr.finish_instantly()
+	# a dangerously tilted piece ahead: the train tips over
+	var ti := track.piece_at(train.distance + 25.0)
+	track.break_piece(ti)
+	track.repair_piece(ti, 12.0)
+	train.full_repair()
+	train.fuel = 100.0
+	train.lever = 1
+	var tipped := await _wait_until(func(): return train.tipped, 20.0)
+	check(tipped, "track tilted 12° tips the train over")
+	await _wait(1.0)
+	check(absf(train.tip_angle) > 30.0 and train.max_speed_now() == 0.0, "the train lies on its side and can't move")
+	train.lever = 0
+	var anchors: Array = main.find_children("*", "AnchorSpot", true, false)
+	check(anchors.size() >= 2, "trees / rocks on the high side become anchor points (%d)" % anchors.size())
+	var eye: HookSpot = train.cars[0].find_children("*", "HookSpot", true, false)[0]
+	check(train.attach_hook(eye) and train.attach_anchor(anchors[0]), "hook the come-along to the train and chain it to a tree")
+	var cranks := 0
+	while train.tipped and cranks < 30:
+		train.crank()
+		cranks += 1
+	await _wait(1.0)
+	check(not train.tipped and absf(train.tip_angle) < 1.0, "%d cranks pull the train back onto the rails" % cranks)
+	track.break_piece(ti)
+	track.repair_piece(ti, 0.0)
+	train.full_repair()
 
 	print("Wheels: fall off, lift in, bolt on")
 	var wheels_before := train.wheels
@@ -221,6 +298,7 @@ func _run() -> void:
 		e.queue_free()
 
 	print("Train cover: panels and doors")
+	train.weld_full()
 	check(train.parts.size() >= 20, "train is covered by %d breakable pieces" % train.parts.size())
 	var door: BodyPart = null
 	for p in train.parts:

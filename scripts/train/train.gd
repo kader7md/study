@@ -38,6 +38,12 @@ const ENGINE_MAX := 20.0     # damaged mostly by water (crashing into a river at
 const CHASSIS_MAX := 15.0    # never falls off, only a value; welded at a station
 const MECH_MAX := WHEEL_LIMIT * 6 + ENGINE_MAX + CHASSIS_MAX
 const OIL_REPAIR := 10.0
+## Track built with this much tilt (degrees) shakes the wheels loose; this much TIPS the train over sideways.
+const BUMP_ROLL := 4.0
+const TIP_ROLL := 8.0
+const TIP_ANGLE := 65.0
+## Degrees the train comes back up per crank of the come-along.
+const CRANK_STEP := 5.0
 const WRENCH_REPAIR := 0.6
 
 ## Things the crew carries out of the cargo car and what each costs from the inventory.
@@ -57,6 +63,15 @@ var chassis_damage := 0.0
 var wheel_wear: Array[float] = []
 var wheels := MAX_WHEELS
 var current_station := -1
+## Tipped over on badly built track: can't move until pulled back up with the come-along.
+var tipped := false
+var tip_angle := 0.0          # current lean in degrees (+ = towards the right side)
+var tip_target := 0.0
+var hook: HookSpot
+var anchor: AnchorSpot
+var _chain: WelderCable
+var _anchors: Array[Node] = []
+var _last_piece := -1
 var cars: Array[AnimatableBody3D] = []
 var total_length := 0.0
 
@@ -82,6 +97,9 @@ func setup(t: Track, front_distance: float) -> void:
 	total_length -= CAR_GAP
 	for c in CARS:
 		cars.append(_build_car(c.type, c.length))
+	_chain = WelderCable.new()
+	add_child(_chain)
+	_chain.visible = false
 	_place_cars()
 
 
@@ -107,7 +125,7 @@ func load_state(state: Dictionary) -> void:
 # --- Simulation -------------------------------------------------------------
 
 func max_speed_now() -> float:
-	if wheels < MIN_WHEELS_TO_MOVE or health <= 0.0:
+	if wheels < MIN_WHEELS_TO_MOVE or health <= 0.0 or tipped:
 		return 0.0
 	var s := MAX_SPEED
 	s *= float(wheels) / MAX_WHEELS                       # each lost wheel: -1/6 of the speed
@@ -182,9 +200,14 @@ func _physics_process(delta: float) -> void:
 		speed = 0.0
 	distance = limited
 
+	_check_track_quality()
+	tip_angle = move_toward(tip_angle, tip_target, 90.0 * delta)
 	_place_cars()
 	_update_station()
 	_update_smoke(delta)
+	if is_instance_valid(hook) and is_instance_valid(anchor):
+		var to := anchor.global_position + Vector3.UP * 1.0
+		_chain.update(hook.global_position, to, hook.global_position.distance_to(to) * 1.02)
 	for i in _wheel_nodes.size():
 		if _wheel_state[i] == 0:
 			_wheel_nodes[i].rotation.x -= speed * delta / 0.45
@@ -202,6 +225,100 @@ func _hit_gap() -> void:
 	elif _block_msg_cooldown <= 0.0 and v > 0.05:
 		Game.say("Train stopped: broken track ahead. Rebuild it!")
 	_block_msg_cooldown = 3.0
+
+
+## Crossing a badly built piece: bumpy (wheel wear) or so tilted that the train tips over.
+func _check_track_quality() -> void:
+	if tipped or absf(speed) < 0.3:
+		return
+	var i := track.piece_at(distance - 1.0) if speed > 0.0 else track.piece_at(rear_distance() + 1.0)
+	if i == _last_piece:
+		return
+	_last_piece = i
+	var roll := track.piece_roll(i)
+	if absf(roll) >= TIP_ROLL and absf(speed) > 1.5:
+		# a positive roll lifts the right rail, so the train falls to the left
+		tip_over(-signf(roll))
+	elif absf(roll) >= BUMP_ROLL:
+		var ok := _ok_wheels()
+		if not ok.is_empty():
+			add_wheel_wear(ok[_rng.randi() % ok.size()], 0.4)
+		Game.say("Bumpy track! (tilt %.0f°) The wheels are shaking loose" % absf(roll))
+
+
+func tip_over(side: float) -> void:
+	tipped = true
+	tip_target = TIP_ANGLE * side
+	speed = 0.0
+	lever = 0
+	take_damage(12.0)
+	Game.say("THE TRAIN TIPPED OVER! Hook the come-along to the lifting eye, chain it to a tree on the high side and crank")
+	_spawn_anchors(side)
+
+
+## Trees and rocks on the high side (opposite to the fall) become anchor points.
+func _spawn_anchors(side: float) -> void:
+	for a in _anchors:
+		if is_instance_valid(a):
+			a.queue_free()
+	_anchors.clear()
+	var center := cars[0].global_position
+	var d := center_distance()
+	var right := track.flat_right(d)
+	var found: Array[Vector3] = []
+	if Game.terrain:
+		for p: Vector3 in Game.terrain.anchor_points:
+			if p.distance_to(center) < 35.0 and (p - center).dot(right) * side < -3.0:
+				found.append(p)
+	found.sort_custom(func(a: Vector3, b: Vector3): return a.distance_to(center) < b.distance_to(center))
+	found = found.slice(0, 6)
+	if found.size() < 2:
+		# no trees nearby: big rocks to anchor to
+		for k in 2:
+			found.append(track.ground_point(d + (k - 0.5) * 8.0, -side * 12.0))
+	for p in found:
+		var a := AnchorSpot.new()
+		a.train = self
+		get_parent().add_child(a)
+		a.global_position = p
+		_anchors.append(a)
+
+
+func attach_hook(h: HookSpot) -> bool:
+	if not tipped:
+		return false
+	hook = h
+	Game.say("Come-along hooked to the train. Now chain it to a tree or rock on the high side")
+	return true
+
+
+func attach_anchor(a: AnchorSpot) -> bool:
+	if not tipped or hook == null:
+		Game.say("First hook the come-along to the train's lifting eye")
+		return false
+	anchor = a
+	_chain.visible = true
+	Game.say("Chain anchored. Crank the come-along [LMB] to pull the train back up!")
+	return true
+
+
+## One pump of the come-along handle. Several players can crank together.
+func crank() -> bool:
+	if not tipped or not is_instance_valid(hook) or not is_instance_valid(anchor):
+		return false
+	tip_target = move_toward(tip_target, 0.0, CRANK_STEP)
+	if absf(tip_target) < 1.0:
+		tipped = false
+		tip_target = 0.0
+		hook = null
+		anchor = null
+		_chain.visible = false
+		for a in _anchors:
+			if is_instance_valid(a):
+				a.queue_free()
+		_anchors.clear()
+		Game.say("Back on the rails!")
+	return true
 
 
 func _update_station() -> void:
@@ -423,9 +540,14 @@ func weld_full() -> void:
 
 func _place_cars() -> void:
 	var d := distance
+	var lean := Transform3D.IDENTITY
+	if absf(tip_angle) > 0.01:
+		# rotate about the rail on the low side
+		var pivot := Vector3(signf(tip_angle) * Track.GAUGE * 0.5, 0.0, 0.0)
+		lean = Transform3D.IDENTITY.translated(pivot) * Transform3D(Basis(Vector3.BACK, -deg_to_rad(tip_angle)), Vector3.ZERO) * Transform3D.IDENTITY.translated(-pivot)
 	for i in cars.size():
 		var length: float = CARS[i].length
-		cars[i].global_transform = track.car_transform(d, d - length)
+		cars[i].global_transform = track.car_transform(d, d - length) * lean
 		d -= length + CAR_GAP
 
 
@@ -497,6 +619,12 @@ func _build_locomotive(car: Node3D, model: Node3D, length: float) -> void:
 	var furnace_spot := ActionSpot.create(car, Vector3(1.4, 1.2, 0.9), Vector3(0, f + 0.6, 0.6),
 		furnace_prompt, func(_p): add_coal())
 	furnace_spot.alt_fn = func(_p): oil_engine()
+	# lifting eyes for the come-along (when the train tips over)
+	for side in [-1.0, 1.0]:
+		var eye := HookSpot.new()
+		eye.train = self
+		eye.position = Vector3(side * 1.62, f + 0.3, -1.0)
+		car.add_child(eye)
 	# chassis weld points under the cab, glowing while the chassis is damaged
 	for side in [-1.0, 1.0]:
 		var spot := ChassisSpot.new()

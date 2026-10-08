@@ -44,6 +44,7 @@ var piece_count := 0
 var _broken := {}  # piece index -> RailRepair
 var _bridge := PackedByteArray()  # 1 = piece is a bridge
 var _deck_shapes := {}  # bridge piece index -> deck collider (disabled while the piece is broken)
+var _roll := {}         # rebuilt piece index -> tilt in degrees (how well the crew built it)
 var _rails: MultiMesh
 var _sleepers: MultiMesh
 var _noise := FastNoiseLite.new()
@@ -312,14 +313,20 @@ func blocking_distance(d_from: float, d_to: float) -> float:
 	return -1.0
 
 
-func break_piece(index: int) -> bool:
+## Tilt (degrees, signed) of a rebuilt piece; 0 for original track.
+func piece_roll(index: int) -> float:
+	return _roll.get(index, 0.0)
+
+
+func break_piece(index: int, cratered := false) -> bool:
 	if index < 0 or index >= piece_count or _broken.has(index) or is_protected(index):
 		return false
+	_roll.erase(index)
 	_set_piece_visible(index, false)
 	if _deck_shapes.has(index):
 		_deck_shapes[index].set_deferred("disabled", true)
 	var repair := RailRepair.new()
-	repair.setup(self, index)
+	repair.setup(self, index, cratered)
 	add_child(repair)
 	repair.global_transform = transform_at(piece_center(index))
 	_broken[index] = repair
@@ -327,11 +334,13 @@ func break_piece(index: int) -> bool:
 	return true
 
 
-func repair_piece(index: int) -> void:
+func repair_piece(index: int, roll := 0.0) -> void:
 	if not _broken.has(index):
 		return
 	_broken[index].queue_free()
 	_broken.erase(index)
+	if absf(roll) > 0.01:
+		_roll[index] = roll
 	_set_piece_visible(index, true)
 	if _deck_shapes.has(index):
 		_deck_shapes[index].set_deferred("disabled", false)
@@ -349,7 +358,7 @@ func break_around(world_pos: Vector3, radius: float, skip_from := -1.0, skip_to 
 		var d := piece_center(i)
 		if d >= skip_from and d <= skip_to:
 			continue
-		if point_at(d).distance_to(world_pos) <= radius + 1.0 and break_piece(i):
+		if point_at(d).distance_to(world_pos) <= radius + 1.0 and break_piece(i, true):
 			broken += 1
 	return broken
 
@@ -361,8 +370,9 @@ func place_initial_gaps(rng: RandomNumberGenerator, gaps_per_segment := 3) -> vo
 		var to := station_distances[s + 1] - STATION_LENGTH
 		for g in gaps_per_segment:
 			var start := piece_at(rng.randf_range(from, to))
+			var rough := rng.randf() < 0.5
 			for k in rng.randi_range(1, 2):
-				break_piece(start + k)
+				break_piece(start + k, rough)
 
 
 # --- Visuals ------------------------------------------------------------------
@@ -396,6 +406,8 @@ func _make_multimesh(mesh: Mesh, count: int) -> MultiMesh:
 
 func _set_piece_visible(index: int, visible_now: bool) -> void:
 	var t := global_transform.affine_inverse() * transform_at(piece_center(index))
+	if _roll.has(index):
+		t.basis = t.basis * Basis(Vector3.BACK, deg_to_rad(_roll[index]))
 	var hide := Basis().scaled(Vector3.ZERO)
 	for side in 2:
 		var rail := t.translated_local(Vector3((side - 0.5) * GAUGE, RAIL_Y, 0))

@@ -19,6 +19,8 @@ const ROCK := Color(0.47, 0.45, 0.43)
 const SNOW := Color(0.93, 0.95, 0.97)
 
 var track: Track
+## Tree and boulder positions near the track: anchor points for the come-along.
+var anchor_points: Array[Vector3] = []
 var _us: Array[float] = []
 
 
@@ -216,5 +218,8 @@ func _build_trees(rng: RandomNumberGenerator) -> void:
 			if p2.y > Track.WATER_LEVEL + 0.5:
 				lists["cliff"].append(_place(p2 - Vector3.UP * 1.0, rng.randf_range(1.0, 2.2), rng, rng.randf_range(0.8, 1.6)))
 		d2 += rng.randf_range(25.0, 60.0)
+	for id in ["pine", "pine_snow", "oak", "birch", "dead_tree", "boulder"]:
+		for t: Transform3D in lists[id]:
+			anchor_points.append(t.origin)
 	for id in ids:
 		_scatter(nature_mesh(id), lists[id], id != "bush" and id != "rock_small")

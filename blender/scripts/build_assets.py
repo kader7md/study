@@ -67,8 +67,8 @@ MATS = {
     "oak_leaves": ("foliage", (0.13, 0.25, 0.06), 0.0, 0.85),
     "birch_leaves": ("foliage", (0.3, 0.42, 0.1), 0.0, 0.85),
     "bush_leaves": ("foliage", (0.09, 0.21, 0.06), 0.0, 0.85),
-    "rock": ("rock", (0.3, 0.29, 0.27), 0.0, 0.9),
-    "cliff": ("rock", (0.36, 0.31, 0.25), 0.0, 0.9),
+    "rock": ("rock", (0.12, 0.115, 0.105), 0.0, 0.9),
+    "cliff": ("rock", (0.16, 0.13, 0.1), 0.0, 0.9),
     "snow": ("plain", (0.88, 0.9, 0.94), 0.0, 0.6),
 }
 _mats = {}
@@ -160,15 +160,15 @@ def mat(name):
         color = _mix(nt, tuple(c * 0.7 for c in base), tuple(min(c * 1.25, 1.0) for c in base), _ramp(nt, _noise(nt, coord, 1.2, 8.0), 0.3, 0.7))
         sep = _n(nt, "ShaderNodeSeparateXYZ")
         nt.links.new(geo.outputs["Normal"], sep.inputs[0])
-        moss = _ramp(nt, sep.outputs["Z"], 0.55, 0.85)
+        moss = _ramp(nt, sep.outputs["Z"], 0.45, 0.75)
         mul = _n(nt, "ShaderNodeMath")
         mul.operation = "MULTIPLY"
         nt.links.new(moss, mul.inputs[0])
         nt.links.new(_ramp(nt, _noise(nt, coord, 3.0), 0.35, 0.6), mul.inputs[1])
-        color = _mix(nt, color, (0.12, 0.22, 0.05), mul.outputs[0])
+        color = _mix(nt, color, (0.06, 0.13, 0.03), mul.outputs[0])
     elif kind == "paint":
         # subtle colour variation, then bare metal on chipped edges
-        color = _mix(nt, tuple(c * 0.8 for c in base), base, _ramp(nt, _noise(nt, coord, 2.0), 0.3, 0.7))
+        color = _mix(nt, tuple(c * 0.93 for c in base), base, _ramp(nt, _noise(nt, coord, 0.8, 2.0), 0.35, 0.65))
         edge = _ramp(nt, geo.outputs["Pointiness"], 0.52, 0.6)
         chip = _ramp(nt, _noise(nt, coord, 30.0, 2.0), 0.45, 0.6)
         mul = _n(nt, "ShaderNodeMath")
@@ -183,7 +183,7 @@ def mat(name):
         nt.links.new(dirt, inv.inputs["Color"])
         dirty = tuple(c * 0.3 for c in base) if kind != "brass" else (0.12, 0.08, 0.03)
         color = _mix(nt, color, dirty, inv.outputs[0])
-        color = _mix(nt, color, tuple(c * 0.55 for c in base) if kind != "brass" else (0.3, 0.22, 0.08), _ramp(nt, grime, 0.6, 1.0))
+        color = _mix(nt, color, tuple(c * 0.7 for c in base) if kind != "brass" else (0.3, 0.22, 0.08), _ramp(nt, grime, 0.75, 1.0))
     if isinstance(color, tuple):
         rgb = _n(nt, "ShaderNodeRGB")
         rgb.outputs[0].default_value = (*color, 1.0)
@@ -652,6 +652,17 @@ def build_wagon(kind):
                 body.append(box(f"step{s}{e}", (0.45, 0.6, 0.05), (1.45 * s, e * 3.5, 0.78), "iron", 0.01))
         for i in range(4):
             body.append(box(f"rib{i}", (2.95, 0.1, 0.1), (0, -3.0 + i * 2.0, FLOOR + 2.45), "iron", 0.01))
+        for e in (-1, 1):
+            for x in (-1.2, -0.4, 0.4, 1.2):
+                body.append(box(f"endpost{e}{x}", (0.1, 0.1, 2.35), (x, e * 3.95, FLOOR + 1.17), "iron", 0.01))
+            body.append(box(f"endplank{e}", (2.6, 0.05, 2.2), (0, e * 3.98, FLOOR + 1.12), "van_brown", 0.005))
+        for s in (-1, 1):
+            body.append(box(f"door_runner_top{s}", (0.06, 3.2, 0.06), (1.5 * s, 0.6, FLOOR + 2.28), "iron", 0.005))
+            body.append(box(f"door_runner_bot{s}", (0.06, 3.2, 0.06), (1.5 * s, 0.6, FLOOR + 0.05), "iron", 0.005))
+        for k in range(6):
+            body.append(box(f"ladder_rung{k}", (0.4, 0.03, 0.03), (-0.9, -4.08, 0.9 + k * 0.35), "iron", 0.003))
+        for x in (-1.1, -0.7):
+            body.append(box(f"ladder_rail{x}", (0.03, 0.03, 2.1), (x, -4.08, 1.75), "iron", 0.003))
         # brake wheel on one end
         body.append(rod("brake_shaft", (1.1, -4.05, 0.9), (1.1, -4.05, FLOOR + 1.6), 0.03, "iron"))
         body.append(torus("brake_wheel", 0.22, 0.025, (1.1, -4.05, FLOOR + 1.6), "iron", axis="Z"))
@@ -690,6 +701,14 @@ def build_wagon(kind):
         for k in range(4):
             body.append(rod(f"tool{k}", (1.2, -2.2 + k * 0.4, FLOOR + 1.9), (1.2, -2.2 + k * 0.4, FLOOR + 1.2), 0.02, "wood", 8))
         body.append(box("toolbox", (0.6, 0.35, 0.3), (-0.9, 3.4, FLOOR + 0.15), "red_paint", 0.02))
+        body.append(box("bench_top", (0.7, 1.6, 0.08), (-1.0, 1.0, FLOOR + 0.85), "wood_dark", 0.01))
+        for y in (0.3, 1.7):
+            body.append(box(f"bench_leg{y}", (0.6, 0.08, 0.85), (-1.0, y, FLOOR + 0.42), "iron", 0.01))
+        body.append(box("vice", (0.15, 0.2, 0.15), (-0.75, 1.6, FLOOR + 0.97), "blue_paint", 0.01))
+        for k, y in enumerate((-3.3, -2.8)):
+            body.append(cyl(f"barrel{k}", 0.28, 0.75, (0.9, y, FLOOR + 0.38), "wood", verts=20))
+            for zz in (0.15, 0.6):
+                body.append(torus(f"barrelband{k}{zz}", 0.285, 0.015, (0.9, y, FLOOR + zz), "iron", axis="Z", seg=20))
         for y in (-1.6, 1.6):
             canvas = [box(f"canopy{y}", (3.0, 3.2, 0.05), (0, y, FLOOR + 2.65), "canvas", 0.02)]
             for k in range(4):

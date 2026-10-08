@@ -22,6 +22,7 @@ var _body: StaticBody3D
 var _slot: PlaceSlot
 var _fasteners_left := 0
 var _door_spot: Interactable
+var _door_tween: Tween
 
 
 func setup(t: Train, car_body: Node3D, mesh_node: MeshInstance3D) -> void:
@@ -58,8 +59,10 @@ func toggle_door() -> void:
 	var size := node.get_aabb().size
 	var angle := side * DOOR_OPEN_ANGLE if size.x <= size.z else -side * DOOR_OPEN_ANGLE
 	var target := _home.basis.rotated(Vector3.UP, angle if door_open else 0.0)
-	var tween := node.create_tween()
-	tween.tween_property(node, "basis", target, 0.3).set_trans(Tween.TRANS_BACK)
+	if _door_tween and _door_tween.is_valid():
+		_door_tween.kill()
+	_door_tween = node.create_tween()
+	_door_tween.tween_property(node, "basis", target, 0.3).set_trans(Tween.TRANS_BACK)
 
 
 ## Breaks the piece off. With `fly` it tumbles away as a FallenPart that can be picked up again.

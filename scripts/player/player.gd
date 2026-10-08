@@ -17,8 +17,8 @@ const HAMMER_DAMAGE := 20.0
 const NAIL_GUN_DAMAGE := 8.0
 const WARM_RADIUS := 7.0
 const SKIN := Color(1.0, 0.76, 0.6)
-const TOOLS := ["hammer", "wrench", "nail_gun", "welder"]
-const TOOL_NAMES := {"hammer": "Hammer", "wrench": "Wrench", "welder": "Welder", "nail_gun": "Nail gun"}
+const TOOLS := ["hammer", "wrench", "nail_gun", "welder", "come_along"]
+const TOOL_NAMES := {"hammer": "Hammer", "wrench": "Wrench", "welder": "Welder", "nail_gun": "Nail gun", "come_along": "Come-along"}
 
 var health := 100.0
 var frost := 0.0
@@ -51,6 +51,8 @@ var _right_rest := Vector3(0.36, -0.36, -0.62)
 var _ride_car: Node3D
 var _ride_prev: Transform3D
 var _ride_grace := 0.0
+## Tests can force the aim point.
+var _test_aim := Vector3.INF
 
 
 func _ready() -> void:
@@ -128,7 +130,9 @@ func _build_hands() -> void:
 	var wrench := Props.instance("wrench")
 	wrench.rotation = Vector3(-0.3, 0.2, 0.15)
 	wrench.scale = Vector3.ONE * 0.8
-	for pair in [["hammer", hammer], ["wrench", wrench], ["welder", welder], ["nail_gun", gun]]:
+	var winch := Props.instance("come_along")
+	winch.rotation = Vector3(-0.2, 0.3, 0.0)
+	for pair in [["hammer", hammer], ["wrench", wrench], ["welder", welder], ["nail_gun", gun], ["come_along", winch]]:
 		_right.add_child(pair[1])
 		_tool_models[pair[0]] = pair[1]
 
@@ -175,6 +179,8 @@ func available_tools() -> Array[String]:
 		list.append("nail_gun")
 	if is_instance_valid(welder_source):
 		list.append("welder")
+	if Game.has("come_along"):
+		list.append("come_along")
 	return list
 
 
@@ -353,6 +359,22 @@ func use_tool() -> void:
 			return
 		if hit and hit.has_method("take_hit"):
 			hit.take_hit(HAMMER_DAMAGE * 0.75)
+	elif current_tool == "come_along":
+		_tool_cd = 0.3
+		var train := Game.train
+		if hit is HookSpot:
+			train.attach_hook(hit)
+		elif hit is AnchorSpot:
+			train.attach_anchor(hit)
+		elif train and train.tipped and is_instance_valid(train.hook) and global_position.distance_to(train.hook.global_position) < 8.0:
+			if train.crank():
+				# pump the ratchet handle
+				var tween := create_tween()
+				tween.tween_property(_right, "rotation:x", 0.9, 0.12)
+				tween.tween_property(_right, "rotation:x", -0.2, 0.15)
+				tween.tween_property(_right, "rotation:x", 0.0, 0.05)
+		elif train and train.tipped:
+			Game.say("Stand near the come-along on the train to crank it")
 	elif current_tool == "nail_gun":
 		_tool_cd = 0.25
 		var tween := create_tween()
@@ -484,6 +506,13 @@ func _update_welder(delta: float) -> void:
 	else:
 		_right.position = _right_rest
 		_right.rotation.z = 0.0
+
+
+## Where the player is looking (within reach), or Vector3.INF.
+func aim_point() -> Vector3:
+	if _test_aim != Vector3.INF:
+		return _test_aim
+	return _ray.get_collision_point() if _ray.is_colliding() else Vector3.INF
 
 
 func weld_tick(target: Interactable, delta: float) -> bool:

@@ -10,6 +10,8 @@ const HAMMER_HITS := 3
 var hits := 0
 var finished := false
 var style := "nail"
+## "" = hammer or nail gun; "nail_gun" = only the nail gun (joining planks to each other)
+var require_tool := ""
 var _paid := false
 var _nail: Node3D
 
@@ -30,12 +32,17 @@ func _ready() -> void:
 func get_prompt(player: Node) -> String:
 	if finished:
 		return ""
+	if require_tool == "nail_gun":
+		return "Join the planks: NAIL GUN [LMB]%s" % ("" if Game.has("nail_gun") else " (you need one: station shop)")
 	var gun := " · nail gun: 1 shot" if Game.has("nail_gun") else ""
 	return "%s: hammer [LMB] %d/%d%s" % ["Bolt the fishplate" if style == "bolt" else "Nail", hits, HAMMER_HITS, gun]
 
 
 func on_tool_hit(tool: String, _player: Node) -> bool:
 	if finished or not tool in ["hammer", "nail_gun"]:
+		return false
+	if require_tool != "" and tool != require_tool:
+		Game.say("Joining planks needs the NAIL GUN (buy one at a station shop)")
 		return false
 	if not _paid:
 		if not Game.take("nails"):

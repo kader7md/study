@@ -41,6 +41,7 @@ func _ready() -> void:
 	terrain.name = "Terrain"
 	add_child(terrain)
 	terrain.build(track, _rng)
+	Game.terrain = terrain
 	_spawn_pickups()
 
 	train = Train.new()
