@@ -128,8 +128,8 @@ def mat(name):
     ao = _n(nt, "ShaderNodeAmbientOcclusion")
     ao.inputs["Distance"].default_value = 0.25
     geo = _n(nt, "ShaderNodeNewGeometry")
-    dirt = _ramp(nt, ao.outputs["AO"], 0.35, 1.0)          # 0 in corners, 1 in the open
-    grime = _ramp(nt, _noise(nt, coord, 6.0), 0.45, 0.75)
+    dirt = _ramp(nt, ao.outputs["AO"], 0.2, 0.9)           # 0 in corners, 1 in the open
+    grime = _ramp(nt, _noise(nt, coord, 3.0, 3.0), 0.5, 0.8)
 
     color = base
     if kind == "wood":
@@ -183,7 +183,7 @@ def mat(name):
         nt.links.new(dirt, inv.inputs["Color"])
         dirty = tuple(c * 0.3 for c in base) if kind != "brass" else (0.12, 0.08, 0.03)
         color = _mix(nt, color, dirty, inv.outputs[0])
-        color = _mix(nt, color, (0.08, 0.07, 0.06), _ramp(nt, grime, 0.75, 1.0))
+        color = _mix(nt, color, tuple(c * 0.55 for c in base) if kind != "brass" else (0.3, 0.22, 0.08), _ramp(nt, grime, 0.6, 1.0))
     if isinstance(color, tuple):
         rgb = _n(nt, "ShaderNodeRGB")
         rgb.outputs[0].default_value = (*color, 1.0)
@@ -362,8 +362,9 @@ def bake_and_export(path, size=2048):
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
-    scene.cycles.samples = 16
-    scene.render.bake.margin = 4
+    scene.cycles.samples = 96          # enough samples so the corner dirt (AO) bakes smooth, not speckled
+    scene.cycles.use_denoising = False
+    scene.render.bake.margin = 6
     bpy.ops.object.bake(type="EMIT")
     img.pack()
 

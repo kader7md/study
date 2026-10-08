@@ -27,6 +27,7 @@ def reset():
     s.render.resolution_y = 900
     s.view_settings.view_transform = "AgX"
     s.view_settings.look = "AgX - Medium High Contrast"
+    s.view_settings.exposure = -0.6
     world = bpy.data.worlds.new("sky")
     s.world = world
     world.use_nodes = True
@@ -36,10 +37,10 @@ def reset():
     sky.sun_elevation = math.radians(28)
     sky.sun_rotation = math.radians(140)
     nt.links.new(sky.outputs[0], nt.nodes["Background"].inputs[0])
-    nt.nodes["Background"].inputs[1].default_value = 0.35
+    nt.nodes["Background"].inputs[1].default_value = 0.12
     bpy.ops.object.light_add(type="SUN", rotation=(math.radians(55), 0, math.radians(140)))
     sun = bpy.context.active_object
-    sun.data.energy = 3.5
+    sun.data.energy = 2.2
     sun.data.angle = math.radians(2)
 
 
