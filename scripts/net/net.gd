@@ -33,7 +33,7 @@ const DEFAULT_PORT := 24565
 const PORT_TRIES := 10
 const MAX_PLAYERS := 5
 ## Bumped whenever the RPC layout changes; the host refuses other versions.
-const PROTOCOL := 1
+const PROTOCOL := 2
 const IMPOSTOR_MIN_PLAYERS := 3
 const JOIN_TIMEOUT := 10.0
 ## How far (m) a client's player may be from what it asks the host to use. Generous: latency and big colliders.
@@ -56,7 +56,7 @@ const ALLOWED := {
 }
 
 var backend: NetBackend
-## peer id -> {"name": String, "ready": bool, "color": Color, "host": bool}
+## peer id -> {"name": String, "ready": bool, "color": Color, "host": bool, "look": String (Appearance code)}
 var players: Dictionary = {}
 var port := DEFAULT_PORT
 var run_active := false
@@ -182,6 +182,34 @@ func player_color(id: int) -> Color:
 	return players[id].color if players.has(id) else COLORS[0]
 
 
+## A player's Appearance code ("" = not chosen: the default look in their colour).
+func player_look(id: int) -> String:
+	if id == local_id():
+		return my_look()
+	return str(players[id].get("look", "")) if players.has(id) else ""
+
+
+## This player's saved look (Settings profile/look).
+func my_look() -> String:
+	return Appearance.saved_code()
+
+
+## The local player picked a new look (the mirror / customise menu): tell the host, who tells everyone.
+func set_local_look(code: String) -> void:
+	code = Appearance.decode(code).encode()
+	var me := local_player()
+	if me:
+		me.look = code  # synced to the other players' screens by InputSync
+	if not is_online():
+		return
+	if is_host():
+		if players.has(1):
+			players[1].look = code
+			_broadcast_players()
+	else:
+		_rpc_set_look.rpc_id(1, code)
+
+
 func all_ready() -> bool:
 	for id: int in players:
 		if not players[id].host and not players[id].ready:
@@ -262,6 +290,7 @@ func host_game(p := DEFAULT_PORT) -> Error:
 	multiplayer.multiplayer_peer = backend.get_peer()
 	players = {1: _entry(my_name(), 0, true)}
 	players[1].ready = true
+	players[1].look = my_look()
 	last_error = ""
 	print("[net] hosting on port %d" % p)
 	players_changed.emit()
@@ -659,7 +688,8 @@ func spawn_players(main: Node, spawn_xform: Transform3D) -> Player:
 func _spawn_data(id: int, index: int, n: String) -> Dictionary:
 	var x: Transform3D = _players_root.get_meta("spawn_xform")
 	x.origin += x.basis.z * 1.4 * index  # one behind the other on the platform
-	return {"id": id, "name": n, "color": player_color(id) if players.has(id) else COLORS[0], "xform": x}
+	return {"id": id, "name": n, "color": player_color(id) if players.has(id) else COLORS[0], "xform": x,
+		"look": player_look(id)}
 
 
 func _spawn_player(data: Variant) -> Node:
@@ -670,6 +700,7 @@ func _spawn_player(data: Variant) -> Node:
 	p.peer_id = id
 	p.display_name = d["name"]
 	p.color = d["color"]
+	p.look = str(d.get("look", ""))
 	p.transform = d["xform"]
 	p.net_pos = p.transform.origin
 	p.net_yaw = p.rotation.y
@@ -751,7 +782,7 @@ func _spawn_rejoined(id: int) -> void:
 	if train and train.cars.size() > 1:
 		var car := train.cars[1]
 		x = Transform3D(car.global_basis.orthonormalized(), car.global_position + Vector3.UP * (Train.FLOOR_HEIGHT + 0.3))
-	_spawner.spawn({"id": id, "name": player_name(id), "color": player_color(id), "xform": x})
+	_spawner.spawn({"id": id, "name": player_name(id), "color": player_color(id), "xform": x, "look": player_look(id)})
 	var p := player_node(id)
 	if p:
 		for other: int in ready_peers():
@@ -974,6 +1005,7 @@ func _on_connected_to_server() -> void:
 	if backend:
 		backend.on_peer_connected(1)
 	_rpc_register.rpc_id(1, PROTOCOL, my_name())
+	_rpc_set_look.rpc_id(1, my_look())
 
 
 func _on_connection_failed() -> void:
@@ -1104,6 +1136,14 @@ func _rpc_set_name(n: String) -> void:
 	var id := multiplayer.get_remote_sender_id()
 	if is_host() and players.has(id):
 		players[id].name = _unique_name(clean_name(n), id)
+		_broadcast_players()
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_set_look(code: String) -> void:
+	var id := multiplayer.get_remote_sender_id()
+	if is_host() and players.has(id):
+		players[id].look = Appearance.decode(code.substr(0, 64)).encode()
 		_broadcast_players()
 
 

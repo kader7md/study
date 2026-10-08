@@ -142,7 +142,7 @@ func _build_ui() -> void:
 	card.anchor_right = 1.0
 	card.anchor_top = 1.0
 	card.anchor_bottom = 1.0
-	card.offset_left = -360
+	card.offset_left = -440
 	card.offset_top = -110
 	card.offset_right = -24
 	card.offset_bottom = -24
@@ -170,6 +170,14 @@ func _build_ui() -> void:
 	_name_edit.text = str(Settings.get_value("profile", "name", ""))
 	_name_edit.text_changed.connect(func(t: String) -> void: Settings.set_value("profile", "name", t.strip_edges().left(Net.NAME_MAX)))
 	cv.add_child(_name_edit)
+	# your crew member's look (the same menu as the mirror on the train)
+	var look_button := Button.new()
+	look_button.name = "LookButton"
+	look_button.text = "Look"
+	look_button.tooltip_text = "Change how your crew member looks"
+	look_button.size_flags_vertical = Control.SIZE_SHRINK_END
+	look_button.pressed.connect(func() -> void: CustomizeMenu.open_on(self))
+	crow.add_child(look_button)
 
 	_toast = Label.new()
 	_toast.theme_type_variation = &"HudLabel"

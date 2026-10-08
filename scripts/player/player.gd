@@ -8,7 +8,9 @@ extends CharacterBody3D
 ## Debug impostor (F2): [Tab] opens the sabotage menu, then keys 1-4; meteor is aimed (LMB drop, RMB cancel).
 ## NET: one Player per peer (Players/Player_<peer id>, spawned by Net). The local one moves itself and sends its
 ## position (InputSync); everything that changes game state goes through Net.request() so it runs on the host.
-## Other players are shown with a third-person RemoteBody; their first-person arms and camera stay hidden.
+## Other players are shown with a third-person RemoteBody (the animated CharacterModel in their own look); their
+## first-person arms and camera stay hidden. Our own CharacterModel is on render layer 2: hidden from our camera, seen in
+## the train's mirror. `look` is the Appearance code (synced), `net_action` the last action clip (synced, "clip#n").
 
 const WALK := 4.5
 const SPRINT := 7.5
@@ -58,6 +60,10 @@ var _test_aim := Vector3.INF
 var peer_id := 1
 var display_name := ""
 var color := Color(0.85, 0.55, 0.3)
+## Appearance code (scripts/character/appearance.gd), written by the owning peer (InputSync), "" = default look.
+var look := ""
+## The last one-shot animation this player played ("hammer#3"), written by the owning peer (InputSync).
+var net_action := ""
 ## Position (local to the ridden train car when net_car >= 0), yaw and camera pitch, written by the owning peer.
 var net_pos := Vector3.ZERO
 var net_yaw := 0.0
@@ -76,6 +82,12 @@ var _remote_car := -1
 var _remote_local := Vector3.ZERO
 var _revive_spot: ReviveSpot
 var _was_downed := false
+## Our own body (render layer 2: the mirror sees it, our camera doesn't).
+var body: CharacterModel
+var _action_n := 0
+var _seen_action := ""
+var _shown_look := "-"
+var _last_net_y := 0.0
 
 
 func _ready() -> void:
@@ -93,16 +105,22 @@ func _ready() -> void:
 	cs.position.y = 0.9
 	add_child(cs)
 
-	# Body for other players to see (hidden from our own camera via render layer 2)
+	# Our own body: on render layer 2, hidden from our own camera, seen in the mirror
 	if is_local():
-		var body := Build.box(self, Vector3(0.7, 1.4, 0.45), Vector3(0, 0.8, 0), Color(0.85, 0.55, 0.3))
-		body.layers = 2
+		if look == "":
+			look = Appearance.saved_code() if Appearance.saved_code() != "" else Appearance.for_color(color).encode()
+		body = CharacterModel.new()
+		body.name = "Body"
+		add_child(body)
+		body.set_render_layers(2)
+		_shown_look = ""
 	else:
 		# NET: another peer's player: a third-person body with a name tag
 		_remote_body = RemoteBody.new()
 		_remote_body.name = "Body"
 		add_child(_remote_body)
 		_remote_body.setup(display_name if display_name != "" else String(name), color)
+		_seen_action = net_action  # an action from before we saw this player is not replayed
 
 	camera = Camera3D.new()
 	camera.position.y = 1.6
@@ -284,7 +302,13 @@ func _handle_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("drop"):
 		Net.request(self, &"put_back")  # NET: state changes run on the host
 	elif event.is_action_pressed("interact") and focused and focused.get_hold_time(self) <= 0.0:
-		Net.request(focused, &"interact", [self])
+		_send_action(interact_clip(focused))
+		if focused.has_method("interact_local"):
+			focused.call("interact_local", self)  # opens something on this screen only (the mirror)
+		else:
+			Net.request(focused, &"interact", [self])
+	elif event.is_action_pressed("emote") and carried_item == "":
+		_send_action("wave")
 	elif event.is_action_pressed("interact_alt") and focused:
 		Net.request(focused, &"interact_alt", [self])
 
@@ -326,6 +350,7 @@ func use_tool() -> void:
 	if carried_item != "" or _tool_cd > 0.0 or current_tool == "welder":
 		return
 	var hit := _ray.get_collider() if _ray.is_colliding() else null
+	_send_action(CharacterAnimator.action_clip(current_tool))
 	if current_tool == "hammer":
 		_tool_cd = 0.45
 		viewmodel.play("hammer")
@@ -389,6 +414,56 @@ func come_along_hit(hit: Node) -> bool:
 	return false
 
 
+# --- Character animation (our own body and what other players see) ----------------
+
+## Plays a one-shot action on our own body and tells the other peers (net_action, synced on change).
+func _send_action(clip: String) -> void:
+	if clip == "":
+		return
+	_action_n += 1
+	net_action = "%s#%d" % [clip, _action_n]
+	if body:
+		body.play_action(clip)
+
+
+## The action clip pressing [E] on `target` plays: shovelling at the furnace, hauling the lever, else a reach.
+func interact_clip(target: Node) -> String:
+	if target == null:
+		return ""
+	if target.has_meta("anim"):
+		return str(target.get_meta("anim"))
+	var prompt: String = target.call("get_prompt", self) if target.has_method("get_prompt") else ""
+	if prompt.begins_with("Furnace"):
+		return "shovel"
+	if prompt.begins_with("Lever"):
+		return "lever"
+	return "interact"
+
+
+## Changes this player's look (local player: saved by the customise menu; synced to the others through `look`).
+func set_look(code: String) -> void:
+	look = code
+
+
+## Our own body follows what we do (the mirror shows it).
+func _update_body(_delta: float) -> void:
+	if body == null:
+		return
+	if look != _shown_look:
+		_shown_look = look
+		var a := Appearance.decode(look)
+		body.apply_look(a)
+		viewmodel.set_look(a)
+	var s := body.anim.state
+	s.speed = Vector2(velocity.x, velocity.z).length()
+	s.on_floor = is_on_floor()
+	s.vertical = velocity.y
+	s.welding = welding
+	body.set_tool(current_tool)
+	body.set_carried(carried_item)
+	body.set_pitch(camera.rotation.x)
+
+
 # --- Update -------------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
@@ -435,6 +510,7 @@ func _local_physics(delta: float) -> void:
 	_update_welder(delta)
 	_update_aim()
 	_write_net_state()
+	_update_body(delta)
 
 
 # --- NET: replication helpers ---------------------------------------------------------
@@ -473,11 +549,18 @@ func _remote_update(delta: float) -> void:
 			if Vector2(global_position.x - plug.x, global_position.z - plug.z).length() > welder_source.cable_length + 6.0:
 				_unplug(false)
 	if _remote_body:
-		var walk := net_pos.distance_to(_last_net_pos) / maxf(delta, 0.001)
+		var flat := Vector2(net_pos.x - _last_net_pos.x, net_pos.z - _last_net_pos.z)
+		var walk := flat.length() / maxf(delta, 0.001)
+		var vy := (net_pos.y - _last_net_pos.y) / maxf(delta, 0.001)
 		_last_net_pos = net_pos
+		_remote_body.set_look(look)
 		_remote_body.set_pitch(net_pitch)
 		_remote_body.set_held("hammer" if current_tool == "welder" and welder_path == "" else current_tool, carried_item)
-		_remote_body.animate(delta, walk if walk < 20.0 else 0.0)
+		_remote_body.set_welding(welding)
+		if net_action != _seen_action:
+			_seen_action = net_action
+			_remote_body.play_action(net_action.get_slice("#", 0))
+		_remote_body.animate(delta, walk if walk < 20.0 else 0.0, vy if absf(vy) < 30.0 else 0.0)
 
 
 func _process(_delta: float) -> void:
@@ -546,6 +629,7 @@ func _update_focus(delta: float) -> void:
 		hold_progress += delta
 		if hold_progress >= hold_needed:
 			hold_progress = 0.0
+			_send_action(interact_clip(focused))
 			Net.request(focused, &"interact", [self])
 	else:
 		hold_progress = 0.0
@@ -594,14 +678,15 @@ func _update_welder(delta: float) -> void:
 
 ## Downed: the camera drops to the ground and tilts (local player), the body lies down (others).
 func _show_downed(on: bool) -> void:
-	var tw := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	if is_local():
+		var tw := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		tw.tween_property(camera, "position:y", 0.35 if on else 1.6, 0.6)
 		tw.parallel().tween_property(camera, "rotation:z", 0.5 if on else 0.0, 0.6)
 		viewmodel.visible = not on
-	elif _remote_body:
-		tw.tween_property(_remote_body, "rotation:x", -PI * 0.5 if on else 0.0, 0.5)
-		tw.parallel().tween_property(_remote_body, "position:y", 0.3 if on else 0.0, 0.5)
+	if _remote_body:
+		_remote_body.set_downed(on)
+	if body:
+		body.anim.state.downed = on
 
 
 ## Where the player is looking (within reach), or Vector3.INF.

@@ -13,8 +13,8 @@ extends Node3D
 ## Carry poses: plank on the shoulder, rail held low with a strained bob, wheel in front with a wobble,
 ## panel flat at chest height. Placing an item lowers it out of view.
 
-const SKIN := Color(1.0, 0.76, 0.6)
-const SLEEVE := Color(0.85, 0.55, 0.3)
+## The cartoon hand and jacket sleeve (built by blender/scripts/build_character.py), tinted with the player's look.
+const ARM_MODEL := "res://assets/models/character/fp_arm.glb"
 const RIGHT_REST := Vector3(0.42, -0.42, -0.62)
 const LEFT_REST := Vector3(-0.42, -0.42, -0.62)
 ## Glove + sleeve size: small enough that the tool, not the glove, reads at mid-swing.
@@ -91,6 +91,8 @@ var _bob := 0.0
 var _kick := 0.0
 var _sfx: AudioStreamPlayer
 var _sounds := {}
+var _arms: Array[Node3D] = []
+var _look := Appearance.new()
 
 
 func setup(p: CharacterBody3D, cam: Camera3D) -> void:
@@ -115,15 +117,40 @@ func setup(p: CharacterBody3D, cam: Camera3D) -> void:
 	add_child(_sfx)
 	_sounds = {"thunk": _make_sound("thunk"), "tick": _make_sound("tick"), "puff": _make_sound("puff"), "clank": _make_sound("clank")}
 	_show_tool(tool)
+	_hide_from_mirror(self)
 
 
-## Leather work glove and jacket sleeve (Blender model arm.glb): hand at the pivot, forearm towards the camera.
+## Bare cartoon hand and jacket sleeve (fp_arm.glb): hand at the pivot, forearm towards the camera.
+## Skin and sleeve follow the player's look (set_look).
 func _arm(pivot: Node3D) -> void:
-	var arm := Props.instance("arm")
+	var arm: Node3D = (load(ARM_MODEL) as PackedScene).instantiate()
 	arm.scale = Vector3.ONE * ARM_SCALE
 	if pivot == left:
 		arm.scale.x = -arm.scale.x  # mirrored for the left hand
 	pivot.add_child(arm)
+	_arms.append(arm)
+	_paint_arm(arm)
+
+
+## The hands take the skin colour, the sleeves the outfit colour of this look.
+func set_look(a: Appearance) -> void:
+	_look = a.duplicate_look()
+	for arm in _arms:
+		_paint_arm(arm)
+
+
+func _paint_arm(arm: Node3D) -> void:
+	for mi: MeshInstance3D in arm.find_children("*", "MeshInstance3D", true, false):
+		for i in mi.mesh.get_surface_count():
+			var src := mi.mesh.surface_get_material(i)
+			var id := src.resource_name if src else ""
+			mi.set_surface_override_material(i, CharacterModel.material_for(id, CharacterModel.part_color(_look, id)))
+
+
+## The first-person arms, tools and carried items never show in the train's mirror (it shows your body instead).
+func _hide_from_mirror(node: Node) -> void:
+	for vi: VisualInstance3D in node.find_children("*", "VisualInstance3D", true, false):
+		vi.layers = Mirror.HIDDEN_LAYER
 
 
 func _build_tools() -> void:
@@ -246,6 +273,7 @@ func carry(item: String) -> void:
 		_carry_model.queue_free()
 	_carry_model = Props.instance(item)
 	add_child(_carry_model)
+	_hide_from_mirror(_carry_model)
 	_anim = ""
 	_anim_t = 1.0
 	_apply_carry_pose(0.0)
