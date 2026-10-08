@@ -1,6 +1,7 @@
 extends Node
 ## Saves preview screenshots (needs a real or virtual display, not --headless):
-##   godot --path . res://tests/Screenshot.tscn -- <output_dir>
+##   godot --path . res://tests/Screenshot.tscn -- <output_dir> [repair|train|menu|hud]
+## menu: title screen, settings tabs, join dialog. hud: in-game HUD (1600x900 and 1280x720), shop, pause menu.
 
 var main: Node3D
 var out := "user://"
@@ -10,6 +11,10 @@ var free_cam: Camera3D
 func _ready() -> void:
 	if OS.get_cmdline_user_args().size() > 0:
 		out = OS.get_cmdline_user_args()[0]
+	if OS.get_cmdline_user_args().has("menu"):
+		await _menu_shots()
+		get_tree().quit()
+		return
 	Game.new_game(false)
 	Game.world_sabotage = false
 	main = load("res://scenes/main/Main.tscn").instantiate()
@@ -20,6 +25,10 @@ func _ready() -> void:
 	var player: Player = main.player
 
 	var args := OS.get_cmdline_user_args()
+	if args.has("hud"):
+		await _hud_shots(track, train, player)
+		get_tree().quit()
+		return
 	if not args.has("repair") and not args.has("train"):
 		await _landscape_shots(track, train, player)
 	if not args.has("train"):
@@ -105,6 +114,63 @@ func _train_shots(track: Track, train: Train, player: Player) -> void:
 	train.take_damage(55.0)
 	await get_tree().create_timer(1.2).timeout
 	await _shot("9_train_damaged")
+
+
+func _menu_shots() -> void:
+	var menu: Node = load("res://scenes/menu/MainMenu.tscn").instantiate()
+	add_child(menu)
+	await get_tree().create_timer(3.5).timeout
+	await _shot("menu_1_title")
+	await get_tree().create_timer(4.0).timeout
+	await _shot("menu_2_title_later")
+	var settings: SettingsMenu = menu.get("_settings")
+	settings.open()
+	for i in settings.tabs.get_tab_count():
+		settings.tabs.current_tab = i
+		await get_tree().create_timer(0.3).timeout
+		await _shot("menu_3_settings_%d_%s" % [i, settings.tabs.get_tab_title(i).to_lower()])
+	settings.close()
+	menu.call("_open_join")
+	await _shot("menu_4_join")
+
+
+func _hud_shots(track: Track, train: Train, player: Player) -> void:
+	main.hud.visible = true
+	player.camera.make_current()
+	_view_player(player, track.transform_at(train.distance + 7.0).origin + track.transform_at(train.distance).basis.x * 4.5 + Vector3.UP * 1.3,
+		train.cars[1].global_position + Vector3.UP * 1.0)
+	# Some wear and tear so every bar shows something
+	train.take_damage(30.0)
+	train.lose_wheel(false)
+	train.lever = 1
+	train.speed = 6.0
+	Game.add("nail_gun")
+	player.health = 72.0
+	player.frost = 35.0
+	Game.say("A wheel came off! (5/6, speed -16%) New wheels are sold at stations.")
+	Game.say("Bought Nails x10")
+	await get_tree().create_timer(0.6).timeout
+	await _shot("hud_1_play")
+	Game.show_banner("Station 1 / 5 reached!\nCheckpoint saved. Repair, shop, rest.")
+	await get_tree().create_timer(0.8).timeout
+	await _shot("hud_2_banner")
+	var st := main.get_node_or_null("Station0") as Station
+	if st:
+		main.hud.open_shop(st)
+		await get_tree().create_timer(0.4).timeout
+		await _shot("hud_3_shop")
+		main.hud.close_shop()
+	main.hud.pause_menu.open()
+	await get_tree().create_timer(0.5).timeout
+	await _shot("hud_4_pause")
+	main.hud.pause_menu.close()
+	# The UI uses the canvas_items stretch mode, so a 1280x720 window shows exactly this frame scaled by 0.8
+	await get_tree().create_timer(0.3).timeout
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	img.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
+	img.save_png("%s/hud_5_play_1280x720.png" % out)
+	print("saved hud_5_play_1280x720")
 
 
 func _view_player(player: Player, pos: Vector3, look: Vector3) -> void:

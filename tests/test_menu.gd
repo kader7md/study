@@ -1,0 +1,187 @@
+extends Node
+## Headless checks for the menus workstream:
+##   godot --headless --path . res://tests/TestMenu.tscn
+## Settings load/save/rebind/reset (on a separate test file), audio and graphics apply, the main menu
+## (120 frames, no Game.track/train), and the pause menu stopping the train in solo play.
+
+const TEST_PATH := "user://test_settings.cfg"
+
+var failures := 0
+
+
+func _ready() -> void:
+	Settings.path = TEST_PATH
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
+	Settings.load_settings()
+	await _settings_checks()
+	await _menu_checks()
+	await _pause_checks()
+	# Back to the real settings file
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
+	Settings.path = Settings.PATH
+	Settings.load_settings()
+	print("\n%s: %d failure(s)" % ["PASSED" if failures == 0 else "FAILED", failures])
+	get_tree().quit(1 if failures > 0 else 0)
+
+
+func check(ok: bool, what: String) -> void:
+	print(("  ok   " if ok else "  FAIL ") + what)
+	if not ok:
+		failures += 1
+
+
+func _frames(n: int) -> void:
+	for i in n:
+		await get_tree().process_frame
+
+
+func _has_key(action: String, key: Key) -> bool:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventKey and (ev as InputEventKey).physical_keycode == key:
+			return true
+	return false
+
+
+func _settings_checks() -> void:
+	print("Settings")
+	check(InputMap.has_action("pause") and _has_key("pause", KEY_ESCAPE), "pause action is registered on Esc")
+	check(InputMap.has_action("push_to_talk") and _has_key("push_to_talk", KEY_V), "push_to_talk action is registered on V")
+	check(is_equal_approx(Settings.mouse_sensitivity, 0.0025) and is_equal_approx(Settings.fov, 80.0), "defaults: sensitivity 0.0025, FOV 80")
+	check(get_tree().root.theme != null, "root viewport has the UiTheme")
+
+	# Rebind jump to J: works at once and survives a reload
+	var j := InputEventKey.new()
+	j.physical_keycode = KEY_J
+	Settings.rebind("jump", j)
+	check(_has_key("jump", KEY_J) and not _has_key("jump", KEY_SPACE), "jump rebound to J at once")
+	Settings.save()
+	var cfg := ConfigFile.new()
+	check(cfg.load(TEST_PATH) == OK and cfg.has_section_key("controls", "bind_jump"), "binding saved in the settings file")
+	InputMap.action_erase_events("jump")
+	Settings.load_settings()
+	check(_has_key("jump", KEY_J), "jump is still J after reloading the file")
+	check(Settings.binding_text("jump") != "" and Settings.binding_text("jump") != "Unbound", "binding text: %s" % Settings.binding_text("jump"))
+	Settings.reset_controls()
+	check(_has_key("jump", KEY_SPACE) and not _has_key("jump", KEY_J), "reset to defaults restores Space")
+	var attack := InputMap.action_get_events("attack")
+	check(attack.size() == 1 and attack[0] is InputEventMouseButton, "attack is back on the left mouse button")
+	var m := InputEventMouseButton.new()
+	m.button_index = MOUSE_BUTTON_MIDDLE
+	Settings.rebind("interact_alt", m)
+	check(Settings.binding_text("interact_alt") == "Mouse Middle", "mouse buttons can be bound")
+	Settings.reset_controls()
+
+	# Audio buses
+	Settings.set_value("audio", "Music", 0.5)
+	var music := AudioServer.get_bus_index("Music")
+	check(music >= 0 and absf(AudioServer.get_bus_volume_db(music) - linear_to_db(0.5)) < 0.01, "Music slider sets the bus volume")
+	Settings.set_value("audio", "SFX", 0.0)
+	check(AudioServer.is_bus_mute(AudioServer.get_bus_index("SFX")), "SFX at 0 mutes the bus")
+	Settings.set_value("audio", "SFX", 0.8)
+	check(not AudioServer.is_bus_mute(AudioServer.get_bus_index("SFX")), "SFX back up unmutes")
+	check(AudioServer.is_bus_mute(AudioServer.get_bus_index("Mic")), "Mic bus is muted (no echo)")
+
+	# Graphics
+	Settings.set_value("graphics", "render_scale", 0.75)
+	check(is_equal_approx(get_tree().root.scaling_3d_scale, 0.75), "resolution scale applies to the viewport")
+	Settings.set_value("graphics", "max_fps", 60)
+	check(Engine.max_fps == 60, "max FPS applies")
+	Settings.set_value("graphics", "aa", 3)
+	check(get_tree().root.msaa_3d == Viewport.MSAA_4X, "MSAA 4x applies")
+	Settings.save()
+	cfg = ConfigFile.new()
+	cfg.load(TEST_PATH)
+	check(is_equal_approx(float(cfg.get_value("graphics", "render_scale", 0.0)), 0.75) and float(cfg.get_value("audio", "Music", 0.0)) == 0.5, "graphics and audio persist")
+	Settings.reset_section("graphics")
+	Settings.reset_section("audio")
+	check(is_equal_approx(get_tree().root.scaling_3d_scale, 1.0) and Engine.max_fps == 0, "graphics reset")
+
+	# Corrupt file falls back to defaults (the engine prints a ConfigFile parse error here: expected)
+	var f := FileAccess.open(TEST_PATH, FileAccess.WRITE)
+	f.store_string("[controls\nthis is = = not a config }{")
+	f.close()
+	Settings.load_settings()
+	check(is_equal_approx(Settings.mouse_sensitivity, 0.0025) and _has_key("jump", KEY_SPACE), "corrupt file -> defaults")
+	Settings.cfg.set_value("graphics", "fov", "banana")
+	Settings._validate()
+	check(is_equal_approx(Settings.fov, 80.0), "wrong value types are dropped")
+	await _frames(2)
+
+
+func _menu_checks() -> void:
+	print("Main menu")
+	var menu: Node = load("res://scenes/menu/MainMenu.tscn").instantiate()
+	add_child(menu)
+	await _frames(120)
+	var bg: MenuBackground = menu.get("background")
+	check(bg != null and bg.train != null and bg.train.cars.size() > 0, "background has the train")
+	check(bg != null and bg.station != null and bg.terrain != null, "background has station 0 and terrain")
+	check(Game.train == null and Game.track == null, "menu does not set Game.train / Game.track")
+	check(get_tree().get_nodes_in_group("player").is_empty(), "no Player in the menu")
+	var buttons: Array = menu.get("_buttons")
+	check(buttons.size() == 4, "four menu buttons")
+	var settings: SettingsMenu = menu.get("_settings")
+	settings.open()
+	await _frames(3)
+	check(settings.visible and settings.tabs.get_tab_count() == 4, "settings opens with 4 tabs")
+	for i in settings.tabs.get_tab_count():
+		settings.tabs.current_tab = i
+		await _frames(2)
+	settings.close()
+	check(not settings.visible, "settings closes")
+	menu.call("_open_join")
+	await _frames(2)
+	menu.call("_close_join")
+	menu.queue_free()
+	await _frames(2)
+
+
+func _pause_checks() -> void:
+	print("Pause menu")
+	Game.new_game(false)
+	Game.world_sabotage = false
+	var main: Node3D = load("res://scenes/main/Main.tscn").instantiate()
+	add_child(main)
+	await _frames(5)
+	var hud: HUD = main.hud
+	var train := Game.train
+	check(hud.pause_menu != null, "HUD has a pause menu")
+	var player: Player = main.player
+	Settings.fov = 95.0
+	check(is_equal_approx(player.camera.fov, 95.0), "FOV setting reaches the player camera")
+	Settings.fov = 80.0
+
+	# Clear the track ahead and drive
+	for i in range(Game.track.piece_at(train.distance), Game.track.piece_at(train.distance + 200.0)):
+		Game.track.repair_piece(i)
+	train.fuel = Train.MAX_FUEL
+	train.lever = 1
+	await get_tree().create_timer(1.5).timeout
+	check(train.speed > 0.5, "train is moving before pausing")
+	await _press_pause()
+	check(hud.pause_menu.is_open and get_tree().paused and Game.ui_open, "Esc opens the pause menu and pauses solo play")
+	var d0 := train.distance
+	await get_tree().create_timer(0.6, true).timeout
+	check(is_equal_approx(train.distance, d0), "the train does not move while paused")
+	await _press_pause()
+	check(not hud.pause_menu.is_open and not get_tree().paused and not Game.ui_open, "Esc again resumes")
+	# Shop open: Esc closes the shop, not opening the pause menu
+	hud.open_shop(main.get_node("Station0") as Station)
+	await _frames(2)
+	await _press_pause()
+	check(not hud.pause_menu.is_open and not Game.ui_open, "Esc closes the shop first")
+	main.queue_free()
+	await _frames(3)
+
+
+func _press_pause() -> void:
+	var ev := InputEventAction.new()
+	ev.action = "pause"
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	await _frames(2)
+	var up := InputEventAction.new()
+	up.action = "pause"
+	up.pressed = false
+	Input.parse_input_event(up)
+	await _frames(2)
