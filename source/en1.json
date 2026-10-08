@@ -1,0 +1,339 @@
+[
+ {
+  "id": 45,
+  "en": "Overseas travel insurance covers treatment costs for injuries. It does not cover treatment costs for illness.",
+  "why": "False. Overseas travel insurance also covers treatment costs for illness. The question removed illness coverage.",
+  "trap": "疾病による治療費用は補償の対象としていません",
+  "type": "Direction flip"
+ },
+ {
+  "id": 46,
+  "en": "Personal liability insurance protects you when, in daily life, you accidentally injure another person or break their property, and you become legally liable to pay damages.",
+  "why": "True. Personal liability insurance = accidents in daily life where you must legally pay for harm to others.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 47,
+  "en": "In personal liability insurance, no claim payment at all is made for liability caused by the actions of the named insured's family.",
+  "why": "False. Usually the named insured AND their family (spouse, relatives living together, unmarried children living apart, etc.) are all insured. So liability caused by family members is also paid.",
+  "trap": "いっさい",
+  "type": "Absolute word"
+ },
+ {
+  "id": 48,
+  "topic_en": "Non-life insurance products",
+  "en_a": "Personal accident insurance pays when the insured is injured by a \"sudden, accidental, external accident\" and is hospitalized, visits a hospital, dies, or has a permanent disability. Bacterial food poisoning and viral food poisoning are not covered.",
+  "en_i": "Overseas travel insurance covers injuries caused by earthquake, volcanic eruption, or tsunami.",
+  "why_a": "True. Food poisoning (bacteria or virus) is not paid by personal accident insurance.",
+  "why_i": "True. Overseas travel insurance does pay for injuries from earthquake, eruption, or tsunami.",
+  "trap_a": "",
+  "trap_i": "",
+  "type_a": "True",
+  "type_i": "True"
+ },
+ {
+  "id": 49,
+  "en": "An agent must follow the basic law, the \"Insurance Business Act\". The agent must also follow rules made by the insurance company, such as the various \"contract rules\".",
+  "why": "True. Agents follow both the law and the insurance company's own rules.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 50,
+  "en": "In compliance, an agent must have this basic attitude: \"Actively do things that are good to do, even if no rule says you must. Strictly avoid things that are better not to do, even if they are not forbidden.\"",
+  "why": "True. Compliance means more than just following written rules.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 51,
+  "en": "It is important for an agent to have the basic compliance attitude and to earn \"trust\", so the agent can be a good advisor for consumers.",
+  "why": "True. The key word is \"trust\" (信頼).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 52,
+  "en": "An agent is usually given the power to make insurance contracts by the insurance company. The agent makes contracts with policyholders on behalf of the insurance company.",
+  "why": "True. Non-life agents usually have the power to conclude contracts.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 53,
+  "en": "An agent is given the power to receive disclosures from the insurance company. At the time of the contract, the agent receives disclosure about the risk from the policyholder or the insured.",
+  "why": "True. The agent has the power to receive disclosure (告知).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 54,
+  "en": "The work an agent is entrusted with by the insurance company is written in the \"agency entrustment contract\" with the insurance company. It is also written in the \"policy conditions\" agreed with the policyholder.",
+  "why": "False. The agent's work is written only in the \"agency entrustment contract\" between the insurance company and the agent. It is not written in the \"policy conditions\". The policy conditions are standard terms the insurance company sets for the contract content and conditions.",
+  "trap": "保険契約者との間で締結された「保険約款」にも記載されています",
+  "type": "Wrong definition"
+ },
+ {
+  "id": 55,
+  "en": "Explaining and handing over brochures, the contract summary, and the important caution information in order to recommend insurance is considered insurance solicitation.",
+  "why": "True. Explaining/handing over these documents to recommend insurance = solicitation.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 56,
+  "topic_en": "Compliance",
+  "en_a": "Compliance usually means \"following laws, etc.\" But \"laws, etc.\" does not include the insurance company's rules or social norms.",
+  "en_i": "As a rule, an agent must receive the full premium from the policyholder at the same time the contract is made.",
+  "why_a": "False. \"Laws, etc.\" in compliance includes laws, AND the insurance company's rules, AND social norms.",
+  "why_i": "True. In principle, the full premium is collected when the contract is made.",
+  "trap_a": "含まれません",
+  "trap_i": "",
+  "type_a": "Direction flip",
+  "type_i": "True"
+ },
+ {
+  "id": 57,
+  "en": "Simply mailing brochures to policyholders, following the agent's instructions, is considered NOT insurance solicitation.",
+  "why": "True. Just mailing (no explanation) is not solicitation.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 58,
+  "en": "An agent cannot solicit insurance for an insurance company other than the companies it belongs to.",
+  "why": "True. An agent can only sell for its own (contracted) insurance companies.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 59,
+  "en": "If someone solicits insurance without agent registration, it is unregistered solicitation, and they get legal penalties.",
+  "why": "True. No registration = illegal, with penalties.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 60,
+  "en": "To solicit insurance as an agent, you must be registered by the Prime Minister.",
+  "why": "True. Agent registration is with the Prime Minister (内閣総理大臣).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 61,
+  "en": "An agent cannot have a person who already solicits insurance at another agency also solicit at the same time as its own employee.",
+  "why": "True. One person cannot work as a solicitor for two agencies at the same time.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 62,
+  "en": "When an agent wants a newly hired employee to solicit insurance, the employee can only start on or after the date the notification to the Prime Minister is accepted.",
+  "why": "True. The new employee can solicit only after the notification is accepted.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 63,
+  "en": "If an agency is registered, its officers and employees can solicit insurance without a solicitor notification.",
+  "why": "False. Even after agency registration, to let officers or employees solicit, the agency must file a solicitor notification with the Prime Minister.",
+  "trap": "募集人届出を行わずに",
+  "type": "Removed requirement"
+ },
+ {
+  "id": 64,
+  "en": "When a corporate agency disappears because of a merger, it does not need to notify the Prime Minister.",
+  "why": "False. When a corporate agency disappears by merger, the person who was its representative officer must notify the Prime Minister without delay.",
+  "trap": "必要はありません",
+  "type": "Removed requirement"
+ },
+ {
+  "id": 65,
+  "en": "When the owner of an individual agency dies, the heir must notify the Prime Minister without delay.",
+  "why": "True. Owner dies -> the heir notifies.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 66,
+  "en": "When an agent's officer or employee stops soliciting insurance, the agent must notify the Prime Minister.",
+  "why": "True. Stopping solicitation must also be notified.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 67,
+  "en": "Before soliciting, an agent must first make clear to the customer whether it makes the contract as the insurance company's representative (agent), or only acts as an intermediary for the contract.",
+  "why": "True. The agent must explain its role: contracting agent or intermediary.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 68,
+  "en": "When soliciting, an agent must give the information the policyholder needs to decide whether to make the contract. The \"contract summary\" and the \"important caution information\" must be explained using an important-matters document. The agent must give that document, or use an electronic method instead.",
+  "why": "True. Contract summary + caution information: explain with a document and hand it over (or electronic).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 69,
+  "en": "When soliciting, an agent must give the information the policyholder needs to decide. The \"contract summary\" is the information the policyholder needs to understand the content of the insurance product.",
+  "why": "True. Contract summary = information to understand the product.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 70,
+  "en": "When soliciting, an agent must understand the customer's wishes (for example, what kind of coverage they want) and suggest a matching product. When making the contract, the agent must check that the customer's wishes and the contract content match.",
+  "why": "True. Understand the wishes, suggest a product, then confirm they match.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 71,
+  "en": "An agent records the customer's wishes in writing (or an electronic method), using the application form or a wish-confirmation document. Then the agent clearly explains how the product relates to those wishes, and checks that the wishes and the contract content match.",
+  "why": "True. Record the wishes, explain, then confirm they match.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 72,
+  "en": "In a contract where the policyholder and the insured are different (for example, accident insurance a company buys for its employees), if the insured pays no premium, it is not necessary to check the insured's wishes. But it is necessary to check the policyholder's wishes.",
+  "why": "True. If the insured pays nothing, only the policyholder's wishes need checking.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 73,
+  "en": "At an agency that sells products of several insurance companies, if its recommendation method is to select comparable products based on the customer's wishes and then recommend one, it must explain an outline of the comparable candidate products and the reason for its recommendation.",
+  "why": "True. Explain the candidate products and why you recommend one.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 74,
+  "en": "When an agent recommends a certain product and compares it with other products to show it is better, the agent must explain everything needed for the comparison, so the customer can decide correctly. This includes the whole picture and features of the other products, and the reasons the recommended product is better.",
+  "why": "True. Comparison must be complete and fair.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 75,
+  "en": "For a renewal contract, even if the customer wants to renew the existing contract, the agent must explain an outline of other comparable candidate products and the reason for recommending a product.",
+  "why": "False. If the customer names a company or product (does not want recommendations), or wants to renew the existing contract, the recommendation explanation is not required. But the agent must still do the duty of understanding the customer's wishes.",
+  "trap": "説明しなければなりません",
+  "type": "Fake exception"
+ },
+ {
+  "id": 76,
+  "en": "When making a contract, an agent must not tell lies to the policyholder or insured. The agent also must not fail to tell important contract terms that affect the policyholder's or insured's decision.",
+  "why": "True. No lies, and no hiding important matters.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 77,
+  "en": "When making a contract, an agent must not encourage the policyholder or insured to give false answers about the matters the insurance company asks them to disclose.",
+  "why": "True. Encouraging false disclosure is forbidden.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 78,
+  "en": "When making a contract, an agent must not give special benefits, such as an improper premium discount, to the policyholder or insured.",
+  "why": "True. Special benefits (like illegal discounts) are forbidden.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 79,
+  "topic_en": "Insurance Business Act",
+  "en_a": "An agent promising or giving the policyholder, the insured, or people closely related to them, goods or services that are not reasonable by normal business standards is giving a special benefit. So it is forbidden.",
+  "en_i": "An agent that also runs a car sales business must not give a discount on the car price on the condition that the customer buys insurance.",
+  "why_a": "True. Unreasonable gifts or services = special benefit = forbidden.",
+  "why_i": "True. A car discount for buying insurance is a special benefit = forbidden.",
+  "trap_a": "",
+  "trap_i": "",
+  "type_a": "True",
+  "type_i": "True"
+ },
+ {
+  "id": 80,
+  "en": "When making a contract, an agent must not simply compare only the premium of another company's product (with different coverage and conditions) and its own company's product, and on purpose say its own premium is cheaper and better.",
+  "why": "True. Comparing only the premium, when coverage differs, is misleading.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 81,
+  "en": "When making a contract, an agent must not hand out newspaper articles about another company's ability to pay, in order to speak badly of that company.",
+  "why": "True. Speaking badly of other companies is forbidden.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 82,
+  "en": "When making a contract, an agent must not greatly trouble the policyholder with a threatening attitude or rough words.",
+  "why": "True. Pressuring customers is forbidden.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 83,
+  "en": "When a corporate agency handles a car insurance contract where the policyholder is a full-time officer of that company, the contract is a self-contract.",
+  "why": "False. For a corporate agency, a self-contract is one where the company itself is the policyholder or the insured. So this case (an officer) is not a self-contract.",
+  "trap": "常勤役員",
+  "type": "Person swap"
+ },
+ {
+  "id": 84,
+  "en": "When a corporate agency handles a fire insurance contract where the company itself is the policyholder, the contract is a self-contract.",
+  "why": "True. Corporate agency + the company itself is policyholder = self-contract.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 85,
+  "en": "When an individual agency handles an accident insurance contract where the policyholder or insured is the owner's father, who lives separately and does not share living costs, the contract is a self-contract.",
+  "why": "False. For an individual agency, a self-contract is one where \"the agent himself/herself\" or \"the person or company that employs the agent\" is the policyholder or insured. So this case (a separate father) is not a self-contract.",
+  "trap": "別居の父親",
+  "type": "Person swap"
+ },
+ {
+  "id": 86,
+  "en": "An agent must set up systems to keep its business sound and proper. For example: explaining important matters to customers, handling customer information properly, and making sure outside companies do their work correctly when solicitation work is outsourced.",
+  "why": "True. All agents must have these systems in place.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 87,
+  "en": "An agent must set up systems to make sure important matters are explained to customers. But this only applies to corporate agencies. Individual agencies do not have this system duty.",
+  "why": "False. The system duty applies to all agents, individual or corporate.",
+  "trap": "個人代理店には体制整備義務は課せられていません",
+  "type": "Fake exception"
+ },
+ {
+  "id": 88,
+  "en": "For an agent's system setup, it is very important to check itself actively and independently, using tools like a self-check sheet.",
+  "why": "True. Self-checking by the agent itself is very important.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 89,
+  "en": "An agent that does recommendation selling or comparison explanations must take steps that fit its size and features. These steps prevent it from asking insurance companies for too many favors, and from accepting too many favors from them. This protects the customer's chance to choose the right product.",
+  "why": "True. Agents must prevent too many favors with insurance companies.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 90,
+  "en": "A large specified insurance solicitor must keep books and records and send business reports to the Finance Bureau. It is hard for the agent itself to know correctly whether it is a large specified solicitor, so the insurance company it belongs to must manage this.",
+  "why": "False. It is the opposite. It is hard for the insurance company to know correctly, so the agent itself must manage whether it is a large specified solicitor.",
+  "trap": "所属保険会社で管理する必要があります",
+  "type": "Person swap"
+ }
+]

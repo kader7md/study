@@ -1,0 +1,367 @@
+[
+ {
+  "id": 91,
+  "en": "The Personal Information Protection Act covers information about a living person. It covers information that can identify a specific person (by name, date of birth, or other details). It also covers information that contains an individual identification code.",
+  "why": "Remember: the law protects information about LIVING people that can identify a person, plus identification codes.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 92,
+  "en": "An agent that also runs a claim-payment-related business (for example, car repair) must manage conflicts of interest by following the insurance company's instructions, so the insurer can make proper claim payments. The agent does not need to take its own measures based on its size and features.",
+  "why": "False. Such an agent must identify deals that may harm the customer's interest or trust because of unfair incentives. It must make and publish a policy to manage them (conflict of interest policy). It must build a system to prevent harm that fits its own size and the features of its claim-related business. The statement wrongly says this is not needed.",
+  "trap": "必要ありません",
+  "type": "Removed requirement"
+ },
+ {
+  "id": 93,
+  "topic_en": "Insurance Business Act",
+  "en_a": "A specified large multi-company agent must place a \"compliance officer\" at each sales office. This person gives advice and guidance needed for selling insurance. The agent must also place a \"general manager\" at the head office. This person gives advice and guidance to the compliance officers.",
+  "en_i": "A specified large multi-company agent that also runs a business paid from claim payments (for example, repair shops) must build a system to watch that side business properly. This is so it does not unfairly affect claim payments.",
+  "why_a": "True. Large multi-company agents need a compliance officer at each office and a general manager at the head office.",
+  "why_i": "True. If they also run a repair-type business, they must watch it so claim payments are not unfairly affected.",
+  "trap_a": "",
+  "trap_i": "",
+  "type_a": "True",
+  "type_i": "True"
+ },
+ {
+  "id": 94,
+  "topic_en": "Insurance Business Act",
+  "en_a": "When selling insurance, the agent must understand what kind of coverage the customer wants. But the agent does not need to understand the customer's wishes about the policy period or the amount insured.",
+  "en_i": "When making an insurance contract, the agent must explain whether the agent has the authority to make (sign) the contract for the insurer.",
+  "why_a": "False. The agent must also understand the customer's wishes about the policy period, the premium, and the amount insured, and what the customer thinks is most important. The statement wrongly says this is not needed.",
+  "why_i": "True. The agent must explain whether it has the right to make the contract on behalf of the insurer.",
+  "trap_a": "把握する必要はありません",
+  "trap_i": "",
+  "type_a": "Removed requirement",
+  "type_i": "True"
+ },
+ {
+  "id": 95,
+  "en": "The purpose of the Personal Information Protection Act is to protect people's rights and interests. It does this by setting duties that businesses handling personal information must follow. At the same time, it considers that personal information is useful. For example, proper and effective use of personal information helps create new industries, an active economy, and a rich life for the people.",
+  "why": "Remember: the purpose is to PROTECT individual rights, while also caring about the usefulness of personal information.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 96,
+  "topic_en": "Insurance Business Act",
+  "en_a": "When making an insurance contract, the agent must not give special benefits, such as money as a thank-you, to the policyholder. This also applies to relatives living with the policyholder.",
+  "en_i": "When making an insurance contract, the agent must never, in any case, make a customer cancel an existing contract and apply for a new one.",
+  "why_a": "True. Special benefits are banned for the policyholder and also for family living with them.",
+  "why_i": "False. What is banned is making the customer cancel an existing contract and apply for a new one WITHOUT telling them the disadvantages. Not all switching of contracts is banned.",
+  "trap_a": "",
+  "trap_i": "いっさい",
+  "type_a": "True",
+  "type_i": "Absolute word"
+ },
+ {
+  "id": 97,
+  "en": "When making an insurance contract, the agent must explain to the policyholder how personal information is handled. For example, the purpose of use, and shared use by the insurance company.",
+  "why": "Remember: at contract time, the agent explains how personal information is used (purpose, shared use, etc.).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 98,
+  "en": "When accepting insurance contracts, insurance companies must not, as a rule, contact each other or exchange information. Agents must not do this with each other either. This is to avoid an \"unreasonable restraint of trade\" under the Antimonopoly Act.",
+  "why": "Remember: insurers with insurers, and agents with agents, should not contact or share information — it can be illegal price fixing (cartel).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 99,
+  "en": "An agent also runs a real estate business. A person wants to rent an apartment. The agent says it will help with the rental only if the person buys fire insurance (with tenant liability coverage) through the agent. The person has no choice but to buy it. This is \"tie-in selling\" and may break the Antimonopoly Act.",
+  "why": "Remember: forcing a customer to buy insurance as a condition for another deal is tie-in selling, which may break the Antimonopoly Act.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 100,
+  "en": "An agent uses its stronger business position over the other party and does something unfair compared to normal business practice. As a rule, this is \"abuse of a superior bargaining position\" and breaks the Antimonopoly Act.",
+  "why": "Remember: using your stronger position to do unfair things = abuse of superior position = Antimonopoly Act violation.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 101,
+  "topic_en": "Related laws and rules",
+  "en_a": "Sales documents, such as the important matters explanation and brochures, are not covered by the Premiums and Representations Act. But if the agent makes its own sales documents, it must always get approval from its insurance company before using them.",
+  "en_i": "When the agent gives a novelty (small gift) to the policyholder or insured at the time of sales or contract, it must stay within the Premiums and Representations Act. In addition, it must not break the Insurance Business Act ban on \"giving special benefits.\"",
+  "why_a": "False. Sales documents such as the important matters explanation and brochures ARE covered by the Premiums and Representations Act.",
+  "why_i": "True. Gifts must follow both the Premiums and Representations Act and the ban on special benefits.",
+  "trap_a": "景品表示法の規制の対象とはなりません",
+  "trap_i": "",
+  "type_a": "Direction flip",
+  "type_i": "True"
+ },
+ {
+  "id": 102,
+  "en": "The Act on Prevention of Transfer of Criminal Proceeds requires financial institutions to check the customer's identity details when doing certain transactions. This is to stop financial institutions from being used for money laundering or terrorist financing.",
+  "why": "Remember: for certain transactions, financial institutions must check customer identity to stop money laundering.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 103,
+  "en": "Under the Act on Prevention of Transfer of Criminal Proceeds, only when the customer is an individual person must the identity details be checked with a driver's license or other ID document.",
+  "why": "False. When a transaction needs checking, the identity must be checked whether the customer is an individual or a company. The statement wrongly limits it to individuals.",
+  "trap": "個人の場合に限り",
+  "type": "Absolute word"
+ },
+ {
+  "id": 104,
+  "en": "Under the Act on Prevention of Transfer of Criminal Proceeds, if a financial institution finds a transaction that may be money laundering, it must report it to the Financial Services Agency.",
+  "why": "Remember: suspicious transactions must be reported to the Financial Services Agency.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 105,
+  "topic_en": "Related laws and rules",
+  "en_a": "Under the Personal Information Protection Act, if a person asks a business to show, correct, or stop using their stored personal data, the business must, as a rule, do so without delay.",
+  "en_i": "Under the Act on Prevention of Transfer of Criminal Proceeds, even if a customer was already checked once, the check must always be done again at every transaction.",
+  "why_a": "True. As a rule, the business must show, correct, or stop using the data without delay.",
+  "why_i": "False. If a customer was already checked once, next time you only need to confirm they are the same person as in the record. A new full check is not needed.",
+  "trap_a": "",
+  "trap_i": "取引の都度、必ず",
+  "type_a": "True",
+  "type_i": "Absolute word"
+ },
+ {
+  "id": 106,
+  "en": "The Consumer Contract Act says a consumer can cancel their application or acceptance of a contract when the business's actions misled or confused the consumer, or when the contract was for too large an amount.",
+  "why": "Remember: if the consumer was misled, confused, or sold too much, they can cancel the contract.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 107,
+  "en": "The Consumer Contract Act says that unfair terms that are one-sidedly bad for the consumer are invalid. Examples: a term that frees the business from liability for damages, or an unclear term that makes it hard for the consumer to claim damages.",
+  "why": "Remember: unfair terms that are one-sidedly bad for consumers are invalid.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 108,
+  "en": "Under the Consumer Contract Act, a \"business\" means a company that is a party to a contract. An individual who makes a contract for business purposes is not a \"business.\"",
+  "why": "False. \"Business\" includes companies and other groups, and ALSO individuals who make contracts as a business or for business purposes.",
+  "trap": "個人は事業者となりません",
+  "type": "Wrong definition"
+ },
+ {
+  "id": 109,
+  "en": "Under the Financial Services Provision Act, an agent that makes insurance contracts as a representative or intermediary for an insurance company is a \"financial product seller.\"",
+  "why": "Remember: insurance agents count as \"financial product sellers.\"",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 110,
+  "en": "Under the Financial Services Provision Act, before a sale is made, a financial product seller must not tell the customer something uncertain as if it were sure.",
+  "why": "Remember: saying uncertain things as certain (\"definite judgment\") is banned.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 111,
+  "en": "Under the Financial Services Provision Act, a financial product seller must make a sales policy and publish it quickly. The policy covers things to consider, such as the customer's knowledge, experience, assets, and purpose of the contract.",
+  "why": "Remember: sellers must make and quickly publish a sales (solicitation) policy.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 112,
+  "en": "When the policyholder is elderly, the agent must take more careful steps that suit older people. For example, as the customer wishes, explain fully with family members present and then confirm the customer's intention, or use the insurer's proxy (representative) system.",
+  "why": "Remember: for elderly customers, be more careful — involve family if they wish, and use proxy rules.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 113,
+  "topic_en": "Related laws and rules",
+  "en_a": "Under the Consumer Contract Act, a \"business\" includes not only the insurance company but also the agent.",
+  "en_i": "Under the Financial Services Provision Act, when a customer claims damages from a financial product seller, the customer must prove the cause-and-effect link between the seller's failure to explain important matters (or giving a definite judgment) and the customer's loss.",
+  "why_a": "True. The agent is also a \"business\" under the Consumer Contract Act.",
+  "why_i": "False. The customer only needs to prove that the seller did not explain important matters or gave a definite judgment. Then the customer can claim damages. The customer does not need to prove the cause-and-effect link.",
+  "trap_a": "",
+  "trap_i": "顧客自らが立証しなければならない",
+  "type_a": "True",
+  "type_i": "Direction flip"
+ },
+ {
+  "id": 114,
+  "en": "When selling insurance by phone to an elderly customer, to check if they understood the explanation, it is important to have them answer with short replies like \"yes\" or \"no,\" so the customer needs to talk as little as possible.",
+  "why": "False. To check understanding, do not rely only on \"yes\" and \"no.\" It is important to encourage the customer to talk in their own words as much as possible.",
+  "trap": "できるだけ顧客自身が話す必要がないように",
+  "type": "Direction flip"
+ },
+ {
+  "id": 115,
+  "en": "When selling to a person with a disability, the agent must carefully listen to what support the policyholder wants. The agent must respond flexibly with reasonable accommodation. If the agent cannot do what the person wants for a valid reason, the agent must carefully explain the reason and try to get the person's understanding.",
+  "why": "Remember: ask what the person wants, give reasonable accommodation, and explain the reason if you cannot do it.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 116,
+  "en": "Agents must accept contracts following the \"principle of fairness.\" They must check the risk well and apply a premium rate that matches the level of risk.",
+  "why": "Remember: principle of fairness = premium rate that matches the risk.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 117,
+  "en": "To keep fairness among policyholders, the agent must have the policyholder or insured correctly disclose the important risk facts that the insurance company asks about (disclosure items).",
+  "why": "Remember: correct disclosure of the items the insurer asks about keeps fairness between policyholders.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 118,
+  "en": "When accepting contracts, the agent must reject contracts that go against the true purpose of insurance, such as a contract made to get claim money by setting a fire (arson fraud).",
+  "why": "Remember: reject contracts made for fraud, like arson.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 119,
+  "en": "When accepting a contract that insures an expensive item, the agent must check whether the item really exists and whether the amount insured is too high. This is to prevent fraud.",
+  "why": "Remember: for expensive items, check the item is real and the amount insured is not too high.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 120,
+  "en": "When accepting a contract, the agent must check whether other insurance contracts already exist for the same insured item or the same insured person.",
+  "why": "Remember: always check for other insurance on the same item or person.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 121,
+  "en": "When making a car insurance contract, the agent does not need to check the accident history of the previous contract, because it is personal privacy.",
+  "why": "False. In car and personal accident insurance, the accident history may make the premium higher, or the insurer may not accept the contract as the policyholder wants. Especially for car insurance, the agent must always check the previous contract's accident history with the policyholder.",
+  "trap": "確認する必要はありません",
+  "type": "Removed requirement"
+ },
+ {
+  "id": 122,
+  "en": "When an agent makes its own sales documents, it must follow each insurance company's rules for making documents. For documents that need the insurer's review, it must always get the insurer's approval before using them.",
+  "why": "Remember: self-made documents need the insurer's approval before use (when review is required).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 123,
+  "en": "When accepting a contract, the agent has the policyholder fully check that the application form has no mistakes. Then, as proof of the intention to apply, the agent gets a record of consent from the policyholder (signature, or name and seal, etc.).",
+  "why": "Remember: the policyholder checks the form and then signs (or name + seal) as proof of consent.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 124,
+  "en": "When an agent gives goods or services to a customer during sales or at contract time, the agent must be careful that it does not become a \"special benefit.\" Check it against social appropriateness, use/cash value, and fairness.",
+  "why": "Remember: check gifts by social appropriateness, use/cash value, and fairness so they are not special benefits.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 125,
+  "topic_en": "Accepting insurance contracts",
+  "en_a": "There is an information gap between the customer and the agent about insurance products. So, to offer products that fit the customer's wishes, it is important to act from the customer's point of view. For example, explain the risks around the customer and the products based on how well the customer understands.",
+  "en_i": "When accepting a contract, after the policyholder has fully checked that the application form has no mistakes, the agent may sign the form for the policyholder.",
+  "why_a": "True. Because of the information gap, act from the customer's point of view and explain based on their understanding.",
+  "why_i": "False. After the policyholder checks the form, the agent must get the policyholder's own consent record (signature, or name and seal, etc.). The agent must not sign for the policyholder. That breaks the consent rules.",
+  "trap_a": "",
+  "trap_i": "署名を代筆しても差し支えありません",
+  "type_a": "True",
+  "type_i": "Fake exception"
+ },
+ {
+  "id": 126,
+  "topic_en": "Accepting insurance contracts",
+  "en_a": "Co-insurance means several insurance companies together accept one non-life insurance contract. Each company has rights and duties based on its share. The companies are not jointly liable. Each company is responsible only for its own part.",
+  "en_i": "When making a co-insurance contract, the agent must explain to the policyholder so the contract relationship with each company is clear. For example: that it is co-insurance, the names of the insurers and their shares, and that each insurer is responsible separately, not jointly.",
+  "why_a": "True. In co-insurance, each insurer is responsible only for its own share (not jointly).",
+  "why_i": "True. The agent must explain it is co-insurance, the insurers and their shares, and that each is separately responsible.",
+  "trap_a": "",
+  "trap_i": "",
+  "type_a": "True",
+  "type_i": "True"
+ },
+ {
+  "id": 127,
+  "en": "Except when the general policy conditions or special clauses say otherwise, the agent must, as a rule, receive the full premium from the policyholder at the same time as the contract is made. This is called the \"principle of immediate premium collection.\"",
+  "why": "Remember: as a rule, collect the full premium at the time of the contract.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 128,
+  "topic_en": "Accepting insurance contracts",
+  "en_a": "If something does not have the nature of an \"agreement\" (nigiri) or a \"target requirement\" (quota), it is never excessive favor (benefit) to an agent.",
+  "en_i": "An insurance company must not choose a specific agent that also has another main business as a place to buy goods or services from, or to refer people to, beyond normal social standards. This kind of act in effect pushes the agent to give priority to the insurer's products, so it is excessive favor.",
+  "why_a": "False. Even if it is not clear that it has the nature of an agreement (nigiri) or quota, it is still excessive favor if it in effect pushes the agent to give priority to the insurer's products.",
+  "why_i": "True. Choosing a specific agent's business beyond normal standards, to get priority for your products, is excessive favor.",
+  "trap_a": "該当することはありません",
+  "trap_i": "",
+  "type_a": "Fake exception",
+  "type_i": "True"
+ },
+ {
+  "id": 129,
+  "en": "The agent must keep the premiums received from policyholders clearly separate from its own money and manage them properly.",
+  "why": "Remember: keep premiums separate from the agent's own money.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 130,
+  "topic_en": "Accepting insurance contracts",
+  "en_a": "Whether an insurer's favor to an agent is excessive is judged by these points: Is it needed for the insurer's business or as social courtesy? Are the price, amount, frequency, and period appropriate? Is it fair between agents? Can it be explained as reasonable by social standards?",
+  "en_i": "If an insurer's staff do premium calculation work that was given to the agent, without the agent taking part, this may be excessive favor, so be careful. (This excludes insurance types the agent cannot calculate.)",
+  "why_a": "True. These four points are used to judge excessive favor.",
+  "why_i": "True. Insurer staff doing the agent's premium calculations can be excessive favor.",
+  "trap_a": "",
+  "trap_i": "",
+  "type_a": "True",
+  "type_i": "True"
+ },
+ {
+  "id": 131,
+  "en": "If it is a cost for the agent's business, the agent may use premiums received from policyholders for other purposes.",
+  "why": "False. Using premiums received from policyholders for other purposes is never allowed, even for agent business costs, no matter the amount or how long.",
+  "trap": "代理店業務に関する支出であれば",
+  "type": "Fake exception"
+ },
+ {
+  "id": 132,
+  "en": "The agent must fully explain in advance to the policyholder what matters need to be notified. These matters are written in the policy conditions and the important matters explanation.",
+  "why": "Remember: explain notification items in advance; they are in the policy conditions and the important matters explanation.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 133,
+  "en": "When a policyholder asks to change the contract, the agent itself must quickly decide whether to approve it and tell the policyholder the result.",
+  "why": "False. When the policyholder asks for a change, the agent must quickly contact the insurance company and get its approval. The agent does not decide by itself.",
+  "trap": "自らが速やかに承認の可否を判断し",
+  "type": "Person swap"
+ },
+ {
+  "id": 134,
+  "en": "When a policyholder asks to cancel a contract, the agent must explain things like: cancelling and then applying for the same type of insurance may be a disadvantage, and no claim payment is made for accidents on or after the cancellation date.",
+  "why": "Remember: at cancellation, explain possible disadvantages and that accidents after the cancellation date are not covered.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 135,
+  "en": "To prevent periods with no insurance, the agent must manage and know each policyholder's expiry date. The agent must actively contact the policyholder before the expiry date, by postcard or phone, so the contract can surely be renewed by the expiry date.",
+  "why": "Remember: track expiry dates and contact customers before expiry so there is no gap in coverage.",
+  "trap": "",
+  "type": "True"
+ }
+]

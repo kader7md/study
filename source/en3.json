@@ -1,0 +1,364 @@
+[
+ {
+  "id": 136,
+  "en": "Sometimes the agent cannot contact the policyholder before the policy's expiry date. In that case, to avoid a time with no insurance, the agent may renew the contract without checking the policyholder's wishes.",
+  "why": "False. Even if the agent does it 'for the policyholder', renewing a contract without permission breaks the law. Never do it. The statement removed the need to confirm the policyholder's wishes.",
+  "trap": "保険契約者の意思を確認することなく",
+  "type": "Removed requirement"
+ },
+ {
+  "id": 137,
+  "en": "If a customer does not say they want to renew, the agent should record 'the reason for not renewing', 'the person who confirmed it', and 'the date of confirmation' in a list such as the expiry notice list. This is important to avoid trouble later.",
+  "why": "True. When a customer does not renew, write down the reason, who confirmed, and the date.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 138,
+  "topic_en": "Accepting insurance contracts / Premiums and contract management",
+  "en_a": "To correct an important item on the application form, you need a record of the policyholder's agreement (signature, or name and seal, etc.) or a correction seal.",
+  "en_i": "When receiving a premium, if the agent has no official receipts from the insurance company in stock, the agent may for a short time use a business card or a store-bought receipt instead.",
+  "why_a": "True. Important corrections on the application form need the policyholder's agreement (signature/seal) or a correction seal.",
+  "why_i": "False. Always use the insurance company's official receipt. Never use a business card or store-bought receipt, even for a short time.",
+  "trap_a": "",
+  "trap_i": "名刺や市販の領収証などを領収証代わりとしても差し支えありません",
+  "type_a": "True",
+  "type_i": "Fake exception"
+ },
+ {
+  "id": 139,
+  "en": "The agent should make sure policyholders etc. know that, if an accident happens, they must tell the agent or the insurance company right away.",
+  "why": "True. Tell customers to report an accident immediately to the agent or the insurer.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 140,
+  "topic_en": "Premiums and contract management",
+  "en_a": "Changes to the contract terms, such as selling or replacing the insured car, changing the driver age condition (car insurance), or raising the insured amount, need advance notice from the policyholder or the insured and approval from the insurance company. Without this, the new terms do not apply.",
+  "en_i": "The agent must manage expiry dates properly so that the policyholder is never left without insurance. Extra care is needed for car insurance, because it can affect the non-fleet grade of the next contract.",
+  "why_a": "True. Contract changes need notice first and the insurer's approval.",
+  "why_i": "True. Good expiry management prevents a gap in cover; for car insurance a gap can affect the next non-fleet grade.",
+  "trap_a": "",
+  "trap_i": "",
+  "type_a": "True",
+  "type_i": "True"
+ },
+ {
+  "id": 141,
+  "en": "When the agent receives an accident report from a policyholder etc., the agent must not explain whether the insurer must pay, and also must not explain how to make a claim, because paying claims is the insurance company's own work.",
+  "why": "False. The agent must not say whether the insurer will pay (that is the insurer's job). But explaining how to make a claim IS part of the agent's work. The statement wrongly says the agent cannot explain the claim procedure.",
+  "trap": "保険金請求手続きの方法についても説明してはなりません",
+  "type": "Direction flip"
+ },
+ {
+  "id": 142,
+  "en": "When an insured accident happens, the agent should help quickly and kindly, from the first response until the claim is paid, to reduce the policyholder's worry.",
+  "why": "True. The agent helps from the first response through to claim payment.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 143,
+  "en": "When a policyholder etc. makes a complaint, the agent should find the cause of the dissatisfaction and take steps so it does not happen again.",
+  "why": "True. Find the cause of a complaint and prevent it from happening again.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 144,
+  "en": "When a policyholder etc. makes a complaint, the agent should understand it correctly and take it seriously. The agent should also be fair and not give that person special treatment.",
+  "why": "True. Take complaints seriously but treat everyone fairly, with no special treatment.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 145,
+  "en": "When the agent receives a complaint from a policyholder etc., it is important to act quickly on the agent's own judgment, not together with the insurance company.",
+  "why": "False. The agent must not handle complaints alone. Work together with the insurance company and respond kindly, carefully, and quickly. The statement flipped 'with the insurer' to 'not with the insurer'.",
+  "trap": "保険会社と連携するのではなく、自らの判断で",
+  "type": "Direction flip"
+ },
+ {
+  "id": 146,
+  "topic_en": "Handling accidents and complaints",
+  "en_a": "When the agent receives an accident report, the agent should tell the policyholder whether the insurer must pay and about how much will be paid, to make the policyholder feel safe.",
+  "en_i": "When a complaint comes from a policyholder etc., the agent must not handle it alone. The agent must work with the insurance company and respond kindly, carefully, and quickly.",
+  "why_a": "False. Paying claims is the insurance company's own work. The agent must not decide whether the insurer must pay or how much will be paid.",
+  "why_i": "True. Handle complaints together with the insurer.",
+  "trap_a": "保険会社の支払責任の有無や支払われる保険金の見込み額などを伝えて",
+  "trap_i": "",
+  "type_a": "Person swap",
+  "type_i": "True"
+ },
+ {
+  "id": 147,
+  "en": "When selling insurance products, it is very important for the agent to communicate well with customers.",
+  "why": "True. Good communication with customers is very important.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 148,
+  "en": "When selling insurance, the agent can use risk management and financial planning methods. This helps the agent give more effective advice for customers' many different needs.",
+  "why": "True. Risk management and financial planning help the agent advise customers better.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 149,
+  "en": "The basic idea of the Basic Consumer Act is 'consumers who are independent and choose and buy products on their own responsibility'. Agents are expected to play a big role in making this happen.",
+  "why": "True. Agents help build independent consumers who choose products on their own responsibility.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 150,
+  "en": "The agent should not only handle accidents. The agent should also learn the basic ideas and actions for accident prevention, disaster prevention, and crime prevention, and use them in advice to customers.",
+  "why": "True. Agents should also give advice on preventing accidents, disasters, and crime.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 151,
+  "en": "Making a fraudulent claim, or helping someone make one, breaks the Insurance Business Act. It can also be a crime, such as fraud or embezzlement. It is a serious violation, so never do it.",
+  "why": "True. Fake claims or helping fake claims are never allowed (they can be crimes).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 152,
+  "en": "Diversity communication is a communication skill. It lets people with different positions (other departments, customers, bosses, young staff, etc.) and different values use their diversity, work together, and create new value.",
+  "why": "True. This is the definition of diversity communication.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 153,
+  "topic_en": "The agent's attitude and mindset",
+  "en_a": "Managing contracts during the policy period and handling accidents are the insurance company's own work. So the agent does not need to give after-sales follow-up.",
+  "en_i": "Risk literacy is said to be 'the ability, when facing a risk, to think about its background, correctly judge how far the risk can spread, and deal with it'.",
+  "why_a": "False. After-sales follow-up (managing contracts during the policy period, advising on claims when an accident happens) is as important as selling. The statement says follow-up is not needed.",
+  "why_i": "True. This is the definition of risk literacy.",
+  "trap_a": "アフターフォローをする必要はありません",
+  "trap_i": "",
+  "type_a": "Removed requirement",
+  "type_i": "True"
+ },
+ {
+  "id": 154,
+  "en": "Tort liability under the Civil Code is the duty of a person (the wrongdoer) who, on purpose or by carelessness, harms another person's rights or legally protected interests, to pay the victim for the damage caused.",
+  "why": "True. Tort = harm caused on purpose or by carelessness → pay for the damage.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 155,
+  "en": "Personal liability insurance is an example of a non-life insurance product related to tort liability (general tort) under the Civil Code.",
+  "why": "True. Personal liability insurance is linked to tort liability.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 156,
+  "en": "Tort liability under the Civil Code arises only when the two parties already have a contract with each other.",
+  "why": "False. Tort liability arises whether or not there is a contract between the parties. 'Only' is the trap.",
+  "trap": "のみ",
+  "type": "Absolute word"
+ },
+ {
+  "id": 157,
+  "en": "The Fire Liability Act is a special law for tort liability under the Civil Code. So it does not apply to liability for non-performance of obligations (breach of contract) under the Civil Code.",
+  "why": "True. The Fire Liability Act applies to tort only, not to breach of contract.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 158,
+  "topic_en": "Compensation for damages",
+  "en_a": "Liability for non-performance under the Civil Code: when a debtor (a party to a contract etc.), for a reason that is their fault, does not perform the obligation as it should be, or cannot perform it, the debtor must pay the creditor for the damage.",
+  "en_i": "Liability for non-performance under the Civil Code arises between people who have a creditor-debtor relationship, such as a contract.",
+  "why_a": "True. This is the definition of liability for non-performance (breach of contract).",
+  "why_i": "True. It needs a contract-type (creditor-debtor) relationship.",
+  "trap_a": "",
+  "trap_i": "",
+  "type_a": "True",
+  "type_i": "True"
+ },
+ {
+  "id": 159,
+  "en": "When the victim of a tort was also careless, the victim's carelessness can be taken into account when calculating the compensation. This is called comparative negligence (offsetting fault).",
+  "why": "True. Victim's own fault reduces the compensation = comparative negligence.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 160,
+  "en": "Tenant's liability insurance is an example of a non-life insurance product related to liability for non-performance (breach of contract) under the Civil Code.",
+  "why": "True. Tenant's liability insurance is linked to breach of contract liability.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 161,
+  "topic_en": "Compensation for damages",
+  "en_a": "Even if a fire spreads from the house next door and causes damage, the person who started the fire is not liable unless they were grossly negligent. So the victim cannot claim compensation from that person.",
+  "en_i": "Car X and car Y crash at a crossing, and both cars are damaged. Car X's damage is 400,000 yen and car Y's damage is 500,000 yen. X and Y agree the fault ratio is 70:30. Then X pays Y 280,000 yen and Y pays X 150,000 yen.",
+  "why_a": "True. Under the Fire Liability Act, the fire starter is liable only with gross negligence.",
+  "why_i": "False. X pays Y: Y's damage 500,000 yen × X's fault 70% = 350,000 yen. Y pays X: X's damage 400,000 yen × Y's fault 30% = 120,000 yen. The statement used each person's own damage instead of the other person's damage.",
+  "trap_a": "",
+  "trap_i": "ＸがＹに支払う損害賠償額は28万円、ＹがＸに支払う損害賠償額は15万円",
+  "type_a": "True",
+  "type_i": "Pair swap"
+ },
+ {
+  "id": 162,
+  "en": "Health insurance gives benefits to company employees etc. and their dependent family for illness or injury that is not work-related.",
+  "why": "True. Health insurance = illness/injury NOT from work, for employees and family.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 163,
+  "en": "Public long-term care insurance gives benefits when the insured needs care or needs support, for example because of dementia or being bedridden.",
+  "why": "True. Benefits are paid for 'care needed' or 'support needed' status.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 164,
+  "en": "In employees' pension insurance, if the insured becomes disabled to a certain level and meets the conditions, a disability employees' pension or a disability allowance is paid.",
+  "why": "True. Disability pension or disability allowance is paid if conditions are met.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 165,
+  "topic_en": "Social insurance",
+  "en_a": "National health insurance does not give benefits for work-related illness or injury.",
+  "en_i": "In workers' accident compensation insurance, a person who receives benefits pays 10% of the cost themselves.",
+  "why_a": "False. Unlike health insurance, national health insurance DOES cover work-related illness and injury.",
+  "why_i": "False. In workers' accident compensation insurance, there is basically no self-payment.",
+  "trap_a": "業務上の病気やケガについては保険給付の対象となりません",
+  "trap_i": "費用の１割を自己負担します",
+  "type_a": "Direction flip",
+  "type_i": "Direction flip"
+ },
+ {
+  "id": 166,
+  "en": "Under the disaster victims' livelihood rebuilding support system, support money is paid only to households whose home was completely destroyed by a natural disaster covered by the system.",
+  "why": "False. Support money is also paid to households with large-scale half-destroyed homes, medium-scale half-destroyed homes, and so on, not only fully destroyed homes. 'Only' is the trap.",
+  "trap": "のみ",
+  "type": "Absolute word"
+ },
+ {
+  "id": 167,
+  "en": "In this support system, there are two kinds of support money: basic support money, paid by the level of damage to the home, and additional support money, paid by the way the home is rebuilt.",
+  "why": "True. Basic = level of damage; additional = how you rebuild.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 168,
+  "en": "Under the Act on Disaster Condolence Grants, a condolence grant is paid to the family of a resident who died because of a disaster.",
+  "why": "True. The family of a person who died in a disaster gets a condolence grant.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 169,
+  "en": "For the earthquake insurance premium deduction, only the earthquake insurance part of the premium paid can be deducted. The main fire insurance premium part cannot be deducted.",
+  "why": "True. Only the earthquake part is deductible, not the fire part.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 170,
+  "en": "For the earthquake insurance premium deduction, the full amount of premiums paid in one year can be deducted for both income tax and individual resident tax.",
+  "why": "False. Income tax: if yearly premiums are 50,000 yen or less, the full amount; if more than 50,000 yen, a flat 50,000 yen. Resident tax: if 50,000 yen or less, half of the premiums; if more than 50,000 yen, a flat 25,000 yen. So it is not always the full amount.",
+  "trap": "全額",
+  "type": "Absolute word"
+ },
+ {
+  "id": 171,
+  "en": "Contracts covered by the life insurance premium deduction are only life insurance contracts made with life insurance companies. Contracts made with non-life insurance companies are never covered.",
+  "why": "False. For the nursing care and medical insurance premium part, contracts handled by non-life insurance companies are also covered, not only life insurers. 'Never' is the trap.",
+  "trap": "いっさい",
+  "type": "Absolute word"
+ },
+ {
+  "id": 172,
+  "en": "Compensation paid to a victim (an individual) from the other driver's car insurance after a traffic accident is not taxed.",
+  "why": "True. Compensation for damage paid to an individual is not taxed.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 173,
+  "en": "Non-life insurance claim payments to individuals, such as fire insurance property payments and accident insurance hospital or outpatient payments, are subject to income tax.",
+  "why": "False. These payments only cover a loss (they make up for damage), so they are not taxed. The statement says they are taxed.",
+  "trap": "所得税の課税対象となります",
+  "type": "Direction flip"
+ },
+ {
+  "id": 174,
+  "en": "A death benefit under an accident insurance contract is taxed, because the heirs etc. who receive it gain money.",
+  "why": "True. A death benefit gives a money gain, so it is taxed.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 175,
+  "en": "Inheritance means that when a person dies, their spouse, children, etc. take over the estate. Inheritance starts not at the moment of death, but when the required procedures are finished.",
+  "why": "False. Inheritance starts at the moment the person dies. The statement says it starts after procedures are finished.",
+  "trap": "所定の手続きが完了した時点から",
+  "type": "Direction flip"
+ },
+ {
+  "id": 176,
+  "en": "In inheritance, the spouse of the deceased (not including a common-law partner) is always an heir, as the spouse heir.",
+  "why": "True. A legal spouse is always an heir (a common-law partner is not).",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 177,
+  "en": "In inheritance, the share of the estate an heir receives is called the inheritance share. When the heirs are the spouse and children, the legal shares are 1/2 each.",
+  "why": "True. Spouse + children: spouse 1/2, children 1/2.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 178,
+  "en": "Life insurance is divided into two kinds by the insured event: 'death insurance' and 'survival insurance'.",
+  "why": "False. There are three kinds: death insurance, survival insurance, and mixed (endowment) insurance. The number was changed from 3 to 2.",
+  "trap": "２つ",
+  "type": "Number swap"
+ },
+ {
+  "id": 179,
+  "topic_en": "Tax and inheritance",
+  "en_a": "In a savings-type insurance contract, the maturity refund and the policyholder dividend that the policyholder receives at the end of the policy period are treated as occasional income.",
+  "en_i": "If a will sets inheritance shares that violate the legally reserved portion, the person entitled to the reserved portion can demand payment of money equal to the amount violated.",
+  "why_a": "True. Maturity refund + dividend = occasional income.",
+  "why_i": "True. A person whose reserved portion is violated can demand money for it.",
+  "trap_a": "",
+  "trap_i": "",
+  "type_a": "True",
+  "type_i": "True"
+ },
+ {
+  "id": 180,
+  "en": "Unlike non-life and life insurance, small-amount short-term insurance has fixed limits on the policy period and the insured amount.",
+  "why": "True. Small-amount short-term insurance has limits on period and amount.",
+  "trap": "",
+  "type": "True"
+ },
+ {
+  "id": 181,
+  "en": "Mutual aid (kyosai) is different from non-life and life insurance, which are based on the Insurance Business Act. Because of its different origins, kyosai is based on different laws and supervised by different government offices.",
+  "why": "True. Kyosai has different laws and different supervisors from insurance.",
+  "trap": "",
+  "type": "True"
+ }
+]

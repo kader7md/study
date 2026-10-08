@@ -1,0 +1,572 @@
+<meta charset="utf-8">
+<title>Sonpo Exam Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@600;700&display=swap">
+<style>
+/* Layout: one reading column, sticky toolbar with furigana/English toggles, four tabs (method, practice, words, facts) */
+:root {
+  --bg: #eef1f6; --surface: #ffffff; --ink: #1a2232; --muted: #5a6477; --line: #d6dce6;
+  --accent: #2a4a96; --accent-soft: #e3e9f7; --mark: #f6dc8a;
+  --ok: #24744a; --ok-soft: #e1f2e8; --ng: #b0353a; --ng-soft: #f8e3e3;
+  --c-subj: #2a4a96; --c-cond: #7b4fa0; --c-num: #a0601c; --c-end: #b0353a;
+  --font-display: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-body: "Atkinson Hyperlegible", "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-jp: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #98a2b4; --line: #2b3441;
+    --accent: #93acee; --accent-soft: #233050; --mark: #6a5718;
+    --ok: #63c08b; --ok-soft: #173326; --ng: #ec8585; --ng-soft: #3a1d20;
+    --c-subj: #93acee; --c-cond: #c39be6; --c-num: #e2a45e; --c-end: #ec8585;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #98a2b4; --line: #2b3441;
+  --accent: #93acee; --accent-soft: #233050; --mark: #6a5718;
+  --ok: #63c08b; --ok-soft: #173326; --ng: #ec8585; --ng-soft: #3a1d20;
+  --c-subj: #93acee; --c-cond: #c39be6; --c-num: #e2a45e; --c-end: #ec8585;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6; }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 64px; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.25; margin: 0; }
+h1 { font-family: var(--font-display); font-size: clamp(1.7rem, 4.5vw, 2.4rem); }
+h2 { font-family: var(--font-display); font-size: 1.45rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0; }
+.jp { font-family: var(--font-jp); }
+.muted { color: var(--muted); }
+.eyebrow { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+ruby rt { font-size: .56em; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+body.no-furi rt { visibility: hidden; }
+body.no-en .en { display: none; }
+
+header.top { display: grid; gap: 8px; padding-block: 8px 20px; }
+header.top p { max-width: 62ch; color: var(--muted); }
+.toolbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tab { font: inherit; font-weight: 700; font-size: .92rem; border: 1px solid transparent; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--surface); }
+.tab:hover:not([aria-selected="true"]) { border-color: var(--line); color: var(--ink); }
+.switches { display: flex; gap: 12px; flex-wrap: wrap; font-size: .88rem; }
+.switches label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, .tab:focus-visible, .vcard:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+section.panel { display: grid; gap: 28px; padding-top: 24px; }
+.block { display: grid; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+.note { background: var(--accent-soft); border-radius: var(--r); padding: 14px 16px; }
+
+.anatomy { font-family: var(--font-jp); font-size: 1.2rem; line-height: 2.4; }
+.anatomy span[data-k] { border-bottom: 3px solid currentColor; padding-bottom: 1px; }
+.k-subj { color: var(--c-subj); } .k-cond { color: var(--c-cond); } .k-num { color: var(--c-num); } .k-end { color: var(--c-end); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .88rem; }
+ol.steps { margin: 0; padding-left: 1.4em; display: grid; gap: 10px; }
+ol.steps li::marker { font-weight: 700; color: var(--accent); }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+td.jpcell { font-family: var(--font-jp); font-size: 1.05rem; line-height: 2; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lean { display: inline-block; font-size: .78rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.lean.x { background: var(--ng-soft); color: var(--ng); }
+.lean.o { background: var(--ok-soft); color: var(--ok); }
+.lean.n { background: var(--accent-soft); color: var(--accent); }
+.meter { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--ng-soft); min-width: 90px; }
+.meter i { background: var(--ok); display: block; }
+
+.big-stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.big-stat .card b { display: block; font-size: 1.9rem; font-variant-numeric: tabular-nums; line-height: 1.2; }
+
+.combo-demo { font-family: var(--font-jp); display: grid; gap: 6px; }
+.combo-grid { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px 14px; font-size: .95rem; }
+.combo-grid b { font-family: var(--font-jp); }
+
+.traps { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.traps .card { display: grid; gap: 6px; align-content: start; }
+.traps .ex { font-family: var(--font-jp); line-height: 2.1; }
+.traps mark, .fact mark { background: var(--mark); color: inherit; border-radius: 3px; }
+
+/* Words */
+.vtools, .qtools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+input[type="search"], select { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+input[type="search"] { flex: 1 1 220px; min-width: 0; }
+.btn { font: inherit; font-weight: 700; font-size: .9rem; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.vgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.vcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.vcard .kanji { font-family: var(--font-jp); font-size: 1.35rem; font-weight: 700; line-height: 2.1; }
+.vcard .meaning { font-weight: 700; }
+.vcard .def { font-size: .9rem; color: var(--muted); }
+.vcard .group { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+body.flash .vcard { cursor: pointer; }
+body.flash .vcard:not(.open) .meaning, body.flash .vcard:not(.open) .def { visibility: hidden; }
+
+/* Practice */
+.score { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; }
+.score .big { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bar { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; flex: 1 1 160px; }
+.bar i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .3s; }
+.qlist { display: grid; gap: 14px; }
+.q { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 12px; }
+.q.right { border-color: var(--ok); }
+.q.wrong { border-color: var(--ng); }
+.qhead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; font-size: .8rem; color: var(--muted); font-weight: 700; letter-spacing: .04em; }
+.qtext { font-family: var(--font-jp); font-size: 1.18rem; line-height: 2.25; }
+.stmt { display: grid; gap: 6px; }
+.stmt + .stmt { border-top: 1px dashed var(--line); padding-top: 10px; }
+.stmt .lbl { font-family: var(--font-jp); font-weight: 700; color: var(--accent); }
+.q .en { color: var(--muted); font-size: .95rem; border-left: 3px solid var(--line); padding-left: 10px; }
+.q mark { background: transparent; color: inherit; }
+.q.done mark { background: var(--mark); border-radius: 3px; }
+.answers { display: flex; flex-wrap: wrap; gap: 8px; }
+.ans { font: inherit; font-family: var(--font-jp); font-size: 1.02rem; font-weight: 700; min-width: 64px; padding: 8px 16px; border-radius: 8px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.ans small { display: block; font-family: var(--font-body); font-weight: 400; font-size: .72rem; color: var(--muted); }
+.ans:hover:not(:disabled) { border-color: var(--accent); }
+.ans:disabled { cursor: default; opacity: .55; }
+.ans.is-right { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); opacity: 1; }
+.ans.is-wrong { border-color: var(--ng); background: var(--ng-soft); color: var(--ng); opacity: 1; }
+.feedback { display: grid; gap: 10px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.verdict { font-weight: 700; }
+.verdict.ok { color: var(--ok); } .verdict.ng { color: var(--ng); }
+.fb-item { display: grid; gap: 4px; }
+.fb-item .tag-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.traptag { font-size: .75rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.correct-jp { font-family: var(--font-jp); line-height: 2.1; background: var(--ok-soft); border-radius: 8px; padding: 6px 10px; }
+.correct-jp::before { content: "Correct statement 正しくは: "; font-family: var(--font-body); font-size: .78rem; font-weight: 700; color: var(--ok); }
+.page { font-size: .8rem; color: var(--muted); }
+.showen { justify-self: start; font: inherit; font-size: .85rem; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+body:not(.no-en) .showen { display: none; }
+body.no-en .q.peek .en { display: block; }
+.more { justify-self: center; }
+
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+@media (max-width: 520px) { .qtext { font-size: 1.08rem; } .anatomy { font-size: 1.05rem; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">損害保険募集人一般試験 · 基礎単位 · your practice test</span>
+    <h1><ruby>損害保険<rt>そんがいほけん</rt></ruby> Exam Study</h1>
+    <p>All the questions from your practice test, with hiragana on every kanji, an English translation, and the reason each answer is right or wrong. Start with <b>How to read</b>, then go to <b>Practice</b>.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-method" aria-selected="true" data-tab="method">How to read</button>
+      <button class="tab" role="tab" id="tab-practice" aria-selected="false" data-tab="practice">Practice</button>
+      <button class="tab" role="tab" id="tab-words" aria-selected="false" data-tab="words">Words</button>
+      <button class="tab" role="tab" id="tab-facts" aria-selected="false" data-tab="facts">Key facts</button>
+    </div>
+    <div class="switches">
+      <label><input type="checkbox" id="opt-furi" checked> Hiragana on kanji</label>
+      <label><input type="checkbox" id="opt-en" checked> English</label>
+    </div>
+  </div>
+
+  <!-- ============ METHOD ============ -->
+  <section class="panel" id="panel-method">
+    <div class="block">
+      <h2>Two kinds of questions</h2>
+      <div class="card block">
+        <h3>1. <span class="jp"><ruby>正誤<rt>せいご</rt></ruby></span> (true / false), one sentence</h3>
+        <p>Read the sentence. If it is correct, answer <b class="jp"><ruby>正<rt>せい</rt></ruby></b> (true). If any part is wrong, answer <b class="jp"><ruby>誤<rt>ご</rt></ruby></b> (false). One wrong word makes the whole sentence false.</p>
+      </div>
+      <div class="card block">
+        <h3>2. <span class="jp"><ruby>組合<rt>くみあわ</rt></ruby>せ</span> (combination), two sentences ア and イ</h3>
+        <p class="jp">次の記述の正誤の組合せとして、正しいものを選んでください。</p>
+        <p class="en">"Choose the correct true/false combination for the following sentences."</p>
+        <p>Decide ア true or false, then イ true or false. Then pick the letter:</p>
+        <div class="combo-grid">
+          <b>A</b><span>ア ○ true</span><span>イ ○ true</span>
+          <b>B</b><span>ア ○ true</span><span>イ × false</span>
+          <b>C</b><span>ア × false</span><span>イ ○ true</span>
+          <b>D</b><span>ア × false</span><span>イ × false</span>
+        </div>
+        <p class="muted">Tip: judge ア and イ separately first, as two true/false questions. Only then look at A to D.</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>What your test shows</h2>
+      <p class="muted">I counted every sentence in your practice test (single sentences plus each ア and イ).</p>
+      <div class="big-stat" id="bigstat"></div>
+      <div class="note"><b>Rule 1: when you really don't know, answer 正 (true).</b> Most sentences in this test are true. The false ones are made by changing one or two words in a true sentence. So your job is to find the changed word.</div>
+    </div>
+
+    <div class="block">
+      <h2>Why you can't just read left to right</h2>
+      <p>In Japanese, the verb and the "not" come at the <b>very end</b>. The last few characters decide "can" or "cannot", "must" or "does not need to". Here is a real sentence from your test, split into parts:</p>
+      <div class="card block">
+        <div class="anatomy" id="anatomy"></div>
+        <p class="en">"Tort liability under the Civil Code arises <u>only</u> when the two sides already have a contract." (Question 69-3)</p>
+        <p>Answer: <span class="lean x">誤 false</span>. The word <b class="jp">のみ</b> (only) is the trap. Tort liability happens even with no contract, for example when you crash into a stranger's car. Without のみ, the sentence would still be wrong, so the writer added a strong word on purpose.</p>
+        <div class="legend">
+          <span class="k-subj"><b>Who / what</b> (before は・が)</span>
+          <span class="k-cond"><b>Condition</b> (場合, とき, ても)</span>
+          <span class="k-num"><b>Strong word</b> (the trap)</span>
+          <span class="k-end"><b>Ending</b>: decides the meaning</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>The 5-step reading method</h2>
+      <ol class="steps">
+        <li><b>Read the ending first.</b> Jump to the last part after the final 、. Is it なければなりません (must), てはなりません (must not), 必要はありません (not needed), できません (cannot)? Use the table below.</li>
+        <li><b>Find WHO.</b> The word before は or が. This test often swaps <span class="jp">代理店</span> (agent) and <span class="jp">保険会社</span> (insurance company), or <span class="jp">保険契約者</span> (policyholder) and <span class="jp">被保険者</span> (insured).</li>
+        <li><b>Circle numbers.</b> 10日, 30%〜50%, 5万円, 70:30. One changed number makes it false.</li>
+        <li><b>Look for strong words.</b> いっさい, 必ず, すべて, のみ, 全額. Ask: "Is there an exception?" If yes, it is false.</li>
+        <li><b>Check direction.</b> 含まれる ↔ 含まれない, 対象となる ↔ 対象とならない, 必要 ↔ 不要. The test flips one word and keeps the rest.</li>
+      </ol>
+    </div>
+
+    <div class="block">
+      <h2>Word patterns: how often true in YOUR test</h2>
+      <p class="muted">Green = share of true sentences. Compare with the average (top of this page).</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Pattern</th><th>English</th><th>Sentences</th><th>True</th><th></th></tr></thead>
+          <tbody id="pattern"></tbody>
+        </table>
+      </div>
+      <p class="muted">Big lesson: "必要はありません" (not needed) was <b>never</b> true in your test. Strong words like いっさい / 全額 were true much less often than average. Soft words like 原則として / など / 一般的に were usually true.</p>
+    </div>
+
+    <div class="block">
+      <h2>Sentence-ending decoder</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Ending</th><th>English</th><th>What to check</th></tr></thead>
+          <tbody id="endings"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>How the false sentences were made</h2>
+      <p class="muted">Each false sentence in your test, sorted by the trick used. Real examples, with the changed words in yellow.</p>
+      <div class="traps" id="traps"></div>
+    </div>
+
+    <div class="block">
+      <h2>Length and form</h2>
+      <div class="card block">
+        <p><b>Long sentence with careful details</b> (原則として, 一般的に, など, 〜に応じて): usually copied from the textbook, so it leans <span class="lean o">正</span>.</p>
+        <p><b>Sentence with one strong or negative word</b> (いっさい, 全額, のみ, 必要はありません, 含まれません): leans <span class="lean x">誤</span>. One word was added to break a true sentence.</p>
+        <p><b>Sentence with an excuse</b> (〜のため, 〜であることから, "because it is privacy", "because it is the company's job"): be careful. The excuse is often invented to make a wrong rule sound reasonable.</p>
+        <p class="muted">These are tendencies, not rules. Use them only when you don't know the fact.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRACTICE ============ -->
+  <section class="panel" id="panel-practice" hidden>
+    <div class="block">
+      <h2>Practice: your test questions</h2>
+      <p class="muted">After you answer, the changed words are highlighted in yellow, and for false sentences you see the correct statement. Tip: turn English OFF and try with only hiragana first. Use "Show English" when stuck.</p>
+      <div class="card score">
+        <div><div class="big" id="scoreTxt">0 / 0</div><div class="muted" style="font-size:.85rem">correct / answered</div></div>
+        <div class="bar" aria-hidden="true"><i id="scoreBar"></i></div>
+      </div>
+      <div class="qtools">
+        <label for="qfilter" class="muted" style="font-size:.9rem">Show</label>
+        <select id="qfilter">
+          <option value="all">All questions</option>
+          <option value="todo">Not answered yet</option>
+          <option value="wrong">My mistakes</option>
+          <option value="false">Only questions with a false sentence</option>
+          <option value="combo">Only ア・イ combination questions</option>
+        </select>
+        <button class="btn" id="shuffle">Shuffle</button>
+        <button class="btn" id="reset">Start over</button>
+      </div>
+      <div class="qlist" id="qlist"></div>
+      <button class="btn more" id="more" hidden>Show more questions</button>
+    </div>
+  </section>
+
+  <!-- ============ WORDS ============ -->
+  <section class="panel" id="panel-words" hidden>
+    <div class="block">
+      <h2>Key words from your test</h2>
+      <p class="muted">Turn on Flashcard mode to hide the English. Tap a card to check yourself.</p>
+      <div class="vtools">
+        <input type="search" id="vsearch" placeholder="Search kanji, hiragana or English" aria-label="Search words">
+        <button class="btn" id="flashbtn" aria-pressed="false">Flashcard mode</button>
+      </div>
+      <p class="muted" id="vcount"></p>
+      <div class="vgrid" id="vgrid"></div>
+    </div>
+  </section>
+
+  <!-- ============ FACTS ============ -->
+  <section class="panel" id="panel-facts" hidden>
+    <div class="block">
+      <h2>Numbers and facts to memorize</h2>
+      <p class="muted">From the explanations in your test. The test changes these to make false sentences.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Topic</th><th>Fact</th><th>English</th></tr></thead>
+          <tbody id="facts"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="block">
+      <h2>Every false sentence, corrected</h2>
+      <p class="muted">Read this list before the exam. The yellow part is what was wrong; the green line is the truth.</p>
+      <div class="qlist" id="falselist"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+/*__DATA__*/
+(function () {
+  function rb(s) {
+    return (s || '')
+      .replace(/\{([^|{}]+)\|([^{}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>')
+      .replace(/\[\[(.+?)\]\]/g, '<mark>$1</mark>');
+  }
+  function $(id) { return document.getElementById(id); }
+  function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  var Q = DATA.Q, S = DATA.S;
+  Q.forEach(function (q, i) { q.id = i; });
+
+  /* ---------- Method tab ---------- */
+  var pct = Math.round(S.true / S.total * 100);
+  $('bigstat').innerHTML =
+    '<div class="card"><b>' + S.total + '</b>sentences in your test</div>' +
+    '<div class="card"><b style="color:var(--ok)">' + pct + '%</b>were true (正)</div>' +
+    '<div class="card"><b style="color:var(--ng)">' + (100 - pct) + '%</b>were false (誤)</div>';
+
+  $('anatomy').innerHTML =
+    '<span data-k class="k-subj">' + rb('{民法|みんぽう}の{不法|ふほう}{行為|こうい}{責任|せきにん}は') + '</span>、' +
+    '<span data-k class="k-cond">' + rb('{当事者|とうじしゃ}{間|かん}にあらかじめ{契約|けいやく}{関係|かんけい}がある{場合|ばあい}に') + '</span>' +
+    '<span data-k class="k-num">のみ</span>' +
+    '<span data-k class="k-end">' + rb('{成立|せいりつ}します') + '</span>。';
+
+  var PAT = [
+    ['absolute', 'いっさい・{必|かなら}ず・すべて・のみ・{全額|ぜんがく}・{常|つね}に', 'strong words: never / always / all / only / full amount'],
+    ['notneeded', '{必要|ひつよう}はありません', 'is not needed'],
+    ['soft', '{原則|げんそく}として・{一般的|いっぱんてき}に・など・{一定|いってい}・{基本的|きほんてき}に', 'soft words: as a rule / generally / etc.'],
+    ['must', 'なければなりません・{必要|ひつよう}があります', 'must / is needed'],
+    ['mustnot', 'てはなりません・てはいけません', 'must not']
+  ];
+  $('pattern').innerHTML = PAT.map(function (p) {
+    var f = S.f[p[0]], n = f[0], t = f[1], pc = n ? Math.round(t / n * 100) : 0;
+    return '<tr><td class="jpcell">' + rb(p[1]) + '</td><td>' + p[2] + '</td><td class="num">' + n + '</td><td class="num"><b>' + pc + '%</b></td><td><div class="meter" title="' + pc + '% true"><i style="width:' + pc + '%"></i></div></td></tr>';
+  }).join('');
+
+  var endings = [
+    ['〜なければなりません', 'must', 'Usually true in your test. Check the WHO is right.'],
+    ['〜てはなりません・〜てはいけません', 'must not', 'Usually true, unless いっさい / のみならず is added.'],
+    ['〜{必要|ひつよう}はありません', 'is not needed', 'Was false every time in your test.'],
+    ['〜できます', 'can', 'Check: is it really allowed?'],
+    ['〜できません', 'cannot', 'Check: is there a case where it IS allowed?'],
+    ['〜{含|ふく}まれます・{含|ふく}まれません', 'is included / is not included', 'A favorite flip. Know which one is true.'],
+    ['〜{対象|たいしょう}となります・なりません', 'is covered / is not covered', 'A favorite flip.'],
+    ['〜とされています', 'is considered', 'Textbook wording. Usually true.'],
+    ['〜といいます', 'is called', 'Definition. Check the definition matches the name.'],
+    ['〜に{該当|がいとう}します・しません', 'falls under / does not', 'Check the rule really applies.'],
+    ['〜のみならず', 'not only ... but also', 'Not the same as のみ (only).']
+  ];
+  $('endings').innerHTML = endings.map(function (r) {
+    return '<tr><td class="jpcell">' + rb(r[0]) + '</td><td>' + r[1] + '</td><td class="muted">' + r[2] + '</td></tr>';
+  }).join('');
+
+  var TYPEINFO = {
+    'Direction flip': 'One word is flipped to the opposite: included ↔ not included, must ↔ must not.',
+    'Absolute word': 'A strong word (いっさい, 全額, のみ) removes the exceptions.',
+    'Removed requirement': 'Says something is not needed, or removes an important condition.',
+    'Person swap': 'The right rule, but for the wrong person: agent ↔ insurance company, policyholder ↔ insured.',
+    'Fake exception': 'An invented excuse or exception is added.',
+    'Pair swap': 'Two similar things trade places.',
+    'Number swap': 'One number or amount is changed.',
+    'Wrong definition': 'The name and the meaning do not match.'
+  };
+  var falses = [];
+  Q.forEach(function (q) {
+    var list = q.k === 'tf' ? [{ j: q.j, en: q.en, why: q.why, ty: q.ty, w: q.w, p: q.p, t: q.a === '○' }] : q.items;
+    list.forEach(function (it, k) { if (!it.t) falses.push({ q: q, it: it, lbl: q.k === 'combo' ? (k ? 'イ' : 'ア') : '' }); });
+  });
+  var byType = {};
+  falses.forEach(function (f) { (byType[f.it.ty] = byType[f.it.ty] || []).push(f); });
+  $('traps').innerHTML = Object.keys(TYPEINFO).filter(function (t) { return byType[t]; })
+    .sort(function (a, b) { return byType[b].length - byType[a].length; })
+    .map(function (t) {
+      var ex = byType[t].slice().sort(function (a, b) { return a.it.j.length - b.it.j.length; })[0];
+      return '<div class="card"><h3>' + t + ' <span class="muted">· ' + byType[t].length + ' times</span></h3><p class="muted">' + TYPEINFO[t] + '</p><p class="ex">' + rb(ex.it.j) + '</p><p class="en" style="font-size:.9rem">' + esc(ex.it.en) + '</p></div>';
+    }).join('');
+
+  /* ---------- Practice ---------- */
+  var saved = store('sonpo-answers') || {};
+  var order = Q.map(function (q) { return q.id; });
+  var LIMIT = 25, shown = LIMIT;
+  function truthOf(q) { return q.k === 'tf' ? (q.a === '○' ? '正' : '誤') : q.a; }
+  function hasFalse(q) { return q.k === 'tf' ? q.a === '×' : q.items.some(function (i) { return !i.t; }); }
+
+  function fbItem(it, lbl) {
+    var tag = it.t ? '<span class="lean o">' + lbl + '正 true</span>' : '<span class="lean x">' + lbl + '誤 false</span><span class="traptag">' + it.ty + '</span>';
+    return '<div class="fb-item"><div class="tag-row">' + tag + '<span class="page">textbook p.' + esc(it.p) + '</span></div>' +
+      (it.w ? '<p class="correct-jp">' + rb(it.w) + '</p>' : '') +
+      '<p>' + esc(it.why) + '</p></div>';
+  }
+  function card(q, done, right, got) {
+    var head, body, btns, fb = '';
+    if (q.k === 'tf') {
+      head = '(' + q.n + ') · 正 or 誤';
+      body = '<div class="stmt"><p class="qtext">' + rb(q.j) + '</p><p class="en">' + esc(q.en) + '</p></div>';
+      btns = [['正', 'true'], ['誤', 'false']].map(function (c) { return btn(q, c[0], c[1], done, got); }).join('');
+      if (done) fb = fbItem({ t: q.a === '○', ty: q.ty, w: q.w, p: q.p, why: q.why }, '');
+    } else {
+      head = q.n + ' · <span class="jp">' + rb(q.topic) + '</span> · ' + esc(q.topic_en) + ' · choose A–D';
+      body = q.items.map(function (it, k) {
+        return '<div class="stmt"><p class="qtext"><span class="lbl">' + (k ? 'イ' : 'ア') + '．</span>' + rb(it.j) + '</p><p class="en">' + esc(it.en) + '</p></div>';
+      }).join('');
+      btns = [['A', 'ア○ イ○'], ['B', 'ア○ イ×'], ['C', 'ア× イ○'], ['D', 'ア× イ×']].map(function (c) { return btn(q, c[0], c[1], done, got); }).join('');
+      if (done) fb = q.items.map(function (it, k) { return fbItem(it, k ? 'イ ' : 'ア '); }).join('');
+    }
+    var verdict = done ? '<span class="verdict ' + (right ? 'ok">Correct' : 'ng">Not quite. Answer: ' + truthOf(q)) + '</span>' : '';
+    return '<article class="q' + (done ? ' done ' + (right ? 'right' : 'wrong') : '') + '" id="q' + q.id + '">' +
+      '<div class="qhead"><span>' + head + '</span></div>' + body +
+      '<button class="showen" data-peek="' + q.id + '">Show English</button>' +
+      '<div class="answers">' + btns + '</div>' +
+      (done ? '<div class="feedback">' + verdict + fb + '</div>' : '') + '</article>';
+  }
+  function btn(q, v, sub, done, got) {
+    var t = truthOf(q), cls = 'ans';
+    if (done && v === t) cls += ' is-right'; else if (done && v === got) cls += ' is-wrong';
+    return '<button class="' + cls + '" data-q="' + q.id + '" data-v="' + v + '"' + (done ? ' disabled' : '') + '>' + v + '<small>' + sub + '</small></button>';
+  }
+  function renderQ() {
+    var f = $('qfilter').value;
+    var list = order.map(function (id) { return Q[id]; }).filter(function (q) {
+      var got = saved[q.id], done = got !== undefined;
+      if (f === 'todo') return !done;
+      if (f === 'wrong') return done && got !== truthOf(q);
+      if (f === 'false') return hasFalse(q);
+      if (f === 'combo') return q.k === 'combo';
+      return true;
+    });
+    $('qlist').innerHTML = list.slice(0, shown).map(function (q) {
+      var got = saved[q.id], done = got !== undefined;
+      return card(q, done, done && got === truthOf(q), got);
+    }).join('') || '<p class="muted">Nothing to show here yet.</p>';
+    $('more').hidden = list.length <= shown;
+    $('more').textContent = 'Show more questions (' + (list.length - shown) + ' left)';
+    var answered = Object.keys(saved).length;
+    var correct = Q.filter(function (q) { return saved[q.id] === truthOf(q); }).length;
+    $('scoreTxt').textContent = correct + ' / ' + answered;
+    $('scoreBar').style.width = Math.round(correct / Q.length * 100) + '%';
+  }
+  $('qlist').addEventListener('click', function (e) {
+    var b = e.target.closest('.ans');
+    if (b && !b.disabled) {
+      saved[b.dataset.q] = b.dataset.v; store('sonpo-answers', saved);
+      var el = $('q' + b.dataset.q), q = Q[+b.dataset.q];
+      var tmp = document.createElement('div');
+      tmp.innerHTML = card(q, true, b.dataset.v === truthOf(q), b.dataset.v);
+      el.replaceWith(tmp.firstChild);
+      var answered = Object.keys(saved).length;
+      var correct = Q.filter(function (q) { return saved[q.id] === truthOf(q); }).length;
+      $('scoreTxt').textContent = correct + ' / ' + answered;
+      $('scoreBar').style.width = Math.round(correct / Q.length * 100) + '%';
+      return;
+    }
+    var p = e.target.closest('.showen');
+    if (p) $('q' + p.dataset.peek).classList.toggle('peek');
+  });
+  $('qfilter').addEventListener('change', function () { shown = LIMIT; renderQ(); });
+  $('more').addEventListener('click', function () { shown += LIMIT; renderQ(); });
+  $('shuffle').addEventListener('click', function () {
+    for (var i = order.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = order[i]; order[i] = order[j]; order[j] = t; }
+    shown = LIMIT; renderQ();
+  });
+  var resetArmed = false;
+  $('reset').addEventListener('click', function () {
+    var b = this;
+    if (!resetArmed) { resetArmed = true; b.textContent = 'Tap again to clear'; setTimeout(function () { resetArmed = false; b.textContent = 'Start over'; }, 3000); return; }
+    resetArmed = false; b.textContent = 'Start over'; saved = {}; store('sonpo-answers', saved);
+    order = Q.map(function (q) { return q.id; }); shown = LIMIT; renderQ();
+  });
+  renderQ();
+
+  /* ---------- Words ---------- */
+  var V = DATA.V;
+  function plain(s) { return s.replace(/\{([^|{}]+)\|([^{}]+)\}/g, '$1 $2'); }
+  function renderVocab() {
+    var q = $('vsearch').value.trim().toLowerCase();
+    var rows = V.filter(function (v) { return !q || (plain(v[1]) + ' ' + plain(v[1]).replace(/ /g, '') + ' ' + v[2] + ' ' + v[3] + ' ' + v[0]).toLowerCase().indexOf(q) !== -1; });
+    $('vcount').textContent = rows.length + ' of ' + V.length + ' words';
+    $('vgrid').innerHTML = rows.map(function (v) {
+      return '<div class="vcard" tabindex="0"><span class="group">' + v[0] + '</span><span class="kanji">' + rb(v[1]) + '</span><span class="meaning">' + esc(v[2]) + '</span><span class="def">' + esc(v[3]) + '</span></div>';
+    }).join('');
+  }
+  $('vsearch').addEventListener('input', renderVocab);
+  $('vgrid').addEventListener('click', function (e) { var c = e.target.closest('.vcard'); if (c) c.classList.toggle('open'); });
+  $('vgrid').addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('vcard')) { e.preventDefault(); e.target.classList.toggle('open'); } });
+  $('flashbtn').addEventListener('click', function () {
+    var on = document.body.classList.toggle('flash');
+    this.setAttribute('aria-pressed', on); this.classList.toggle('primary', on);
+    document.querySelectorAll('.vcard.open').forEach(function (c) { c.classList.remove('open'); });
+  });
+  renderVocab();
+
+  /* ---------- Facts ---------- */
+  var F = [
+    ['{地震|じしん}{保険|ほけん}の{保険|ほけん}{金額|きんがく}', '{火災|かさい}{保険|ほけん}の30%〜50%', 'Earthquake insurance amount: 30–50% of the fire insurance amount (not the same amount).'],
+    ['{地震|じしん}{保険|ほけん}の{上限|じょうげん}', '{建物|たてもの}5,000{万|まん}{円|えん}・{家財|かざい}1,000{万|まん}{円|えん}', 'Maximum: building 50 million yen, household goods 10 million yen.'],
+    ['{地震|じしん}{保険|ほけん}の{支払|しはらい}', '10{日|にち}を{経過|けいか}した{後|あと}は{支払|しはら}われない', 'Not paid for damage that happens after 10 days (counted from the day after the earthquake).'],
+    ['{地震|じしん}{保険|ほけん}の{損害|そんがい}{区分|くぶん}', '{全損|ぜんそん}・{大半損|だいはんそん}・{小半損|しょうはんそん}・{一部損|いちぶそん}', '4 levels of damage: total, large half, small half, partial.'],
+    ['{地震|じしん}{保険|ほけん}{料|りょう}{控除|こうじょ}（{所得税|しょとくぜい}）', '5{万|まん}{円|えん}まで', 'Income tax: full premium up to 50,000 yen; above that, 50,000 yen.'],
+    ['{地震|じしん}{保険|ほけん}{料|りょう}{控除|こうじょ}（{住民税|じゅうみんぜい}）', '2.5{万|まん}{円|えん}まで', 'Resident tax: half the premium; above 50,000 yen, 25,000 yen.'],
+    ['リスクの{分類|ぶんるい}', '3つ：{人的|じんてき}・{物的|ぶってき}・{賠償|ばいしょう}{責任|せきにん}', '3 risk types: people, property, liability.'],
+    ['{生命|せいめい}{保険|ほけん}の{分類|ぶんるい}', '3つ：{死亡|しぼう}・{生存|せいぞん}・{生死|せいし}{混合|こんごう}', '3 types: death, survival, mixed (not 2).'],
+    ['{過失|かしつ}{割合|わりあい}の{計算|けいさん}', '{相手|あいて}の{損害|そんがい}×{自分|じぶん}の{過失|かしつ}%', 'You pay: the OTHER side\'s damage × YOUR fault %. 50万×70%=35万.'],
+    ['{法定|ほうてい}{相続|そうぞく}{分|ぶん}（{配偶者|はいぐうしゃ}と{子|こ}）', 'それぞれ2{分|ぶん}の1', 'Spouse and children: 1/2 each.'],
+    ['{労災|ろうさい}{保険|ほけん}の{自己|じこ}{負担|ふたん}', '{基本的|きほんてき}になし', 'Workers\' accident insurance: basically no self-payment (not 10%).'],
+    ['{自賠責|じばいせき}{保険|ほけん}の{限度|げんど}{額|がく}', '{被害者|ひがいしゃ}1{名|めい}あたり', 'Compulsory car insurance: limit is per victim, by death / disability / injury.'],
+    ['リスクの{移転|いてん}（{保険|ほけん}）が{有効|ゆうこう}', '{頻度|ひんど}が{低|ひく}く{損害|そんがい}が{大|おお}きい', 'Insurance works best for risks that are rare but cause big losses.']
+  ];
+  $('facts').innerHTML = F.map(function (r) {
+    return '<tr><td class="jpcell">' + rb(r[0]) + '</td><td class="jpcell"><b>' + rb(r[1]) + '</b></td><td>' + esc(r[2]) + '</td></tr>';
+  }).join('');
+  $('falselist').innerHTML = falses.map(function (f) {
+    var it = f.it, src = f.q.k === 'tf' ? '(' + f.q.n + ')' : f.q.n + ' ' + f.lbl;
+    return '<article class="q done fact"><div class="qhead"><span>' + src + '</span><span class="traptag">' + it.ty + '</span></div>' +
+      '<p class="qtext">' + rb(it.j) + '</p><p class="en">' + esc(it.en) + '</p>' +
+      (it.w ? '<p class="correct-jp">' + rb(it.w) + '</p>' : '') + '<p>' + esc(it.why) + '</p></article>';
+  }).join('');
+
+  /* ---------- Tabs and toggles ---------- */
+  function show(tab) {
+    document.querySelectorAll('.tab').forEach(function (t) { t.setAttribute('aria-selected', t.dataset.tab === tab); });
+    document.querySelectorAll('section.panel').forEach(function (p) { p.hidden = p.id !== 'panel-' + tab; });
+    store('sonpo-tab', tab);
+  }
+  document.querySelectorAll('.tab').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); window.scrollTo(0, 0); }); });
+  var startTab = (location.hash || '').slice(1) || store('sonpo-tab');
+  if (['method', 'practice', 'words', 'facts'].indexOf(startTab) !== -1) show(startTab);
+  function applyOpts() {
+    document.body.classList.toggle('no-furi', !$('opt-furi').checked);
+    document.body.classList.toggle('no-en', !$('opt-en').checked);
+    store('sonpo-opts', { furi: $('opt-furi').checked, en: $('opt-en').checked });
+  }
+  var opts = store('sonpo-opts');
+  if (opts) { $('opt-furi').checked = opts.furi !== false; $('opt-en').checked = opts.en !== false; }
+  $('opt-furi').addEventListener('change', applyOpts);
+  $('opt-en').addEventListener('change', applyOpts);
+  applyOpts();
+})();
+</script>
