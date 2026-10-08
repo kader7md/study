@@ -26,6 +26,8 @@ What's in it:
 - **Shop** at every station, **checkpoints**, back to the last checkpoint if everyone dies
 - **Sabotage**: meteor (aimed), zombies, eagles (steal cargo), freezing wind
 - First-person player with cartoony hands, a tool hotbar, and carrying items; can ride the moving train
+- **Online co-op for 1 to 5 players** (host-authoritative, ENet): crew lobby with invite codes, ready and kick, other
+  players drawn as chunky workers with name tags, a secret impostor with 3+ players, push-to-talk proximity voice
 
 ### Controls
 | Key | Action |
@@ -37,7 +39,8 @@ What's in it:
 | F1 | Show/hide help |
 | F2 | Debug: play as **impostor** (**Tab** = sabotage menu, then 1–4; meteor: aim + LMB) |
 | F3 | Debug: world sabotage on/off |
-| F5 / F6 | Last checkpoint / new game |
+| F5 / F6 | Last checkpoint / new game (offline or host only) |
+| V (hold) | Push-to-talk voice chat (online) |
 
 ### Rebuilding the models
 ```bash
@@ -46,10 +49,21 @@ blender --background --python blender/scripts/build_nature.py -- .      # trees,
 blender --background --python blender/scripts/render_showcase.py -- . renders   # preview pictures
 ```
 
+### Playing together (1 to 5 players)
+- **Host:** *Host game* in the main menu opens the **crew lobby** (or run `res://scenes/net/Lobby.tscn`, which also offers
+  solo / host / join on its own). Share the **invite code** (Copy code), e.g. `60N00-H8QZN`: it is your IP and port.
+  Friends on your Wi-Fi join right away. Over the internet, forward **UDP port 24565** on your router or press
+  **Open the port (UPnP)**. Press **Start the run** when everyone is ready (alone it says *Start solo*: plain offline play).
+- **Join:** *Join game*, paste the code (or type `192.168.1.20` / `192.168.1.20:24565`), then **I'm ready**.
+- The host's PC runs the game; everyone sees the same train, track, repairs and inventory. With 3 to 5 players one of
+  you is secretly the **impostor** (a private banner tells only them). If the host leaves, everyone goes back to the menu.
+- Details, the Steam plug-in steps and the invite-code format: [`docs/NETWORK.md`](docs/NETWORK.md).
+
 ### Tests
 ```bash
 godot --headless --path . res://tests/TestTrain.tscn   # automated playthrough of the core loop, exit code 0 = pass
+tests/run_net_test.sh                                   # multiplayer: headless host + client (+ latecomer, + 3 players); GODOT=/path/to/godot
 ```
 
 ### Not built yet (see GDD milestones)
-Multiplayer (M1) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **locked routes + quest maps (next)** · Chapter 2 sea
+Steam lobbies (the backend is stubbed, ENet works) · joining mid-run · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **locked routes + quest maps (next)** · Chapter 2 sea

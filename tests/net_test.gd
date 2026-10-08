@@ -21,6 +21,7 @@ var _flags := {}       # set by the other process through _tell()
 var _disconnect_reason := ""
 var shot_dir := ""
 var _finished := false
+var _expect_disconnect := false
 
 
 func _ready() -> void:
@@ -49,10 +50,11 @@ func _ready() -> void:
 		await _lobby_shots()
 		get_tree().quit()
 		return
-	get_tree().create_timer(TIMEOUT, true, false, true).timeout.connect(func():
-		check(false, "finished within %d s" % int(TIMEOUT))
+	var limit := TIMEOUT * (3.0 if shot_dir != "" else 1.0)  # rendering (screenshots) is much slower
+	get_tree().create_timer(limit, true, false, true).timeout.connect(func():
+		check(false, "finished within %d s" % int(limit))
 		_finish())
-	Net.disconnected.connect(func(reason: String): _disconnect_reason = reason)
+	Net.disconnected.connect(_on_disconnected)
 	print("[%s] net test on port %d" % [mode, port])
 	if mode == "host":
 		await _host()
@@ -105,6 +107,13 @@ func _look_at_player(me: Player, other: Player) -> void:
 	me.rotation.x = 0.0
 	me.rotation.z = 0.0
 	me.camera.rotation.x = -0.12
+
+
+func _on_disconnected(reason: String) -> void:
+	_disconnect_reason = reason
+	if not _expect_disconnect and mode != "crew_client":
+		check(false, "unexpected disconnect: %s" % reason)
+		_finish()
 
 
 func _finish() -> void:
@@ -167,6 +176,11 @@ func _host() -> void:
 	check(not Net.can_start(), "can't start before everyone is ready")
 	check(await _wait_until(func(): return Net.players.has(cid) and Net.players[cid].ready, 15.0), "the client is ready")
 	check(Net.can_start(), "now the host can start")
+	if shot_dir != "":
+		get_tree().change_scene_to_file(Net.LOBBY_SCENE)
+		await _wait(2.0)
+		await _shot("lobby_host_2p")
+		await _wait(2.0)  # the client takes its picture too
 
 	print("Start the run")
 	Net.start_run()
@@ -283,8 +297,10 @@ func _host() -> void:
 		await _wait(1.0)
 		check(_main().get_node_or_null("Players/Player_%d" % cid) != null, "the client's player is back")
 		check(Game.train.distance < Game.track.station_distances[0] + 40.0, "the train is back at the departure station")
+		Game.train.chassis_damage = 6.0  # for the client to weld at the station
 	_tell.rpc_id(cid, "reloaded", true)
-	await _wait_until(func(): return _flags.has("client_reloaded"), 30.0)
+	await _wait_until(func(): return _flags.has("client_reloaded"), 40.0)
+	check(Game.train and Game.train.chassis_damage < 6.0, "the client welded the chassis (%.1f left)" % Game.train.chassis_damage)
 
 	print("Host leaves")
 	await _wait(0.5)
@@ -316,6 +332,10 @@ func _client() -> void:
 	check(Net.players.size() == 2 and Net.player_name(1) == "Host", "sees the host in the lobby")
 	check(not Net.is_host() and Net.is_online(), "is a client")
 	Net.set_ready(true)
+	if shot_dir != "":
+		get_tree().change_scene_to_file(Net.LOBBY_SCENE)
+		await _wait(1.5)
+		await _shot("lobby_client")
 
 	print("Start the run")
 	var loaded := await _wait_until(func(): return _main() != null and Game.train != null and _main().player != null, 60.0)
@@ -498,9 +518,12 @@ func _client() -> void:
 	if back:
 		check(Game.train.distance < Game.track.station_distances[0] + 40.0, "the train is back at the departure station")
 		check(Game.count("gold") == Game.START_INVENTORY.gold, "the inventory is back to the start")
+		await _wait_until(func(): return _flags.has("reloaded"), 20.0)
+		await _client_welds(_main())
 	_tell.rpc_id(1, "client_reloaded", true)
 
 	print("The host leaves")
+	_expect_disconnect = true
 	var dropped := await _wait_until(func(): return _disconnect_reason != "", 30.0)
 	check(dropped and _disconnect_reason == "Host left the game", "told: '%s'" % _disconnect_reason)
 	await _wait(1.0)
@@ -567,6 +590,29 @@ func _late() -> void:
 	var reason: String = _flags.get("refused", "")
 	check(told and reason.contains("already started"), "turned away: '%s'" % reason)
 	check(not Net.is_online() and not Net.players.has(Net.local_id()), "and not in the game")
+
+
+## Takes the station welder's torch, welds the chassis through requests, puts the torch back.
+func _client_welds(main: Node) -> void:
+	var me: Player = main.player
+	var train := Game.train
+	var source: WelderSource = main.get_node("Station0").find_children("*", "WelderSource", true, false)[0]
+	var torch: Interactable = source.get_node("TakeTorch")
+	_teleport(me, torch.global_position + Vector3.UP * 0.5 + source.global_basis.x * 1.5)
+	await _wait(0.4)
+	Net.request(torch, &"interact", [me])
+	check(await _wait_until(func(): return me.current_tool == "welder" and is_instance_valid(me.welder_source), 5.0), "the host handed us the station's torch")
+	await _wait_until(func(): return train.chassis_damage > 0.0, 5.0)
+	var spot: ChassisSpot = train.cars[0].find_children("*", "ChassisSpot", true, false)[0]
+	_teleport(me, spot.global_position + train.cars[0].global_basis.x * signf(spot.position.x) * 1.5 + Vector3.UP * 0.2)
+	await _wait(0.4)
+	var before := train.chassis_damage
+	for k in 6:
+		Net.request(me, &"weld_tick", [spot, 0.3])
+		await _wait(0.1)
+	check(await _wait_until(func(): return train.chassis_damage < before, 5.0), "welding the chassis works (%.1f -> %.1f)" % [before, train.chassis_damage])
+	me.select_tool("hammer")
+	check(await _wait_until(func(): return me.welder_path == "", 5.0), "switching tools puts the torch back (on the host too)")
 
 
 func _teleport(p: Player, pos: Vector3) -> void:

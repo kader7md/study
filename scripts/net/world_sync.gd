@@ -132,9 +132,11 @@ func snapshot() -> Dictionary:
 	var anchor_name := String(train.anchor.name) if is_instance_valid(train.anchor) else ""
 	var states := PackedByteArray()
 	var wear := PackedFloat32Array()
+	var bolt_hits := PackedByteArray()
 	for i in Train.MAX_WHEELS:
 		states.append(train.wheel_state(i))
 		wear.append(train.wheel_wear[i])
+		bolt_hits.append(int(train.wheel_slot(i).get("_hits")))
 	var cds := PackedFloat32Array()
 	if Game.sabotage:
 		for id: String in SabotageManager.ABILITIES:
@@ -142,7 +144,7 @@ func snapshot() -> Dictionary:
 	return {
 		"t": [train.distance, train.speed, train.lever, train.fuel, train.body_health, train.engine_damage,
 			train.chassis_damage, train.tipped, train.tip_target, train.current_station, hook_index, anchor_name],
-		"w": states, "ww": wear,
+		"w": states, "ww": wear, "wh": bolt_hits,
 		"g": [Game.next_station, Game.wind_active],
 		"cd": cds,
 	}
@@ -436,8 +438,11 @@ func _rpc_snapshot(s: Dictionary) -> void:
 	train.anchor = main.get_node_or_null(anchor_name) as AnchorSpot if anchor_name != "" else null
 	var states: PackedByteArray = s.w
 	var wear: PackedFloat32Array = s.ww
+	var bolt_hits: PackedByteArray = s.get("wh", PackedByteArray())
 	for i in mini(states.size(), Train.MAX_WHEELS):
 		train.net_set_wheel(i, states[i], wear[i])
+		if i < bolt_hits.size():
+			train.wheel_slot(i).set("_hits", bolt_hits[i])  # the "Bolt the wheel 1/3" prompt
 	var g: Array = s.g
 	Game.next_station = g[0]
 	Game.wind_active = g[1]
