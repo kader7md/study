@@ -13,3 +13,7 @@ export_credentials.cfg
 # OS
 .DS_Store
 Thumbs.db
+
+# Secrets (API keys)
+.env
+*.env

@@ -1,6 +1,7 @@
 # How We Build the Game: Workflow Plan
 
 Based on the reference video (Godot + Blender + Tripo3D pipeline).
+**The video's exact method (MCP, concept→Tripo3D, master prompt, animations, cost control): [`VIDEO_METHOD.md`](VIDEO_METHOD.md)**
 
 ## 1. The tools
 
@@ -49,8 +50,7 @@ Keep characters and enemies in separate folders (as the video does):
 - Generate models in Tripo3D, do the Blender work
 - Judge the art direction and how the game *feels*
 
-Claude can't open the Godot editor or Blender from the cloud.
-Anything visual has to be tested by you.
+Claude can't open the Godot editor or Blender from the cloud. **On your PC, with MCP connected, Claude can run both itself** (like in the video). You still judge how it looks and feels.
 
 ## 4. Repo layout
 
@@ -73,6 +73,7 @@ blender/               ← source .blend files
 | Phase | Goal | Done when |
 |-------|------|-----------|
 | **0. Plan** (now) | Workflow (this file) + the **game idea** from you → Game Design Doc | GDD approved |
+| **0.5 PC + MCP setup** | Move repo to PC, install Godot/Blender, connect **Godot MCP + Blender MCP** to Claude Code | Claude can run the game and Blender by itself |
 | **1. Skeleton** | `project.godot`, player capsule moves, camera follows, test level from boxes | You can walk around in Godot |
 | **2. Core loop** | The main mechanic (combat, exploring, …) with placeholder shapes | It's fun with grey boxes |
 | **3. First real assets** | 1 hero + 1 enemy through the Tripo3D → Blender → Godot pipeline | Animated hero fights an animated enemy |
