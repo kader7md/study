@@ -18,7 +18,40 @@ Generate these in **Higgsfield** in **landscape 16:9 at the highest resolution**
 Do the **master sheet** first. If the assets come out too small, use the 5 themed sheets (fewer items each, more detail).
 Save them as `assets/concept/sheet_<name>.png`.
 
-### 🔥 Everything in ONE prompt (all assets + characters)
+### 🔥 Everything in ONE prompt: DETAILED version (not childish)
+```
+Professional AAA game concept art asset sheet for the co-op survival adventure game "TRUST ISSUES", ultra detailed, 8K,
+landscape 16:9 presentation board, dark charcoal background with thin brass frame lines, clean organised grid, every asset
+isolated with a small label underneath, grouped in titled sections. Top-left: cinematic key art of a weathered 19th-century
+steam locomotive with brass fittings and soot-stained red boiler crossing a tall timber trestle bridge over a misty river gorge,
+pine forest and jagged snowy mountains, dramatic golden-hour light, volumetric steam and haze.
+TRAIN: heavy steam locomotive with riveted boiler plates, brass bands, pistons and connecting rods; the same locomotive battle-
+damaged with torn plates exposing the iron frame; covered wooden boxcar with iron straps; open workshop flatcar with canvas
+canopy and tools; rusted corrugated container wagon with chains and padlock; cast-iron spoked wheel; wooden wall panel with
+bolts; riveted boiler plate; cab door with glass window; curved roof panel.
+TOOLS: forged claw hammer with worn leather grip; industrial pneumatic nail gun; arc welding torch with braided cable; portable
+diesel welding generator with gauges and cable reel; coal shovel with dented blade; heavy adjustable wrench; crowbar.
+REPAIR & RESOURCES: creosote-stained railway sleeper; steel rail section; crate of iron spikes; pile of glossy coal; stacked
+split logs with bark; heap of rusted scrap metal and gears; quartz boulder with raw gold veins; reinforced supply crate;
+military medkit; vintage oil can; iron grappling hook with rope; improvised spear with scrap blade; brass oil lantern.
+NATURE: tall pine tree, snow-laden pine, ancient oak, birch, gnarled dead tree, mossy stump, fallen rotting log, wild bush,
+tall grass, wildflowers, moss-covered boulder, scattered rocks, layered sedimentary cliff, wet river stones, snowy mountain
+peak, waterfall with rocks.
+RAILWAY & STATION: old brick and timber railway station, stone platform with iron canopy, wooden trading post shop, timber water
+tower, semaphore signal, buffer stop, timber trestle bridge section, ballast track piece, cast-iron bench, gas lamp post, blank
+wooden sign, weathered gravestone, split-rail fence, harbour pier with ropes, sleek black-and-white luxury villain yacht.
+FURNITURE & PROPS: bistro café table with chairs, café counter with espresso machine, heavy workbench with vice and tools, round
+oak meeting table with brass bell, stone altar with melted candles, oak barrel, metal toolbox, burlap sacks.
+CHARACTERS (T-pose, front view, stylized realistic proportions): young man in smart date clothes; his girlfriend in an elegant
+date outfit; friend in worn hoodie and beanie; friend in work overalls and cap; henchman in black suit and sunglasses; rotting
+zombie in torn clothes; large golden eagle with spread wings; mountain goat; black military helicopter.
+Style: stylized realism like Sea of Thieves, Valheim and The Legend of Zelda: Tears of the Kingdom concept art, detailed
+hand-painted PBR textures, wood grain, rust, scratches, dirt and wear, realistic materials and proportions with slight
+stylization, consistent soft studio lighting on every asset, 3/4 view, crisp readable silhouettes, high detail, professional
+game art presentation
+```
+
+### Everything in ONE prompt: cartoon version (older, more childish)
 ```
 Huge game concept art asset sheet for the cosy cartoon co-op adventure game "TRUST ISSUES", ultra high resolution, landscape
 16:9 poster, dark wooden board background with gold frame lines, clean organised grid, every asset isolated with a small label
@@ -102,10 +135,10 @@ chunky rounded shapes, soft bevels, bright warm colours, hand-painted textures, 
 ## STYLE (paste before every prompt)
 
 ```
-Stylized 3D game asset, chunky rounded cartoon shapes, soft bevelled edges, bright warm colours, simple clean hand-painted
-textures, slightly exaggerated proportions, cosy and funny co-op game look (similar mood to RV There Yet, Peak, Fortnite),
-soft studio lighting, 3/4 front view from slightly above, single object centred, plain light grey background,
-no text, no logo, no shadow on the background, full object visible, game-ready, low-poly friendly
+Detailed 3D game asset, stylized realism like Sea of Thieves and Valheim, realistic proportions with slight stylization,
+detailed hand-painted PBR textures, wood grain, rust, scratches, dirt and wear, realistic materials, soft studio lighting,
+3/4 front view from slightly above, single object centred, plain light grey background, no text, no logo,
+no shadow on the background, full object visible, game-ready
 ```
 
 For objects you want to turn into 3D, add:

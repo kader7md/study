@@ -207,8 +207,9 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
 - Dead players spectate until revived.
 
 ## 9. Look, camera and UI (reference: RV There Yet)
-- **Art style: exactly like RV There Yet.** Bright stylised cartoon, chunky round characters with big heads and short bodies,
-  painterly trees, warm sunny colours, simple materials. Not realistic.
+- **Art style: stylized realism** (updated: assets should be detailed, not childish): realistic proportions with slight
+  stylization, detailed hand-painted textures with wear, rust and dirt (Sea of Thieves / Valheim direction).
+  Gameplay feel and HUD stay RV There Yet-like.
 - **First-person camera** with big cartoony hands visible, holding tools and items.
 - **HUD (from the reference screenshots):**
   - Top centre: **train health bar** (green) plus a **journey progress bar** to the next station
