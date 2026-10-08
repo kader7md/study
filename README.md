@@ -8,7 +8,7 @@ A co-op train chase (then a sea chase) with a secret impostor. Made with **Godot
 
 ## Current prototype: Chapter 1 train core (grey boxes)
 
-Open the folder in **Godot 4.4+** (standard build), then press **F5** (Run Project).
+Open the folder in **Godot 4.7** (standard build; tested on 4.7.2), then press **F5** (Run Project).
 
 What's in it:
 - **Track** with 6 stations: departure + 5 checkpoints (420 m apart for now; the real game will be longer)
