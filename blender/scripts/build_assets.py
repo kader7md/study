@@ -1,7 +1,7 @@
 """Builds the Trust Issues train, repair items and tools in Blender, bakes worn PBR-style textures, exports .glb.
 
 Run headless:
-    blender --background --python blender/scripts/build_assets.py -- <repo_root> [only=train,props]
+    blender --background --python blender/scripts/build_assets.py -- <repo_root> [only=train,props,gate]
 Or open Blender → Scripting tab → open this file → Run Script.
 
 Style: stylized realism (Sea of Thieves / Valheim direction): real proportions, rivets, bolts, iron straps,
@@ -31,7 +31,7 @@ FLOOR = 1.35
 random.seed(7)
 
 # --- Materials (procedural wear → baked) ---------------------------------------------
-# kind: paint (chipped edges), iron (rust), brass (tarnish), wood (grain), plain, canvas, glass, lamp, rubber
+# kind: paint (chipped edges), enamel (clean signal paint), iron (rust), brass (tarnish), wood (grain), plain, canvas, glass, lamp, rubber
 MATS = {
     "red_paint": ("paint", (0.42, 0.07, 0.05), 0.35, 0.45),
     "green_paint": ("paint", (0.12, 0.27, 0.18), 0.3, 0.5),
@@ -70,6 +70,12 @@ MATS = {
     "rock": ("rock", (0.12, 0.115, 0.105), 0.0, 0.9),
     "cliff": ("rock", (0.16, 0.13, 0.1), 0.0, 0.9),
     "snow": ("plain", (0.88, 0.9, 0.94), 0.0, 0.6),
+    # locked track gate (boom barrier), its signal post and the key
+    "white_paint": ("enamel", (0.8, 0.78, 0.72), 0.1, 0.5),
+    "signal_red": ("enamel", (0.5, 0.035, 0.025), 0.1, 0.45),
+    "lamp_red": ("lamp", (1.0, 0.1, 0.04), 0.0, 0.2),
+    "concrete": ("rock", (0.36, 0.35, 0.33), 0.0, 0.9),
+    "paper": ("canvas", (0.8, 0.72, 0.52), 0.0, 0.9),
 }
 _mats = {}
 
@@ -166,6 +172,9 @@ def mat(name):
         nt.links.new(moss, mul.inputs[0])
         nt.links.new(_ramp(nt, _noise(nt, coord, 3.0), 0.35, 0.6), mul.inputs[1])
         color = _mix(nt, color, (0.06, 0.13, 0.03), mul.outputs[0])
+    elif kind == "enamel":
+        # signal enamel: glossy, only a faint colour variation (no chipping, so stripes read cleanly from afar)
+        color = _mix(nt, tuple(c * 0.9 for c in base), base, _ramp(nt, _noise(nt, coord, 0.8, 2.0), 0.35, 0.65))
     elif kind == "paint":
         # subtle colour variation, then bare metal on chipped edges
         color = _mix(nt, tuple(c * 0.93 for c in base), base, _ramp(nt, _noise(nt, coord, 0.8, 2.0), 0.35, 0.65))
@@ -848,6 +857,136 @@ def build_props():
     bake_and_export(os.path.join(OUT_PROPS, "wrench.glb"), 512)
 
 
+# --- Locked track gate, its signal post and the key ------------------------------------------
+
+def build_gate_props():
+    """track_gate.glb: a heavy striped timber boom across the rails, hinged on a timber post (with a lantern and a
+    counterweight) and padlocked into a steel cradle on the far post. Separate nodes for the game to animate:
+    GateFrame (static), Boom (origin = hinge pin, swings up about the track axis), Padlock (origin = shackle top),
+    Lamp (the lantern lens, recoloured red / green in Godot).
+    gate_signal.glb: the warning signal post 120 m before the gate (Lens = recoloured in Godot).
+    gate_key.glb: the big iron key with a brass bow and a paper tag (upright, origin in the middle)."""
+    clear_scene()
+    hx, rx, pz = -2.35, 2.35, 1.05      # hinge post x, rest post x, boom pivot height
+    ground = -0.38
+    frame = []
+    for x, h in ((hx, 2.05), (rx, 1.12)):
+        frame.append(box(f"footing{x}", (0.7, 0.7, 0.35), (x, 0, ground - 0.05), "concrete", 0.04))
+        frame.append(box(f"post{x}", (0.34, 0.34, h), (x, 0, ground + 0.12 + h / 2), "wood_dark", 0.02))
+        for k, zz in enumerate((ground + 0.4, ground + 0.12 + h - 0.25)):
+            frame.append(box(f"band{x}{k}", (0.37, 0.37, 0.07), (x, 0, zz), "iron", 0.006))
+            frame += rivets_line(f"bandriv{x}{k}", (x - 0.12, -0.19, zz), (x + 0.12, -0.19, zz), 3, "iron", 0.02)
+        # raking strut so the post looks like it can take a hit
+        frame.append(rod(f"strut{x}", (x, -0.75, ground + 0.05), (x, -0.12, ground + 0.95), 0.055, "wood", 8))
+        frame.append(box(f"strut_shoe{x}", (0.2, 0.25, 0.08), (x, -0.78, ground + 0.06), "iron", 0.01))
+    # hinge: two steel cheek plates with an axle pin along the track
+    for sy in (-0.21, 0.21):
+        frame.append(box(f"cheek{sy}", (0.42, 0.04, 0.42), (hx, sy, pz), "steel", 0.01))
+        frame += rivets_line(f"cheekriv{sy}", (hx - 0.13, sy * 1.12, pz - 0.13), (hx + 0.13, sy * 1.12, pz - 0.13), 2, "iron", 0.02)
+    frame.append(cyl("pin", 0.045, 0.56, (hx, 0, pz), "steel", axis="Y", verts=16))
+    for sy in (-0.29, 0.29):
+        frame.append(cyl(f"pin_nut{sy}", 0.07, 0.04, (hx, sy, pz), "iron", axis="Y", verts=6))
+    # lantern on top of the hinge post
+    top = ground + 0.12 + 2.05
+    frame.append(box("lantern_base", (0.3, 0.3, 0.05), (hx, 0, top + 0.03), "black_paint", 0.01))
+    frame.append(box("lantern_body", (0.24, 0.24, 0.3), (hx, 0, top + 0.2), "black_paint", 0.015))
+    frame.append(cyl("lantern_roof", 0.2, 0.14, (hx, 0, top + 0.42), "black_paint", verts=4, radius2=0.04, rot=(0, 0, math.pi / 4)))
+    frame.append(torus("lantern_handle", 0.07, 0.012, (hx, 0, top + 0.53), "iron", axis="Y", seg=16))
+    frame.append(cyl("lantern_hood", 0.1, 0.08, (hx, -0.16, top + 0.24), "black_paint", axis="Y", verts=20))
+    # rest post: steel fork cradle the boom drops into, with the hasp staple for the padlock
+    rz = ground + 0.12 + 1.12
+    frame.append(box("cradle_base", (0.36, 0.36, 0.06), (rx, 0, rz + 0.02), "steel", 0.01))
+    for sy in (-0.15, 0.15):
+        frame.append(box(f"fork{sy}", (0.3, 0.05, 0.26), (rx, sy, rz + 0.17), "steel", 0.008))
+    frame.append(box("hasp_plate", (0.16, 0.03, 0.3), (rx, -0.2, rz - 0.1), "iron", 0.006))
+    frame.append(torus("staple", 0.045, 0.014, (rx, -0.235, rz - 0.16), "steel", axis="X", seg=16))
+    # warning plate on the hinge post
+    frame.append(box("plate_back", (0.42, 0.02, 0.42), (hx, -0.18, ground + 1.55), "white_paint", 0.006, rot=(0, math.radians(45), 0)))
+    frame.append(box("plate_rim", (0.3, 0.025, 0.3), (hx, -0.185, ground + 1.55), "signal_red", 0.004, rot=(0, math.radians(45), 0)))
+    frame.append(box("plate_core", (0.2, 0.03, 0.2), (hx, -0.19, ground + 1.55), "white_paint", 0.004, rot=(0, math.radians(45), 0)))
+    join("GateFrame", frame, origin=(0, 0, 0))
+
+    join("Lamp", [cyl("lens", 0.075, 0.05, (hx, -0.13, top + 0.2), "lamp_red", axis="Y", verts=20),
+                  cyl("lens_back", 0.075, 0.05, (hx, 0.13, top + 0.2), "lamp_red", axis="Y", verts=20)],
+         origin=(hx, 0, top + 0.2))
+
+    # the boom: a heavy timber beam painted in red / white stripes, steel bands at the joints, counterweight
+    boom = []
+    x0, x1 = hx + 0.25, rx + 0.12
+    n = int(round((x1 - x0) / 0.5))
+    seg = (x1 - x0) / n
+    for k in range(n):
+        boom.append(box(f"stripe{k}", (seg + 0.002, 0.24, 0.24), (x0 + seg * (k + 0.5), 0, pz),
+                        "signal_red" if k % 2 == 0 else "white_paint", 0.012))
+    for k in range(0, n + 1, 2):
+        boom.append(box(f"sband{k}", (0.05, 0.26, 0.26), (x0 + seg * k, 0, pz), "iron", 0.006))
+    boom.append(box("underchannel", (x1 - x0, 0.12, 0.05), ((x0 + x1) / 2, 0, pz - 0.14), "steel", 0.006))
+    boom.append(box("hub", (0.42, 0.34, 0.3), (hx, 0, pz), "iron", 0.02))
+    boom.append(box("tail", (0.7, 0.2, 0.2), (hx - 0.45, 0, pz), "wood_dark", 0.015))
+    boom.append(box("counterweight", (0.38, 0.36, 0.46), (hx - 0.82, 0, pz - 0.05), "iron", 0.03))
+    boom += rivets_line("cwriv", (hx - 0.95, -0.19, pz + 0.1), (hx - 0.69, -0.19, pz + 0.1), 3, "iron", 0.025)
+    boom.append(box("hasp_strap", (0.08, 0.03, 0.36), (rx, -0.15, pz - 0.08), "iron", 0.006))
+    boom.append(box("tip_cap", (0.05, 0.27, 0.27), (x1 + 0.01, 0, pz), "steel", 0.008))
+    # diamond STOP plate hanging in the middle of the boom
+    boom.append(box("stop_plate", (0.55, 0.03, 0.55), (0, -0.13, pz - 0.05), "signal_red", 0.01, rot=(0, math.radians(45), 0)))
+    boom.append(box("stop_core", (0.36, 0.035, 0.36), (0, -0.14, pz - 0.05), "white_paint", 0.006, rot=(0, math.radians(45), 0)))
+    boom.append(box("stop_bar", (0.26, 0.04, 0.07), (0, -0.15, pz - 0.05), "signal_red", 0.004))
+    join("Boom", boom, origin=(hx, 0, pz))
+
+    # a big brass padlock hanging from the staple, facing the train (-Y = towards the approaching train)
+    lz = rz - 0.16
+    lock = [box("lock_body", (0.24, 0.1, 0.22), (rx, -0.29, lz - 0.2), "brass", 0.03),
+            box("lock_face", (0.2, 0.02, 0.18), (rx, -0.345, lz - 0.2), "brass", 0.01),
+            box("keyhole", (0.025, 0.02, 0.06), (rx, -0.355, lz - 0.22), "black_paint", 0.003),
+            cyl("keyhole_top", 0.022, 0.02, (rx, -0.355, lz - 0.18), "black_paint", axis="Y", verts=12)]
+    for sx in (-0.07, 0.07):
+        lock.append(rod(f"shackle_leg{sx}", (rx + sx, -0.27, lz - 0.1), (rx + sx, -0.27, lz + 0.02), 0.022, "steel", 10))
+    lock.append(torus("shackle_top", 0.07, 0.022, (rx, -0.27, lz + 0.02), "steel", axis="Y", seg=20))
+    lock += rivets_line("lockriv", (rx - 0.09, -0.35, lz - 0.28), (rx + 0.09, -0.35, lz - 0.28), 3, "brass", 0.012)
+    join("Padlock", lock, origin=(rx, -0.27, lz + 0.08))
+    bake_and_export(os.path.join(OUT_PROPS, "track_gate.glb"), 1024)
+
+    clear_scene()
+    # warning signal post: iron mast with a ladder, lamp case with a hood, red / white diamond board
+    sig = [box("sig_footing", (0.5, 0.5, 0.3), (0, 0, -0.3), "concrete", 0.03),
+           cyl("mast", 0.07, 3.4, (0, 0, 1.55), "black_paint", verts=12),
+           box("sig_case", (0.36, 0.26, 0.6), (0, 0, 3.2), "black_paint", 0.03),
+           cyl("sig_hood", 0.15, 0.16, (0, -0.2, 3.32), "black_paint", axis="Y", verts=20),
+           box("backboard", (0.56, 0.03, 0.8), (0, 0.12, 3.2), "black_paint", 0.02),
+           box("board", (0.6, 0.03, 0.6), (0, -0.08, 2.35), "white_paint", 0.01, rot=(0, math.radians(45), 0)),
+           box("board_rim", (0.44, 0.035, 0.44), (0, -0.085, 2.35), "signal_red", 0.006, rot=(0, math.radians(45), 0)),
+           box("board_core", (0.3, 0.04, 0.3), (0, -0.09, 2.35), "white_paint", 0.004, rot=(0, math.radians(45), 0)),
+           box("board_bar", (0.06, 0.045, 0.24), (0, -0.095, 2.38), "black_paint", 0.004),
+           box("board_dot", (0.06, 0.045, 0.06), (0, -0.095, 2.2), "black_paint", 0.004)]
+    for k in range(7):
+        sig.append(box(f"rung{k}", (0.3, 0.03, 0.03), (0, 0.1, 0.4 + k * 0.38), "iron", 0.004))
+    for sx in (-0.15, 0.15):
+        sig.append(box(f"rung_rail{sx}", (0.03, 0.03, 2.6), (sx, 0.1, 1.55), "iron", 0.004))
+    join("SignalPost", sig, origin=(0, 0, 0))
+    join("Lens", [cyl("sig_lens", 0.11, 0.04, (0, -0.14, 3.32), "lamp_red", axis="Y", verts=24)], origin=(0, -0.14, 3.32))
+    bake_and_export(os.path.join(OUT_PROPS, "gate_signal.glb"), 512)
+
+    clear_scene()
+    # the key: big old iron key, brass trefoil bow, collar rings, toothed bit, and a paper tag on a string.
+    # Upright (bow at the top), about 0.55 m tall so it reads from the cab.
+    key = [torus("bow", 0.075, 0.022, (0, 0, 0.17), "brass", axis="Y", seg=28)]
+    for k, (bx, bz) in enumerate(((0.075, 0.2), (-0.075, 0.2), (0, 0.26))):
+        key.append(torus(f"lobe{k}", 0.035, 0.016, (bx, 0, bz), "brass", axis="Y", seg=18))
+    key.append(cyl("collar1", 0.03, 0.03, (0, 0, 0.085), "brass", verts=16))
+    key.append(cyl("collar2", 0.026, 0.02, (0, 0, 0.055), "iron", verts=16))
+    key.append(cyl("shank", 0.017, 0.33, (0, 0, -0.1), "iron", verts=14))
+    key.append(sphere("tip", 0.022, (0, 0, -0.265), "iron", seg=12))
+    key.append(box("bit", (0.1, 0.022, 0.08), (0.055, 0, -0.22), "iron", 0.006))
+    for k, (tx, tz) in enumerate(((0.09, -0.27), (0.11, -0.2), (0.09, -0.18))):
+        key.append(box(f"tooth{k}", (0.025, 0.024, 0.03), (tx, 0, tz), "iron", 0.004))
+    key.append(rod("string", (-0.07, 0, 0.2), (-0.16, 0.0, 0.08), 0.006, "canvas", 6))
+    key.append(box("tag", (0.1, 0.012, 0.15), (-0.19, 0, 0.0), "paper", 0.01, rot=(0, math.radians(-14), 0)))
+    key.append(box("tag_stripe", (0.1, 0.016, 0.025), (-0.188, 0, 0.045), "signal_red", 0.002, rot=(0, math.radians(-14), 0)))
+    key.append(torus("tag_eye", 0.012, 0.004, (-0.172, 0, 0.068), "brass", axis="Y", seg=12))
+    join("GateKey", key, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "gate_key.glb"), 512)
+
+
 if __name__ == "__main__":
     if ONLY is None or "train" in ONLY:
         build_locomotive()
@@ -855,4 +994,6 @@ if __name__ == "__main__":
             build_wagon(k)
     if ONLY is None or "props" in ONLY:
         build_props()
+    if ONLY is None or "gate" in ONLY:
+        build_gate_props()
     print("done")

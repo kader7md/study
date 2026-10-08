@@ -19,6 +19,7 @@ var _chassis_bar: ProgressBar
 var _damage_label: Label
 var _progress_bar: ProgressBar
 var _progress_label: Label
+var _objective: Label
 var _status_label: Label
 var _inventory_label: Label
 var _health_bar: ProgressBar
@@ -66,6 +67,12 @@ func _ready() -> void:
 	_progress_bar = _bar(top, Color(0.25, 0.55, 0.95), Vector2(520, 14))
 	_progress_label = _label(top, "", 18)
 	_progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# objective (Game.objective, kept up to date by the RunDirector)
+	_objective = _label(top, "", 19)
+	_objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_objective.add_theme_color_override("font_color", Color(1.0, 0.88, 0.5))
+	Game.objective_changed.connect(_on_objective_changed)
+	_on_objective_changed(Game.objective)
 
 	# Top left: inventory
 	_inventory_label = _label(root, "", 18)
@@ -291,6 +298,10 @@ func close_shop() -> void:
 
 
 # --- Messages -----------------------------------------------------------------
+
+func _on_objective_changed(text: String) -> void:
+	_objective.text = ("► " + text) if text != "" else ""
+
 
 func _add_message(text: String) -> void:
 	var l := _label(_messages, text, 18)

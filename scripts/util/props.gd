@@ -14,6 +14,9 @@ const PATHS := {
 	"nail_gun": "res://assets/models/props/nail_gun.glb",
 	"wrench": "res://assets/models/props/wrench.glb",
 	"welder_machine": "res://assets/models/props/welder_machine.glb",
+	"track_gate": "res://assets/models/props/track_gate.glb",
+	"gate_signal": "res://assets/models/props/gate_signal.glb",
+	"gate_key": "res://assets/models/props/gate_key.glb",
 }
 
 static var _cache := {}

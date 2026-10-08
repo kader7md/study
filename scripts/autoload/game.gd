@@ -10,24 +10,37 @@ signal chapter_completed
 signal crew_lost
 signal wind_changed(active: bool)
 signal ui_changed(open: bool)
+## The current goal for the crew ("Reach station 2", "Gate locked: find the key"...), shown by the HUD.
+signal objective_changed(text: String)
+## Station 5 reached: the run is over. `run_stats` is a copy of `stats`.
+signal run_finished(run_stats: Dictionary)
 
 ## Checkpoint stations after the departure station (index 0). Station 5 is the last one (the port).
 const STATION_COUNT := 5
 const SAVE_PATH := "user://checkpoint.json"
+const MENU_SCENE := "res://scenes/menu/MainMenu.tscn"
+const MAIN_SCENE := "res://scenes/main/Main.tscn"
 
-const START_INVENTORY := {"coal": 14, "wood": 10, "scrap": 10, "gold": 15, "nails": 20, "wheel": 1, "engine_oil": 1, "come_along": 1}
+## Balance (see the balance table in docs/GDD.md). One gap piece on solid ground costs about
+## 4 wood (planks), 4 scrap (2 rails) and 8 nails (2 per plank; the fishplate bolts come with the rails).
+const START_INVENTORY := {"coal": 12, "wood": 10, "scrap": 10, "gold": 15, "nails": 30, "wheel": 1, "engine_oil": 1, "come_along": 1}
 
-## Station shop. "gives" is added to the crew inventory.
+## Station shop. "gives" is added to the crew inventory. Wood and scrap are the softlock fallback.
 const SHOP := {
-	"nails": {"label": "Nails x10", "price": 5, "gives": {"nails": 10}},
+	"nails": {"label": "Nails x10", "price": 4, "gives": {"nails": 10}},
+	"wood": {"label": "Planks (wood x5)", "price": 3, "gives": {"wood": 5}},
+	"scrap": {"label": "Scrap metal x5", "price": 3, "gives": {"scrap": 5}},
+	"coal": {"label": "Coal x5", "price": 2, "gives": {"coal": 5}},
 	"wheel": {"label": "Train wheel", "price": 8, "gives": {"wheel": 1}},
 	"engine_oil": {"label": "Engine oil (repairs the engine)", "price": 6, "gives": {"engine_oil": 1}},
-	"nail_gun": {"label": "Nail gun (faster rail repair)", "price": 15, "gives": {"nail_gun": 1}},
+	"nail_gun": {"label": "Nail gun (faster rail repair, joins planks over water)", "price": 15, "gives": {"nail_gun": 1}},
 	"medkit": {"label": "Medkit", "price": 7, "gives": {"medkit": 1}},
 	"come_along": {"label": "Come-along (hand winch: pulls a tipped train back up)", "price": 10, "gives": {"come_along": 1}},
 	"grappler": {"label": "Grappling hook", "price": 12, "gives": {"grappler": 1}},
-	"coal": {"label": "Coal x5", "price": 3, "gives": {"coal": 5}},
 }
+
+## Run statistics shown on the Chapter 1 end screen (and saved in the checkpoint).
+const STAT_KEYS := ["time", "distance", "repairs", "panels", "wheels_lost", "gates", "gold_found"]
 
 const INPUTS := {
 	"move_forward": [KEY_W], "move_back": [KEY_S], "move_left": [KEY_A], "move_right": [KEY_D],
@@ -59,6 +72,19 @@ var ui_open := false:
 		ui_open = value
 		ui_changed.emit(value)
 
+## Run statistics (see STAT_KEYS). Time runs from leaving station 0 and stops while the game is paused.
+var stats: Dictionary = {}
+## True between leaving the departure station and reaching the last station.
+var run_timing := false
+var run_complete := false
+## Segments whose locked gate has been opened (gate state for the checkpoint).
+var opened_gates: Array[int] = []
+var objective := "":
+	set(value):
+		if objective != value:
+			objective = value
+			objective_changed.emit(value)
+
 ## Scene references, set by Main.
 var track: Track
 var train: Train
@@ -86,6 +112,11 @@ func _setup_input() -> void:
 			var mb := InputEventMouseButton.new()
 			mb.button_index = pair[1]
 			InputMap.action_add_event(pair[0], mb)
+
+
+func _process(delta: float) -> void:
+	if run_timing and not run_complete:
+		stats.time = float(stats.get("time", 0.0)) + delta
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -155,6 +186,35 @@ func buy(item_id: String) -> bool:
 	return true
 
 
+# --- Run stats ---------------------------------------------------------------
+
+func add_stat(key: String, amount: float = 1.0) -> void:
+	stats[key] = float(stats.get(key, 0.0)) + amount
+
+
+func stat(key: String) -> float:
+	return float(stats.get(key, 0.0))
+
+
+static func empty_stats() -> Dictionary:
+	var d := {}
+	for k: String in STAT_KEYS:
+		d[k] = 0.0
+	return d
+
+
+## The train left a station: the run clock starts (or resumes after a checkpoint restart).
+func on_train_left_station(_index: int) -> void:
+	if not run_complete:
+		run_timing = true
+
+
+func on_gate_opened(segment: int) -> void:
+	if not segment in opened_gates:
+		opened_gates.append(segment)
+		add_stat("gates")
+
+
 # --- Messages --------------------------------------------------------------
 
 func say(text: String) -> void:
@@ -174,11 +234,16 @@ func on_train_stopped_at_station(index: int) -> void:
 	if index != next_station:
 		return
 	next_station += 1
+	if index >= STATION_COUNT:
+		run_timing = false
+		run_complete = true
 	save_checkpoint(index)
 	station_reached.emit(index)
 	if index >= STATION_COUNT:
 		show_banner("FINAL STATION REACHED!\nThe helicopter landed at the port… (Chapter 2: the sea)")
+		objective = "Chapter 1 complete!"
 		chapter_completed.emit()
+		run_finished.emit(stats.duplicate())
 	else:
 		show_banner("Station %d / %d reached!\nCheckpoint saved. Repair, shop, rest." % [index, STATION_COUNT])
 
@@ -188,6 +253,9 @@ func save_checkpoint(station_index: int) -> void:
 		"station": station_index,
 		"inventory": inventory.duplicate(),
 		"train": train.save_state() if train else {},
+		"stats": stats.duplicate(),
+		"gates": opened_gates.duplicate(),
+		"complete": run_complete,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -210,10 +278,25 @@ func restart_from_checkpoint() -> void:
 	if checkpoint.is_empty():
 		new_game(true)
 		return
-	inventory = checkpoint.inventory.duplicate()
-	next_station = int(checkpoint.station) + 1
-	inventory_changed.emit()
+	load_checkpoint_state()
 	get_tree().reload_current_scene.call_deferred()
+
+
+## Restores the run state saved in the checkpoint (inventory, stats, opened gates) without reloading the scene.
+func load_checkpoint_state() -> void:
+	inventory = checkpoint.inventory.duplicate()
+	inventory.erase("key")  # keys belong to their gate; gates behind the checkpoint load open
+	next_station = int(checkpoint.station) + 1
+	var saved_stats: Dictionary = checkpoint.get("stats", {})
+	stats = empty_stats()
+	stats.merge(saved_stats, true)
+	opened_gates.clear()
+	for seg in checkpoint.get("gates", []):
+		opened_gates.append(int(seg))
+	run_complete = bool(checkpoint.get("complete", false))
+	run_timing = false
+	objective = ""
+	inventory_changed.emit()
 
 
 func new_game(reload: bool) -> void:
@@ -222,6 +305,26 @@ func new_game(reload: bool) -> void:
 	next_station = 1
 	wind_active = false
 	ui_open = false
+	stats = empty_stats()
+	run_timing = false
+	run_complete = false
+	opened_gates.clear()
+	objective = ""
 	inventory_changed.emit()
 	if reload:
 		get_tree().reload_current_scene.call_deferred()
+
+
+## Leaves the run: closes the network session (if the Net autoload exists), then goes to the main menu,
+## or starts a fresh run in Main when the menu scene does not exist (yet).
+func return_to_menu() -> void:
+	var net := get_node_or_null("/root/Net")
+	if net and net.has_method("leave"):
+		net.leave()
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	new_game(false)
+	if ResourceLoader.exists(MENU_SCENE):
+		get_tree().change_scene_to_file.call_deferred(MENU_SCENE)
+	else:
+		get_tree().change_scene_to_file.call_deferred(MAIN_SCENE)
