@@ -1,6 +1,6 @@
 """Renders showcase pictures of the exported .glb models (train, damaged train, tools, nature).
 
-    blender --background --python blender/scripts/render_showcase.py -- <repo_root> <out_dir> [shots=train,damaged,tools,nature]
+    blender --background --python blender/scripts/render_showcase.py -- <repo_root> <out_dir> [shots=train,damaged,tools,nature,gate]
 """
 import math
 import os
@@ -167,6 +167,23 @@ def nature_scene():
     render("nature")
 
 
+def gate_scene():
+    reset()
+    ground((0.2, 0.26, 0.12), 120)
+    track(60)
+    load(os.path.join(M, "props", "track_gate.glb"), (0, 0, 0))
+    load(os.path.join(M, "props", "gate_signal.glb"), (2.7, -14, 0))
+    for o in load(os.path.join(M, "props", "gate_key.glb"), (4.2, -1.5, 0.75)):
+        if o.parent is None:
+            o.scale = (2.2, 2.2, 2.2)
+    camera((-5.5, -11.5, 3.2), (0.8, 0, 1.0), 30)
+    render("gate")
+    camera((4.6, -3.6, 1.6), (2.4, 0, 0.9), 40)
+    render("gate_lock")
+
+
+if "gate" in SHOTS:
+    gate_scene()
 if "train" in SHOTS:
     train_scene(False)
 if "damaged" in SHOTS:

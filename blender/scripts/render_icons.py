@@ -1,6 +1,6 @@
 """Renders a 128x128 transparent icon for every item, tool and resource → assets/icons/<id>.png
 
-    blender --background --python blender/scripts/render_icons.py -- <repo_root>
+    blender --background --python blender/scripts/render_icons.py -- <repo_root> [only=key,wood]
 
 Tools / repair items come from the exported .glb models; resources without a model are built here
 with the same helpers and materials as build_assets.py.
@@ -20,7 +20,7 @@ PROPS = os.path.join(A.ROOT, "assets", "models", "props")
 
 FROM_GLB = {
     "hammer": "hammer.glb", "wrench": "wrench.glb", "nail_gun": "nail_gun.glb", "welder": "welder_torch.glb",
-    "wheel": "wheel.glb", "plank": "plank.glb", "rail": "rail.glb",
+    "wheel": "wheel.glb", "plank": "plank.glb", "rail": "rail.glb", "key": "gate_key.glb",
 }
 
 
@@ -119,6 +119,8 @@ def frame_and_render(objs, path):
 
 def main():
     items = list(FROM_GLB) + ["coal", "wood", "scrap", "gold", "nails", "medkit", "engine_oil", "grappler", "come_along", "panel"]
+    if A.ONLY is not None:
+        items = [i for i in items if i in A.ONLY]
     for item in items:
         A.clear_scene()
         bpy.ops.object.select_all(action="SELECT")

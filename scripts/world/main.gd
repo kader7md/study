@@ -1,17 +1,30 @@
+class_name Main
 extends Node3D
 ## Builds the Chapter 1 level: sky, track with 6 stations over hills, rivers, a mountain pass,
-## a lake and the coast; terrain, train (Blender models), pickups, sabotage, player and HUD.
+## a lake and the coast; a locked gate (with its key beside it) in every segment; terrain, train (Blender models),
+## pickups, sabotage, player and HUD. The RunDirector runs objectives, softlock guards and the ending.
+## Everything is built from SEED, so every peer builds the same world (deterministic node names:
+## Repair_<piece>, Gate_<seg>, Key_<seg>, Pickup_<n>, Station<i>).
 
 const SEED := 20261008
-const PICKUP_SPACING := 22.0
-const GOLD_ROCKS_PER_SEGMENT := 6
+const PICKUP_SPACING := 34.0
+const GOLD_ROCKS_PER_SEGMENT := 3
+## Supplies left beside every pre-placed gap (balance table in docs/GDD.md). Per broken piece:
+## WOOD_PER_PIECE wood in 2-3 piles, SCRAP_PER_PIECE scrap, NAILS_PER_PIECE nails in a crate.
+const WOOD_PER_PIECE := 4
+const SCRAP_PER_PIECE := 4
+const NAILS_PER_PIECE := 8
+const GAP_SUPPLY_RADIUS := 22.0
 
 var track: Track
 var train: Train
 var player: Player
 var hud: HUD
+var director: RunDirector
 var _env: Environment
 var _rng := RandomNumberGenerator.new()
+var _pickups: Node3D
+var _pickup_count := 0
 
 
 func _ready() -> void:
@@ -30,6 +43,11 @@ func _ready() -> void:
 	for i in track.piece_count:
 		if track.piece_center(i) < track.station_distances[start_station] and track.is_broken(i):
 			track.repair_piece(i)
+	# Gates behind the checkpoint (and any opened before) are open and have no key
+	for s in start_station:
+		if not s in Game.opened_gates:
+			Game.opened_gates.append(s)
+	track.spawn_gates(Game.opened_gates)
 
 	for i in track.station_distances.size():
 		var st := Station.new()
@@ -72,6 +90,11 @@ func _ready() -> void:
 	hud.player = player
 	add_child(hud)
 
+	director = RunDirector.new()
+	director.name = "RunDirector"
+	director.main = self
+	add_child(director)
+
 	Game.wind_changed.connect(_on_wind_changed)
 	if start_station == 0:
 		Game.show_banner("TRUST ISSUES\nShe was taken. Follow the tracker: 5 stations to go.\nShovel coal, push the lever, repair the rails.")
@@ -113,24 +136,78 @@ func _on_wind_changed(active: bool) -> void:
 	tween.parallel().tween_property(_env, "fog_light_color", Color(0.85, 0.92, 1.0) if active else Color(0.75, 0.82, 0.9), 2.0)
 
 
+# --- Pickups (balance: see the table in docs/GDD.md) -----------------------------------------
+
 func _spawn_pickups() -> void:
-	var pickups := Node3D.new()
-	pickups.name = "Pickups"
-	add_child(pickups)
-	var items := ["coal", "coal", "wood", "wood", "scrap"]
+	_pickups = Node3D.new()
+	_pickups.name = "Pickups"
+	add_child(_pickups)
+	# 1. Scattered along the whole line, a few metres beside the rails
+	var items := ["coal", "coal", "coal", "wood", "scrap"]
 	var d := Track.LEAD_IN + Track.STATION_LENGTH
 	while d < track.get_length() - 20.0:
 		var side := -1.0 if _rng.randf() < 0.5 else 1.0
 		var item: String = items[_rng.randi() % items.size()]
 		var amount := _rng.randi_range(2, 4) if item == "coal" else _rng.randi_range(1, 3)
 		var p := track.ground_point(d, side * _rng.randf_range(2.5, 7.0))
-		if p.y > Track.WATER_LEVEL + 0.5 and not track.is_bridge_at(d):
-			Pickup.create(pickups, item, amount, p)
+		if _good_spot(d, p):
+			add_pickup(item, amount, p)
 		d += PICKUP_SPACING * _rng.randf_range(0.6, 1.4)
+	# 2. A supply cache beside every pre-placed gap: wood, scrap and nails for that gap, plus coal;
+	#    a gold rock at every other gap
+	for g in track.initial_gaps.size():
+		var gap: Dictionary = track.initial_gaps[g]
+		var n := int(gap.count)
+		var center := track.piece_center(int(gap.first)) + (n - 1) * Track.PIECE_LENGTH * 0.5
+		var wood_piles: Array = [3, 2] if n == 1 else [3, 3, 3]
+		for w: int in wood_piles:
+			_cache(center, "wood", w)
+		_cache(center, "scrap", SCRAP_PER_PIECE * n)
+		_cache(center, "nails", NAILS_PER_PIECE * n)
+		_cache(center, "coal", _rng.randi_range(3, 4))
+		if g % 2 == 0:
+			_cache(center, "gold", 0)
+	# 3. Beside every gate: a coal pile and a gold rock (the crew stops here anyway)
+	for s in track.gate_count():
+		var gd := track.gate_distance(s) - 6.0
+		_cache(gd, "coal", 4)
+		_cache(gd, "gold", 0)
+	# 4. A few more gold rocks further from the track
 	for s in track.station_distances.size() - 1:
 		for g in GOLD_ROCKS_PER_SEGMENT:
 			var d2 := _rng.randf_range(track.station_distances[s] + 50.0, track.station_distances[s + 1] - 50.0)
 			var side := -1.0 if _rng.randf() < 0.5 else 1.0
 			var p := track.ground_point(d2, side * _rng.randf_range(6.0, 14.0))
 			if p.y > Track.WATER_LEVEL + 0.5:
-				Pickup.create_gold_rock(pickups, p)
+				add_pickup("gold", 0, p)
+
+
+## Adds a pickup named Pickup_<n> (n = spawn order, the same on every peer). item "gold" = a gold rock.
+func add_pickup(item: String, amount: int, pos: Vector3) -> Pickup:
+	var p: Pickup
+	if item == "gold":
+		p = Pickup.create_gold_rock(_pickups, pos)
+	else:
+		p = Pickup.create(_pickups, item, amount, pos)
+	p.name = "Pickup_%d" % _pickup_count
+	_pickup_count += 1
+	return p
+
+
+## A pickup on solid ground within GAP_SUPPLY_RADIUS of distance `center` (not on the gap itself).
+func _cache(center: float, item: String, amount: int) -> void:
+	for attempt in 16:
+		var along := _rng.randf_range(6.0, GAP_SUPPLY_RADIUS - 6.0) * (-1.0 if _rng.randf() < 0.6 else 1.0)
+		var side := -1.0 if _rng.randf() < 0.5 else 1.0
+		var u := side * _rng.randf_range(3.0, 6.0 if item != "gold" else 7.5)
+		var d := center + along
+		var p := track.ground_point(d, u)
+		if _good_spot(d, p):
+			add_pickup(item, amount, p)
+			return
+	# fallback: right beside the track, just before the gap
+	add_pickup(item, amount, track.ground_point(center - 8.0, 3.0))
+
+
+func _good_spot(d: float, p: Vector3) -> bool:
+	return p.y > Track.WATER_LEVEL + 0.5 and not track.is_bridge_at(d) and absf(p.y - track.point_at(d).y) < 2.5

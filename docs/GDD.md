@@ -63,7 +63,11 @@ on an old coal train (**Chapter 1**), then across the sea on a raft they build t
 ### Chapter 1: The Train Chase
 - Ride the train through **5 stations**. Each one is a **checkpoint**, and the game saves on arrival.
 - Between stations: keep the train running, gather resources, repair the track, survive sabotage.
-- Some routes are **locked** and need a key from a side quest (see 7).
+- Some routes are **locked** and need a key from a side quest (see 7). **v1 placeholder:** every segment has one locked
+  gate and its key lies right beside it (see "Locked gates" in 4) until the quest maps exist.
+- **Ending:** when the train stops at station 5 (the port), sabotage stops and a **"Chapter 1 complete"** card shows the
+  run stats (time from leaving the departure station, distance, track pieces rebuilt, panels refitted, wheels lost,
+  gates opened, gold found) with *Back to main menu* or *Keep exploring*.
 - The train has a **locked container**. The crew doesn't know what's inside until Chapter 2: a boat engine, gasoline and boat tools.
 
 ### Chapter 2: The Sea (the yacht chase)
@@ -95,6 +99,15 @@ Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations 
 - **Crafting table** on the train (see 6).
 - **Sacrifice altar** on the train, for reviving (see 8).
 
+### Locked gates (one per segment, placeholder for the quest maps)
+- In the second half of every segment a **heavy striped timber boom** is padlocked across the rails, always on solid
+  ground (never on a bridge or by water, never within 30 m of a gap or a station). A **red signal post** stands 120 m before it.
+- The train stops in front of it: gently below crash speed, or with **half the crash damage** if it comes in too fast.
+- Its **key** lies **4-10 m beside the track, within 8 m of the gate**: a big glowing iron key that bobs and spins, with a
+  warm light, a beam of light and a KEY label, so it is found within seconds. [E] picks it up; [E] on the padlock uses it:
+  the padlock drops, the boom swings up, the lamps turn green, and the train can go on.
+- Gates behind the last checkpoint stay open (their keys are gone). Later, each key comes from a quest map (see 7) instead.
+
 ### Hands-on repair (RV There Yet style: you do it with your hands, no "hold E")
 **Broken track: free building, together** (anywhere on the line)
 1. Carry **planks** from the cargo car and place them where you aim (they snap to the 4 sleeper positions of the gap).
@@ -105,7 +118,7 @@ Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations 
      and must be **joined to it with the NAIL GUN**, so the crew builds a platform out over the water.
      A plank with nothing under it and no neighbour **falls into the water** (the wood is lost).
 2. Carry **rails** onto the planks (a rail needs at least 3 of the 4 planks under it).
-3. **Bolt the fishplates** at both ends of each rail (hammer / nail gun).
+3. **Bolt the fishplates** at both ends of each rail (hammer / nail gun). The bolts come with the rail (no nails).
 
 **Build quality matters:** the rebuilt piece keeps the average tilt of its planks (plus sag for missing ones).
 - tilt **4-8°**: bumpy, the wheels shake loose (wheel wear)
@@ -119,7 +132,8 @@ crank together) until the train is back on the rails.
 a **cable** (30 m): walk too far and it stops you, go much further and it pulls out.
 
 **Wheels:** a fallen wheel is gone. Buy a new one at a station, carry it from the cargo car, **lift it into place** (animated),
-then **bolt it on with 3 hammer hits**.
+then **bolt it on with 3 hammer hits**. With fewer than 3 wheels (or a wrecked train) the train only **limps** at walking
+pace, so it can always reach a station.
 
 ### Train damage: two bars (100 % = 50 % body + 50 % mechanics)
 HUD top centre (train card): 🟩 **body bar**, then the mechanics as **6 yellow wheel squares** (a square empties as its
@@ -160,8 +174,26 @@ Bridges are wooden trestles. A broken bridge piece leaves a hole you can fall th
 | **Gold** | Mining **gold rocks** near the track | Shop currency, crafting blueprints. **Carried into Chapter 2** |
 
 ### Shops (at stations)
-Nail gun · nails · grappling hook (reach cliffs, cross gaps, like Peak) · medkit · train wheels · engine oil · repair hammer ·
-blueprint special items (tools, guns)
+Nail gun · nails · planks (wood) · scrap · coal · grappling hook (reach cliffs, cross gaps, like Peak) · medkit · train wheels ·
+engine oil · come-along · later: repair hammer and blueprint special items (tools, guns)
+
+### Balance (Chapter 1, v1; constants in `game.gd`, `track.gd`, `main.gd`, `train.gd`, `sabotage_manager.gd`)
+One broken piece on solid ground costs about **4 wood** (planks), **4 scrap** (2 rails) and **8 nails** (2 per plank).
+
+| What | Value | Why |
+|------|-------|-----|
+| Start inventory | 12 coal, 10 wood, 10 scrap, 15 gold, 30 nails, 1 spare wheel, 1 engine oil, 1 come-along | Covers a couple of meteor holes or panels on top of the gaps |
+| Pre-placed gaps | segment 1: **2**, segments 2-5: **3**, 1-2 pieces each, one per third of the segment | Never on a bridge (that needs the nail gun), never within 60 m before a gate |
+| Supplies beside every gap (within 22 m) | 2-3 wood piles (4 wood per piece + 1), 1 scrap pile (4 per piece), a nail crate (8 per piece), 3-4 coal; a gold rock at every other gap | A crew that never shops still has enough |
+| Beside every gate | 4 coal and a gold rock | The crew stops there anyway |
+| Along the line | a pile every ~34 m (60 % coal, 20 % wood, 20 % scrap), 3 extra gold rocks per segment 6-14 m out | Coal near the track is 4-8x the burn; the coal at the gaps and gate alone is ~1.5-2.5x (checked by TestRoute) |
+| Gold rock | 3 hits x 2 gold | Each segment has 30+ gold near the track: a wheel + oil (14) and more |
+| Shop | nails x10 = 4, wood x5 = 3, scrap x5 = 3, coal x5 = 2, wheel = 8, oil = 6, medkit = 7, come-along = 10, grappling hook = 12, nail gun = 15 | Wood and scrap are the softlock fallback |
+| Crash | (speed - 4 m/s) x 3.5 + 4 damage (a locked gate: half) | Full speed into a gap ≈ 39 of 100 |
+| Wheels | wear at 2.5 falls off; bumpy track (4-8° tilt) +0.4 per crossing; crash damage spreads over 2 wheels | Tighten with the wrench in time |
+| World sabotage (1-2 players) | every 100-160 s in segment 1, 80-140, 65-120, 55-105, 50-95 s by segment 5; never within 20 s of leaving a station; world meteors avoid bridges and gates | Calm start, busier towards the port |
+| Softlock guards | supply crate (6 wood, 10 nails, 4 scrap; + a loaned nail gun over water) when stopped at a gap without the materials or the gold to buy them; a coal crate when out of coal and gold; one emergency wheel per station when under 3 wheels and broke; a limping train can always reverse or crawl to a station | |
+| Pace | ~2.5 min of driving per segment; with 3-5 pieces to rebuild by hand, the gate and the stops: about 6-10 min per segment solo | |
 
 ### Cold and heat
 - Areas get cold. The furnace heats the cabin, and players near the heat are safe.
@@ -209,6 +241,7 @@ Friendly fire is **on**, which gives the impostor sneaky chances and players ple
 The side quests are **full separate maps, each like a small game of its own**.
 Instead of making one big horror game with many levels, **each quest map takes the feel of one famous game or genre**.
 The train stops, the crew enters the quest map, wins a **key** (opens locked routes) and/or a **blueprint**, and gets back to the train.
+**Until the quest maps exist**, each segment's key simply lies beside its locked gate (see "Locked gates" in 4).
 
 | Quest map | Inspired by | Gameplay | Reward |
 |-----------|-------------|----------|--------|

@@ -261,6 +261,7 @@ func _on_bolted() -> void:
 		var roll := build_roll()
 		var quality := "solid" if absf(roll) < Train.BUMP_ROLL else ("bumpy" if absf(roll) < Train.TIP_ROLL else "DANGEROUS (the train will tip over!)")
 		Game.say("Track rebuilt: tilt %.1f° (%s)" % [absf(roll), quality])
+		Game.add_stat("repairs")
 		track.repair_piece.call_deferred(index, roll)
 
 
@@ -323,8 +324,9 @@ func _process(_delta: float) -> void:
 	_ghost.visible = show
 
 
-## Debug/test helper: finishes the whole repair instantly (perfectly level).
+## Debug/test helper: finishes the whole repair instantly (perfectly level). Counts as a rebuilt piece.
 func finish_instantly() -> void:
+	Game.add_stat("repairs")
 	track.repair_piece(index, 0.0)
 
 

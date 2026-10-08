@@ -29,6 +29,11 @@ const MAX_WHEELS := 6
 const MIN_WHEELS_TO_MOVE := 3
 const WHEEL_BOLT_HITS := 3
 const CRASH_SPEED := 4.0
+## Crash damage = (speed - CRASH_SPEED) * CRASH_PER_MS + CRASH_BASE (a locked gate: half of it).
+const CRASH_PER_MS := 3.5
+const CRASH_BASE := 4.0
+## With fewer than MIN_WHEELS_TO_MOVE wheels (or a wrecked train) it still crawls at this speed.
+const LIMP_SPEED := 1.6
 
 ## Train health = 100: BODY (cover pieces) 50 + MECHANICS 50 (wheels 6 x 2.5, engine 20, chassis 15).
 const BODY_MAX := 50.0
@@ -125,8 +130,11 @@ func load_state(state: Dictionary) -> void:
 # --- Simulation -------------------------------------------------------------
 
 func max_speed_now() -> float:
-	if wheels < MIN_WHEELS_TO_MOVE or health <= 0.0 or tipped:
+	if tipped:
 		return 0.0
+	if wheels < MIN_WHEELS_TO_MOVE or health <= 0.0:
+		# softlock guard: a wrecked train can always limp on (or back) to a station at walking pace
+		return LIMP_SPEED
 	var s := MAX_SPEED
 	s *= float(wheels) / MAX_WHEELS                       # each lost wheel: -1/6 of the speed
 	s *= 1.0 - 0.5 * engine_damage / ENGINE_MAX           # a hurt engine has less power
@@ -189,15 +197,17 @@ func _physics_process(delta: float) -> void:
 		var gap := track.blocking_distance(distance, distance + step)
 		if gap >= 0.0:
 			new_front = gap - 0.01
-			_hit_gap()
+			_hit_gap(track.blocking_gate(distance, distance + step) >= 0 and track.locked_gate_ahead(gap, Track.GATE_STOP + 0.5) >= 0)
 	elif step < 0.0:
 		var gap := track.blocking_distance(rear_distance(), rear_distance() + step)
 		if gap >= 0.0:
 			new_front = gap + 0.01 + total_length
-			_hit_gap()
+			_hit_gap(track.blocking_gate(rear_distance(), rear_distance() + step) >= 0)
 	var limited := clampf(new_front, total_length + 1.0, track.get_length() - 1.0)
 	if limited != new_front:
 		speed = 0.0
+	if limited > distance:
+		Game.add_stat("distance", limited - distance)
 	distance = limited
 
 	_check_track_quality()
@@ -213,11 +223,24 @@ func _physics_process(delta: float) -> void:
 			_wheel_nodes[i].rotation.x -= speed * delta / 0.45
 
 
-func _hit_gap() -> void:
+static func crash_damage(v: float) -> float:
+	return (v - CRASH_SPEED) * CRASH_PER_MS + CRASH_BASE if v > CRASH_SPEED else 0.0
+
+
+func _hit_gap(gate := false) -> void:
 	var v := absf(speed)
 	speed = 0.0
+	if gate:
+		# a locked gate: a soft stop below CRASH_SPEED, half the crash damage above it
+		if v > CRASH_SPEED:
+			take_damage(crash_damage(v) * 0.5)
+			Game.say("BANG! The train hit the locked gate! Find the key nearby")
+		elif _block_msg_cooldown <= 0.0 and v > 0.05:
+			Game.say("Train stopped at a LOCKED GATE. Find the key: it glows beside the track")
+		_block_msg_cooldown = 3.0
+		return
 	if v > CRASH_SPEED:
-		take_damage((v - CRASH_SPEED) * 6.0 + 5.0)
+		take_damage(crash_damage(v))
 		Game.say("CRASH! The train hit a broken rail!")
 		if track.is_bridge_at(distance + 2.0) or track.is_bridge_at(rear_distance() - 2.0):
 			engine_damage = minf(engine_damage + 6.0 + v, ENGINE_MAX)
@@ -324,6 +347,8 @@ func crank() -> bool:
 func _update_station() -> void:
 	var s := track.station_at(center_distance())
 	if s == -1:
+		if current_station != -1:
+			Game.on_train_left_station(current_station)
 		current_station = -1
 	elif is_stopped() and current_station != s:
 		current_station = s
@@ -436,6 +461,7 @@ func _detach_wheel(i: int, announce: bool) -> void:
 	_wheel_nodes[i].visible = false
 	if announce:
 		_drop_wheel(i)
+		Game.add_stat("wheels_lost")
 		wheel_lost.emit(wheels)
 		Game.say("A wheel came off! (%d/%d, speed -%d%%) New wheels are sold at stations." % [wheels, MAX_WHEELS, int(100.0 / MAX_WHEELS)])
 
@@ -526,6 +552,7 @@ func _sync_parts(fly := true) -> void:
 ## A piece was put back and nailed / welded on.
 func on_part_refitted(part: BodyPart) -> void:
 	body_health = minf(body_health + part.value(), BODY_MAX)
+	Game.add_stat("panels")
 	Game.say("Panel fixed (body %d%%)" % int(body_health / BODY_MAX * 100.0))
 
 

@@ -4,9 +4,12 @@ extends Path3D
 ## hills, rivers, a mountain pass, a lake and the coast. Each segment between stations has a theme.
 ## The rails are split into pieces of PIECE_LENGTH metres. Any piece can be broken (pre-placed gaps,
 ## meteors) and must be rebuilt by hand (see RailRepair) before the train can pass.
+## Each segment also has one LOCKED GATE (TrackGate) across the rails in its second half, with its KEY
+## (GateKey) lying beside the track (a placeholder for the quest-map mini-games that come later).
 
 signal piece_broken(index: int)
 signal piece_repaired(index: int)
+signal gate_opened(segment: int)
 
 const PIECE_LENGTH := 4.0
 ## Distance between stations. The full game will be longer still (Chapter 1 ≈ 10 h).
@@ -23,6 +26,17 @@ const SLEEPER_Y := -0.16
 const WATER_LEVEL := -4.0
 ## A piece is a bridge when the natural ground under it is this far below the rails.
 const BRIDGE_DEPTH := 2.5
+
+## Locked gates: the train's front stops GATE_STOP metres before the boom. A signal post stands
+## GATE_SIGNAL metres before it. No gap within GATE_GAP_BEFORE before or GATE_GAP_AFTER after a gate.
+const GATE_STOP := 3.0
+const GATE_SIGNAL := 120.0
+const GATE_GAP_BEFORE := 60.0
+const GATE_GAP_AFTER := 30.0
+## Pre-placed gaps per segment (balance table in docs/GDD.md), 1-2 pieces each.
+const GAPS_PER_SEGMENT := [2, 3, 3, 3, 3]
+## Where each segment's gate would ideally stand (fraction of the segment).
+const GATE_FRACTIONS := [0.64, 0.72, 0.6, 0.66, 0.74]
 
 ## Segment themes (segment i runs from station i to station i+1).
 ## heights: track height keypoints as (fraction of segment, metres). Station heights are in STATION_HEIGHTS.
@@ -49,6 +63,13 @@ var _rails: MultiMesh
 var _sleepers: MultiMesh
 var _noise := FastNoiseLite.new()
 var _height_keys: Array[Vector2] = []  # (distance, height) keypoints of the track profile
+## Boom position of each segment's locked gate (distance along the track).
+var gate_distances: Array[float] = []
+## Where each gate's key lies: x = distance along the track, y = sideways offset (+ = right).
+var key_spots: Array[Vector2] = []
+var _gate_locked: Array[bool] = []
+## Pre-placed gaps: [{"segment", "first" (piece index), "count"}].
+var initial_gaps: Array[Dictionary] = []
 
 
 func build(rng: RandomNumberGenerator) -> void:
@@ -57,6 +78,7 @@ func build(rng: RandomNumberGenerator) -> void:
 	_noise.fractal_octaves = 3
 	_build_curve(rng)
 	_build_bridge_flags()
+	_choose_gate_spots()
 	_build_visuals()
 
 
@@ -297,20 +319,49 @@ func is_protected(index: int) -> bool:
 	return station_at(d) != -1 or d < LEAD_IN * 0.5 or d > get_length() - 10.0
 
 
-## Moving from d_from to d_to: returns the edge of the first broken piece in the way, or -1.0 if clear.
-## Forward: the start of the broken piece. Backward: its end.
+## Moving from d_from to d_to: returns the edge of the first broken piece or locked gate in the way,
+## or -1.0 if clear. Forward: the start of the broken piece (a gate: GATE_STOP before its boom). Backward: its end.
 func blocking_distance(d_from: float, d_to: float) -> float:
-	if _broken.is_empty():
-		return -1.0
-	if d_to >= d_from:
-		for i in range(piece_at(d_from), piece_at(d_to) + 1):
-			if _broken.has(i):
-				return maxf(i * PIECE_LENGTH, d_from)
-	else:
-		for i in range(piece_at(d_from), piece_at(d_to) - 1, -1):
-			if _broken.has(i):
-				return minf((i + 1) * PIECE_LENGTH, d_from)
-	return -1.0
+	var block := -1.0
+	if not _broken.is_empty():
+		if d_to >= d_from:
+			for i in range(piece_at(d_from), piece_at(d_to) + 1):
+				if _broken.has(i):
+					block = maxf(i * PIECE_LENGTH, d_from)
+					break
+		else:
+			for i in range(piece_at(d_from), piece_at(d_to) - 1, -1):
+				if _broken.has(i):
+					block = minf((i + 1) * PIECE_LENGTH, d_from)
+					break
+	var seg := blocking_gate(d_from, d_to)
+	if seg >= 0:
+		var g := _gate_block_point(seg, d_to >= d_from, d_from)
+		if block < 0.0 or (d_to >= d_from and g < block) or (d_to < d_from and g > block):
+			block = g
+	return block
+
+
+## The locked gate (segment) in the way when moving from d_from to d_to, or -1.
+func blocking_gate(d_from: float, d_to: float) -> int:
+	for s in gate_distances.size():
+		if not _gate_locked[s]:
+			continue
+		if d_to >= d_from:
+			var stop := gate_distances[s] - GATE_STOP
+			if stop >= d_from - 0.05 and stop <= d_to:
+				return s
+		else:
+			var back := gate_distances[s] + 1.0
+			if back <= d_from + 0.05 and back >= d_to:
+				return s
+	return -1
+
+
+func _gate_block_point(seg: int, forward: bool, d_from: float) -> float:
+	if forward:
+		return maxf(gate_distances[seg] - GATE_STOP, d_from)
+	return minf(gate_distances[seg] + 1.0, d_from)
 
 
 ## Tilt (degrees, signed) of a rebuilt piece; 0 for original track.
@@ -326,6 +377,7 @@ func break_piece(index: int, cratered := false) -> bool:
 	if _deck_shapes.has(index):
 		_deck_shapes[index].set_deferred("disabled", true)
 	var repair := RailRepair.new()
+	repair.name = "Repair_%d" % index
 	repair.setup(self, index, cratered)
 	add_child(repair)
 	repair.global_transform = transform_at(piece_center(index))
@@ -364,15 +416,184 @@ func break_around(world_pos: Vector3, radius: float, skip_from := -1.0, skip_to 
 
 
 ## Pre-placed gaps between stations: the crew has to stop and rebuild the track.
-func place_initial_gaps(rng: RandomNumberGenerator, gaps_per_segment := 3) -> void:
+## GAPS_PER_SEGMENT gaps of 1-2 pieces, spread over the segment (one per zone), always on solid ground
+## (never on a bridge: those need the nail gun) and never just before or after the locked gate.
+func place_initial_gaps(rng: RandomNumberGenerator, gaps_per_segment := -1) -> void:
+	initial_gaps.clear()
+	var grng := RandomNumberGenerator.new()
+	grng.seed = rng.randi()
 	for s in station_distances.size() - 1:
+		var count: int = gaps_per_segment if gaps_per_segment >= 0 else int(GAPS_PER_SEGMENT[mini(s, GAPS_PER_SEGMENT.size() - 1)])
 		var from := station_distances[s] + STATION_LENGTH
 		var to := station_distances[s + 1] - STATION_LENGTH
-		for g in gaps_per_segment:
-			var start := piece_at(rng.randf_range(from, to))
-			var rough := rng.randf() < 0.5
-			for k in rng.randi_range(1, 2):
-				break_piece(start + k, rough)
+		for g in count:
+			var zone_from := lerpf(from, to, float(g) / count)
+			var zone_to := lerpf(from, to, float(g + 1) / count)
+			for attempt in 120:
+				# after 60 failed tries in its zone, a gap may go anywhere in the segment
+				var lo := zone_from if attempt < 60 else from
+				var hi := zone_to if attempt < 60 else to
+				var start := piece_at(grng.randf_range(lo, hi))
+				var n := grng.randi_range(1, 2)
+				var rough := grng.randf() < 0.5
+				if not _gap_spot_ok(start, n):
+					continue
+				for k in n:
+					break_piece(start + k, rough)
+				initial_gaps.append({"segment": s, "first": start, "count": n})
+				break
+
+
+func _gap_spot_ok(start: int, n: int) -> bool:
+	for i in range(start - 2, start + n + 2):
+		if i < 0 or i >= piece_count or is_bridge(i) or is_protected(i) or _broken.has(i):
+			return false
+	var d0 := start * PIECE_LENGTH
+	var d1 := (start + n) * PIECE_LENGTH
+	for g in gate_distances:
+		if d1 > g - GATE_GAP_BEFORE and d0 < g + GATE_GAP_AFTER:
+			return false
+	for gap in initial_gaps:
+		if absf(float(gap.first) * PIECE_LENGTH - d0) < 80.0:
+			return false
+	return true
+
+
+## Number of pre-placed broken pieces in segment `seg`.
+func gap_pieces_in_segment(seg: int) -> int:
+	var n := 0
+	for gap in initial_gaps:
+		if int(gap.segment) == seg:
+			n += int(gap.count)
+	return n
+
+
+# --- Locked gates -------------------------------------------------------------------
+
+func gate_count() -> int:
+	return gate_distances.size()
+
+
+func gate_distance(seg: int) -> float:
+	return gate_distances[seg]
+
+
+func is_gate_locked(seg: int) -> bool:
+	return seg >= 0 and seg < _gate_locked.size() and _gate_locked[seg]
+
+
+## Host: unlocks a gate (the key was used on it). Emits gate_opened and counts the stat.
+func open_gate(seg: int) -> void:
+	if not is_gate_locked(seg):
+		return
+	_gate_locked[seg] = false
+	var key := get_node_or_null("Key_%d" % seg)
+	if key:
+		key.queue_free()  # no orphan keys once the gate is open
+	Game.on_gate_opened(seg)
+	gate_opened.emit(seg)
+
+
+## The next locked gate whose boom is ahead of distance d within `within` metres, or -1.
+func locked_gate_ahead(d: float, within: float) -> int:
+	for s in gate_distances.size():
+		if _gate_locked[s] and gate_distances[s] >= d - 1.0 and gate_distances[s] - d <= within:
+			return s
+	return -1
+
+
+## Creates the gate nodes (Gate_<seg>, each with its signal post) and the keys (Key_<seg>) of locked gates.
+## Gates of segments in `open_segments` (behind the checkpoint, or opened before) start open and have no key.
+func spawn_gates(open_segments: Array) -> void:
+	for s in gate_distances.size():
+		_gate_locked[s] = not (s in open_segments)
+		var gate := TrackGate.new()
+		gate.setup(self, s, _gate_locked[s])
+		add_child(gate)
+		if _gate_locked[s]:
+			GateKey.create(self, s, key_position(s))
+
+
+## World position of segment `seg`'s key, on the ground beside the track.
+func key_position(seg: int) -> Vector3:
+	return ground_point(key_spots[seg].x, key_spots[seg].y)
+
+
+## Deterministic gate spot per segment: second half, solid ground (no bridge or water nearby), clear of the
+## station, with a dry, walkable key spot 4-10 m beside the track. Gaps are placed around it afterwards.
+func _choose_gate_spots() -> void:
+	gate_distances.clear()
+	key_spots.clear()
+	_gate_locked.clear()
+	for s in station_distances.size() - 1:
+		var start := station_distances[s]
+		var lo := start + SEGMENT_LENGTH * 0.5
+		var hi := station_distances[s + 1] - STATION_LENGTH * 0.5 - 40.0
+		var best := -1.0
+		var key := Vector2.ZERO
+		# preferred spot 60-75 % into the segment (varies per segment), then search outwards in 6 m steps
+		var pref := clampf(start + SEGMENT_LENGTH * float(GATE_FRACTIONS[s % GATE_FRACTIONS.size()]), lo, hi)
+		for k in 200:
+			var d := pref + 6.0 * ceilf(k / 2.0) * (1.0 if k % 2 == 0 else -1.0)
+			if d < lo or d > hi or not _gate_ground_ok(d):
+				continue
+			var spot := _key_spot_for(d, s)
+			if spot != Vector2.ZERO:
+				best = d
+				key = spot
+				break
+		if best < 0.0:
+			best = pref
+			key = Vector2(pref, 6.0)
+			push_warning("No ideal gate spot in segment %d" % s)
+		gate_distances.append(best)
+		key_spots.append(key)
+		_gate_locked.append(true)
+
+
+func _gate_ground_ok(d: float) -> bool:
+	for i in range(piece_at(d - 45.0), piece_at(d + 25.0) + 1):
+		if is_bridge(i):
+			return false
+	for k in range(-8, 5):
+		var dd := d + k * 5.0
+		var nat := natural_height(dd, 0.0)
+		if nat < point_at(dd).y - 1.6 or nat < WATER_LEVEL + 1.5:
+			return false
+	return true
+
+
+## A dry, fairly flat key spot 4-10 m beside the track within 8 m of the gate at d (alternating sides per
+## segment), or Vector2.ZERO.
+func _key_spot_for(d: float, seg: int) -> Vector2:
+	var first_side := 1.0 if seg % 2 == 0 else -1.0
+	var alongs := [-4.0, 3.0, -1.0, 6.0, -7.0]
+	var sides := [6.0, 7.5, 5.0, 8.5, 4.5]
+	# rotate the preferences per segment so every key lies a little differently
+	for k in seg:
+		alongs.push_back(alongs.pop_front())
+		sides.push_back(sides.pop_front())
+	for side: float in [first_side, -first_side]:
+		for along: float in alongs:
+			for u: float in sides:
+				var dk := d + along
+				var uk := side * u
+				var ty := point_at(dk).y
+				var h := ground_height(dk, uk)
+				var slope := absf(ground_height(dk, uk + 1.0) - ground_height(dk, uk - 1.0)) * 0.5
+				if h > WATER_LEVEL + 1.0 and h > ty - 2.0 and h < ty + 1.5 and slope < 0.5:
+					return Vector2(dk, uk)
+	return Vector2.ZERO
+
+
+## Spots where no tree should grow (gates, signal posts and keys stay visible).
+func reserved_spots() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for s in gate_distances.size():
+		out.append(point_at(gate_distances[s]))
+		out.append(key_position(s))
+		out.append(point_at(gate_distances[s] - GATE_SIGNAL))
+	return out
 
 
 # --- Visuals ------------------------------------------------------------------

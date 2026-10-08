@@ -185,11 +185,14 @@ func _build_trees(rng: RandomNumberGenerator) -> void:
 		var empty: Array[Transform3D] = []
 		lists[id] = empty
 	var count := int(track.get_length() / 2.5)
+	var reserved := track.reserved_spots()  # gates, signal posts and keys stay in the open
 	for i in count:
 		var d := rng.randf_range(0.0, track.get_length())
 		var u := (1.0 if rng.randf() < 0.5 else -1.0) * rng.randf_range(9.0, 165.0)
 		var p := track.ground_point(d, u)
 		if p.y < Track.WATER_LEVEL + 1.0 or (track.station_at(d) != -1 and absf(u) < 20.0):
+			continue
+		if absf(u) < 20.0 and reserved.any(func(r: Vector3): return Vector2(r.x - p.x, r.z - p.z).length() < 7.0):
 			continue
 		var theme: String = track.theme_at(d).name
 		var r := rng.randf()

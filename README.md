@@ -38,14 +38,25 @@ What's in it:
   forward so you can see ahead and walk to the front of the engine
 - **Shop** at every station, **checkpoints**, back to the last checkpoint if everyone dies
 - **Sabotage**: meteor (aimed), zombies, eagles (steal cargo), freezing wind
-- First-person player with cartoony hands, a tool hotbar, and carrying items; can ride the moving train
+- First-person player with cartoony hands, a tool hotbar, and carrying items; can ride the moving train.
+  Every tool has its own first-person animation (hammer overhead swing with a camera kick, wrench twist with a ratchet
+  tick, nail gun recoil and puff, welder steady hand with sparks, two-handed come-along pump) and every carried item
+  its own pose (plank on the shoulder, rail low with a strained bob, wheel in front, panel flat at chest height)
+- **A full run, station 0 to station 5**: each segment has pre-placed gaps (2 in the first, then 3) and one **locked gate**
+  across the rails (striped boom, padlock, red lamp, a red signal post 120 m before it). Its **glowing key lies right
+  beside the track**: pick it up [E], use it on the padlock [E], the boom swings up (placeholder until the quest maps).
+  An objective line on the HUD says what to do next ("Gate locked: find the key", "Rebuild the broken track ahead"...)
+- **Chapter 1 complete** screen at the port with the run stats (time, distance, track rebuilt, panels, wheels lost,
+  gates, gold), then *Back to main menu* (`Game.return_to_menu()`, reloads Main while there is no menu scene) or *Keep exploring*
+- **Balance**: supplies beside every gap and gate, softlock guards (supply crate, coal crate, emergency wheel, a limping
+  train can always reach a station). See the balance table in the GDD
 
 ### Controls
 | Key | Action |
 |-----|--------|
 | WASD / Shift / Space | Move / sprint / jump |
 | Mouse · LMB | Look · use tool (hammer hit, nail gun shot, hold to weld) |
-| 1-5 (or mouse wheel) | Hammer / wrench / nail gun / welder (only while holding a station torch) / come-along |
+| 1–5 (or mouse wheel) | Hammer / wrench / nail gun (once bought) / welder (only while holding a station torch) / come-along |
 | E · Q · G | Use / place carried item · alternative use · put the carried item back |
 | Esc | Pause menu (closes the shop or Settings first) |
 | V | Push to talk (voice chat, with multiplayer) |
@@ -57,9 +68,11 @@ What's in it:
 
 ### Rebuilding the models
 ```bash
-blender --background --python blender/scripts/build_assets.py -- .      # train, tools, repair items
+blender --background --python blender/scripts/build_assets.py -- .      # train, tools, repair items, gate, key
+blender --background --python blender/scripts/build_assets.py -- . only=gate   # just the locked gate, signal post, key
 blender --background --python blender/scripts/build_nature.py -- .      # trees, rocks, cliffs, bushes
-blender --background --python blender/scripts/render_showcase.py -- . renders   # preview pictures
+blender --background --python blender/scripts/render_icons.py -- . [only=key]   # item icons (assets/icons)
+blender --background --python blender/scripts/render_showcase.py -- . renders [shots=gate]   # preview pictures
 ```
 
 All keys can be changed in Settings > Controls.
@@ -69,9 +82,11 @@ All keys can be changed in Settings > Controls.
 godot --headless --path . --import                     # once after pulling (registers classes and imports assets)
 godot --headless --path . res://tests/TestTrain.tscn   # automated playthrough of the core loop, exit code 0 = pass
 godot --headless --path . res://tests/TestMenu.tscn    # settings save/load/rebind, main menu, pause menu, scene flow
-# Screenshots need a display (or xvfb-run); modes: repair, train, menu, hud
+godot --headless --path . res://tests/TestRoute.tscn   # the whole Chapter 1 route: gaps, 5 gates and keys, every
+                                                       # checkpoint, the end screen and a station 3 restart (~1-2 min)
+# Screenshots need a display (or xvfb-run); modes: repair, train, menu, hud, gate, end, tools
 xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/Screenshot.tscn -- <out_dir> menu
 ```
 
 ### Not built yet (see GDD milestones)
-Multiplayer (M1, in progress) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **locked routes + quest maps (next)** · Chapter 2 sea
+Multiplayer (M1, in progress) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **quest maps (next; the keys lie beside the gates until then)** · Chapter 2 sea
