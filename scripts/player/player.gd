@@ -1,8 +1,8 @@
 class_name Player
 extends CharacterBody3D
-## First-person player (big cartoony hands, RV There Yet style):
+## First-person player (big cartoony hands; the hands, tools and carry poses live in Viewmodel):
 ## walk, sprint, jump, ride the train, use things ([E]/[Q], hold [E]),
-## tools on keys 1-3: hammer (nails, bolts, wheels, fight), nail gun (if bought), welder (only while holding the
+## tools on keys 1-5: hammer (nails, bolts, wheels, fight), nail gun (if bought), welder (only while holding the
 ## torch taken from a STATION welder machine: hold LMB, the cable has a length limit).
 ## Carry repair items (plank, rail, wheel) in both hands; [G] puts them back.
 ## Debug impostor (F2): [Tab] opens the sabotage menu, then keys 1-4; meteor is aimed (LMB drop, RMB cancel).
@@ -39,14 +39,9 @@ var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _tool_cd := 0.0
 var _aim_marker: MeshInstance3D
 var _aim_point := Vector3.INF
-var _right: Node3D          # right arm pivot (holds the tool)
-var _left: Node3D           # left arm pivot (shows when carrying)
-var _tool_models := {}
-var _carry_model: Node3D
-var _sparks: CPUParticles3D
-var _weld_light: OmniLight3D
+## First-person hands, tools, tool animations and carry poses (scripts/player/viewmodel.gd).
+var viewmodel: Viewmodel
 var _cable: WelderCable
-var _right_rest := Vector3(0.36, -0.36, -0.62)
 ## Riding the train: the car we stand on and its transform last frame (we move with it exactly).
 var _ride_car: Node3D
 var _ride_prev: Transform3D
@@ -89,7 +84,10 @@ func _ready() -> void:
 	_ray.add_exception(self)
 	camera.add_child(_ray)
 
-	_build_hands()
+	viewmodel = Viewmodel.new()
+	viewmodel.name = "Viewmodel"
+	camera.add_child(viewmodel)
+	viewmodel.setup(self, camera)
 
 	_aim_marker = Build.cylinder(self, Meteor.RADIUS, 0.1, Vector3.ZERO, Color(1, 0, 0, 0.4))
 	_aim_marker.top_level = true
@@ -106,72 +104,6 @@ func _ready() -> void:
 
 
 # --- Hands, tools, carrying --------------------------------------------------------
-
-func _build_hands() -> void:
-	_right = Node3D.new()
-	_right.position = _right_rest
-	camera.add_child(_right)
-	_arm(_right)
-	_left = Node3D.new()
-	_left.position = Vector3(-0.36, -0.36, -0.62)
-	camera.add_child(_left)
-	_arm(_left)
-	_left.visible = false
-
-	var hammer := Props.instance("hammer")
-	hammer.rotation = Vector3(-0.35, 0.25, 0.2)
-	hammer.position = Vector3(0, 0.02, -0.03)
-	hammer.scale = Vector3.ONE * 0.65
-	var welder := Props.instance("welder")
-	welder.position = Vector3(0, 0.02, -0.06)
-	welder.scale = Vector3.ONE * 0.8
-	var gun := Props.instance("nail_gun")
-	gun.position = Vector3(0, 0.0, -0.04)
-	var wrench := Props.instance("wrench")
-	wrench.rotation = Vector3(-0.3, 0.2, 0.15)
-	wrench.scale = Vector3.ONE * 0.8
-	var winch := Props.instance("come_along")
-	winch.rotation = Vector3(-0.2, 0.3, 0.0)
-	for pair in [["hammer", hammer], ["wrench", wrench], ["welder", welder], ["nail_gun", gun], ["come_along", winch]]:
-		_right.add_child(pair[1])
-		_tool_models[pair[0]] = pair[1]
-
-	_sparks = CPUParticles3D.new()
-	_sparks.emitting = false
-	_sparks.amount = 40
-	_sparks.lifetime = 0.35
-	_sparks.direction = Vector3(0, 1, 0)
-	_sparks.spread = 70.0
-	_sparks.initial_velocity_min = 1.5
-	_sparks.initial_velocity_max = 3.5
-	_sparks.gravity = Vector3(0, -9.8, 0)
-	_sparks.scale_amount_min = 0.02
-	_sparks.scale_amount_max = 0.04
-	var spark_mesh := SphereMesh.new()
-	spark_mesh.radius = 0.5
-	spark_mesh.height = 1.0
-	var spark_mat := StandardMaterial3D.new()
-	spark_mat.albedo_color = Color(1.0, 0.75, 0.3)
-	spark_mat.emission_enabled = true
-	spark_mat.emission = Color(1.0, 0.6, 0.2)
-	spark_mat.emission_energy_multiplier = 4.0
-	spark_mesh.material = spark_mat
-	_sparks.mesh = spark_mesh
-	_sparks.position = Vector3(0, 0.05, -0.42)
-	welder.add_child(_sparks)
-	_weld_light = OmniLight3D.new()
-	_weld_light.light_color = Color(0.6, 0.8, 1.0)
-	_weld_light.omni_range = 4.0
-	_weld_light.light_energy = 0.0
-	_weld_light.position = Vector3(0, 0.05, -0.42)
-	welder.add_child(_weld_light)
-
-
-func _arm(pivot: Node3D) -> void:
-	Build.box(pivot, Vector3(0.11, 0.11, 0.4), Vector3(0, -0.04, 0.22), SKIN)
-	Build.sphere(pivot, 0.07, Vector3(0, 0, 0), SKIN)  # chunky hand
-	Build.box(pivot, Vector3(0.13, 0.13, 0.12), Vector3(0, -0.04, 0.42), Color(0.85, 0.55, 0.3))  # sleeve
-
 
 func available_tools() -> Array[String]:
 	var list: Array[String] = ["hammer", "wrench"]
@@ -202,8 +134,7 @@ func select_tool(tool: String) -> void:
 			Game.say("Welding torches are only at stations: take one from the station welder")
 		return
 	current_tool = tool
-	for id: String in _tool_models:
-		_tool_models[id].visible = id == tool and carried_item == ""
+	viewmodel.select_tool(tool)
 	if tool != "welder":
 		_unplug(false)
 
@@ -211,38 +142,14 @@ func select_tool(tool: String) -> void:
 func carry(item: String) -> void:
 	carried_item = item
 	_unplug(false)
-	if _carry_model:
-		_carry_model.queue_free()
-	_carry_model = Props.instance(item)
-	match item:
-		"plank":
-			_carry_model.position = Vector3(0, -0.38, -0.85)
-			_carry_model.scale = Vector3.ONE * 0.55
-		"rail":
-			_carry_model.position = Vector3(0.05, -0.4, -1.1)
-			_carry_model.rotation = Vector3(0, 0.15, 0)
-			_carry_model.scale = Vector3.ONE * 0.45
-		"panel":
-			_carry_model.position = Vector3(0, -0.3, -0.85)
-			_carry_model.scale = Vector3.ONE * 0.6
-		"wheel":
-			_carry_model.position = Vector3(0, -0.35, -0.8)
-			_carry_model.rotation = Vector3(0, PI * 0.5, 0)
-			_carry_model.scale = Vector3.ONE * 0.7
-	camera.add_child(_carry_model)
-	_left.visible = true
-	_right.position = Vector3(0.3, -0.35, -0.6)
-	_left.position = Vector3(-0.3, -0.35, -0.6)
+	viewmodel.carry(item)
 	select_tool(current_tool)
 
 
+## The carried item was placed (or put back): the hands lower it out of view.
 func consume_carried() -> void:
 	carried_item = ""
-	if _carry_model:
-		_carry_model.queue_free()
-		_carry_model = null
-	_left.visible = false
-	_right.position = _right_rest
+	viewmodel.drop_carry()
 	select_tool(current_tool)
 
 
@@ -343,43 +250,33 @@ func use_tool() -> void:
 	var hit := _ray.get_collider() if _ray.is_colliding() else null
 	if current_tool == "hammer":
 		_tool_cd = 0.45
-		var tween := create_tween()
-		tween.tween_property(_right, "rotation:x", -1.1, 0.08).set_ease(Tween.EASE_IN)
-		tween.tween_property(_right, "rotation:x", 0.0, 0.2).set_ease(Tween.EASE_OUT)
+		viewmodel.play("hammer")
 		if hit is Interactable and hit.on_tool_hit("hammer", self):
 			return
 		if hit and hit.has_method("take_hit"):
 			hit.take_hit(HAMMER_DAMAGE)
 	elif current_tool == "wrench":
-		_tool_cd = 0.35
-		var tween := create_tween()
-		tween.tween_property(_right, "rotation:z", -0.9, 0.12)
-		tween.tween_property(_right, "rotation:z", 0.0, 0.18)
+		_tool_cd = 0.5
+		viewmodel.play("wrench")
 		if hit is Interactable and hit.on_tool_hit("wrench", self):
 			return
 		if hit and hit.has_method("take_hit"):
 			hit.take_hit(HAMMER_DAMAGE * 0.75)
 	elif current_tool == "come_along":
-		_tool_cd = 0.3
+		_tool_cd = 0.45
+		viewmodel.play("come_along")
 		var train := Game.train
 		if hit is HookSpot:
 			train.attach_hook(hit)
 		elif hit is AnchorSpot:
 			train.attach_anchor(hit)
 		elif train and train.tipped and is_instance_valid(train.hook) and global_position.distance_to(train.hook.global_position) < 8.0:
-			if train.crank():
-				# pump the ratchet handle
-				var tween := create_tween()
-				tween.tween_property(_right, "rotation:x", 0.9, 0.12)
-				tween.tween_property(_right, "rotation:x", -0.2, 0.15)
-				tween.tween_property(_right, "rotation:x", 0.0, 0.05)
+			train.crank()
 		elif train and train.tipped:
 			Game.say("Stand near the come-along on the train to crank it")
 	elif current_tool == "nail_gun":
 		_tool_cd = 0.25
-		var tween := create_tween()
-		tween.tween_property(_right, "position:z", _right.position.z + 0.08, 0.04)
-		tween.tween_property(_right, "position:z", _right.position.z, 0.1)
+		viewmodel.play("nail_gun")
 		if hit is Interactable and hit.on_tool_hit("nail_gun", self):
 			return
 		if hit and hit.has_method("take_hit"):
@@ -492,20 +389,13 @@ func _update_welder(delta: float) -> void:
 		global_position = Vector3(back.x, global_position.y, back.z)
 	cable_tension = flat.length() / limit
 	_cable.visible = true
-	_cable.update(plug, _sparks.global_position, limit)
+	_cable.update(plug, viewmodel.muzzle_position(), limit)
 
 	if Input.is_action_pressed("attack") and not Game.ui_open:
 		var hit := _ray.get_collider() if _ray.is_colliding() else null
 		if hit is Interactable:
 			welding = hit.on_weld(delta, self, welder_source)
 	_set_weld_fx(welding)
-	if welding:
-		var t := Time.get_ticks_msec() * 0.02
-		_right.position = _right_rest + Vector3(cos(t) * 0.015, sin(t * 1.3) * 0.015, 0)
-		_right.rotation.z = sin(t * 0.7) * 0.08
-	else:
-		_right.position = _right_rest
-		_right.rotation.z = 0.0
 
 
 ## Where the player is looking (within reach), or Vector3.INF.
@@ -532,9 +422,8 @@ func _unplug(announce: bool) -> void:
 
 
 func _set_weld_fx(on: bool) -> void:
-	if _sparks:
-		_sparks.emitting = on
-		_weld_light.light_energy = randf_range(1.5, 3.0) if on else 0.0
+	if viewmodel:
+		viewmodel.set_welding(on)
 
 
 func _update_aim() -> void:
