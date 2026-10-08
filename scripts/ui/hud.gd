@@ -5,9 +5,10 @@ extends CanvasLayer
 ## bottom left player health/frost, centre crosshair + prompt + hold bar, right side messages,
 ## bottom right the impostor's sabotage panel, plus the station shop window.
 
-const HELP := """[F1] help   WASD move · Shift sprint · Space jump · E use (hold for repairs) · Q alt · LMB shovel
-Lever in the cab: E forward / Q back · Shovel coal into the furnace · Repair broken rails (wood + nails)
-F2 play as impostor (keys 1-4 sabotage) · F3 world sabotage on/off · F5 last checkpoint · F6 new game"""
+const HELP := """[F1] help   WASD move · Shift sprint · Space jump · E use / place · Q alt · G put item back
+Tools: 1 hammer · 2 welder (hold LMB, plug in near a welder machine) · 3 nail gun · LMB use tool
+Broken track: take planks → place → nail → take rails → place → weld · Lever: E forward / Q back
+F2 play as impostor ([Tab] sabotage menu) · F3 world sabotage on/off · F5 last checkpoint · F6 new game"""
 
 var player: Player
 
@@ -23,6 +24,7 @@ var _hold_bar: ProgressBar
 var _messages: VBoxContainer
 var _banner: Label
 var _sabotage_label: Label
+var _hotbar: Label
 var _help: Label
 var _shop: PanelContainer
 var _shop_list: VBoxContainer
@@ -86,9 +88,14 @@ func _ready() -> void:
 	_place(_sabotage_label, 1.0, 1.0, Vector2(-330, -150), Vector2(310, 0))
 	_sabotage_label.add_theme_color_override("font_color", Color(1, 0.45, 0.45))
 
+	# Bottom centre: tool hotbar + carried item
+	_hotbar = _label(root, "", 20)
+	_place(_hotbar, 0.5, 1.0, Vector2(-450, -150), Vector2(900, 0))
+	_hotbar.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
 	# Bottom centre: help
 	_help = _label(root, HELP, 15)
-	_place(_help, 0.5, 1.0, Vector2(-450, -76), Vector2(900, 0))
+	_place(_help, 0.5, 1.0, Vector2(-450, -100), Vector2(900, 0))
 	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	_build_shop(root)
@@ -137,11 +144,29 @@ func _process(_delta: float) -> void:
 		_hold_bar.visible = player.hold_needed > 0.0 and player.hold_progress > 0.0
 		if _hold_bar.visible:
 			_hold_bar.value = player.hold_progress / player.hold_needed * 100.0
+		var slots := PackedStringArray()
+		var tools := player.available_tools()
+		for i in Player.TOOLS.size():
+			var id: String = Player.TOOLS[i]
+			if id in tools:
+				var name: String = Player.TOOL_NAMES[id]
+				slots.append(("[ %d %s ]" if id == player.current_tool and player.carried_item == "" else "%d %s") % [i + 1, name])
+		var line := "   ".join(slots)
+		if player.carried_item != "":
+			line = "Carrying: %s   ([E] place · [G] put back)" % player.carried_item.to_upper()
+		elif player.current_tool == "welder":
+			if is_instance_valid(player.welder_source):
+				line += "\nCable %d%%%s" % [int(player.cable_tension * 100.0), "  ⚠ LIMIT" if player.cable_tension > 0.95 else ""]
+			else:
+				line += "\nWelder not plugged in: go near a welder machine (train utility car or station)"
+		_hotbar.text = line
 
 	_sabotage_label.visible = Game.role == "impostor"
 	if _sabotage_label.visible and Game.sabotage:
-		var lines := PackedStringArray(["IMPOSTOR (secret)"])
+		var lines := PackedStringArray(["IMPOSTOR (secret) · [Tab] %s" % ("close" if Game.sabotage_menu_open else "sabotage menu")])
 		for id: String in SabotageManager.ABILITIES:
+			if not Game.sabotage_menu_open:
+				break
 			var info: Dictionary = SabotageManager.ABILITIES[id]
 			var cd: float = Game.sabotage.cooldowns[id]
 			var state := "unavailable" if Game.sabotage.locked else ("ready" if cd <= 0.0 else "%ds" % int(cd))

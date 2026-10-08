@@ -1,6 +1,6 @@
 class_name Meteor
 extends Node3D
-## Falls for FALL_TIME seconds onto a target spot (a red warning circle shows where).
+## Falls for FALL_TIME seconds onto a target spot on the ground (a red warning circle shows where).
 ## The train keeps moving while it falls, so a badly timed meteor misses.
 
 const FALL_TIME := 3.0
@@ -18,7 +18,7 @@ var _warning: MeshInstance3D
 
 static func spawn(parent: Node, target_pos: Vector3) -> Meteor:
 	var m := Meteor.new()
-	m.target = Vector3(target_pos.x, 0.0, target_pos.z)
+	m.target = target_pos
 	parent.add_child(m)
 	return m
 

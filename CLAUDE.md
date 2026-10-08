@@ -1,9 +1,11 @@
 # Trust Issues: notes for Claude
 
-- Godot 4.7.2, GDScript, typed. Grey-box geometry is built in code (`scripts/util/build.gd`) until real `.glb` assets exist.
+- Godot 4.7.2, GDScript, typed. Train and repair-item models come from `blender/scripts/build_train.py` (Blender 4.5,
+  exports `.glb` to `assets/models/`, loaded via `Props`). Other grey-box geometry is built in code (`scripts/util/build.gd`).
 - `Game` autoload (`scripts/autoload/game.gd`) holds shared state: inventory, checkpoints, signals, debug role.
   Keep state changes host-side so multiplayer (M1) can sync them later.
-- Main pieces: `Track` (rail pieces, gaps, stations), `Train` (distance-based movement on the track), `Station`,
+- Main pieces: `Track` (rail pieces, gaps, stations, landscape themes, bridges), `Terrain` (ribbon mesh along the track),
+  `Train` (distance-based movement), `RailRepair`/`PlaceSlot`/`NailSpot`/`WeldSeam`/`WelderSource` (hands-on repair), `Station`,
   `SabotageManager` (+ `Meteor`, `Zombie`, `Eagle`), `Player`, `HUD`. `ActionSpot` = interactable from callables.
 - The design source of truth is `docs/GDD.md`. Open TODOs for local work: `docs/TODO_LOCAL.md`.
 - Before pushing: `godot --headless --path . --import` then `godot --headless --path . res://tests/TestTrain.tscn` (must print PASSED).

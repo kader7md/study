@@ -95,14 +95,32 @@ Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations 
 - **Crafting table** on the train (see 6).
 - **Sacrifice altar** on the train, for reviving (see 8).
 
-### Two kinds of repair
-| On the track (anywhere) | **Only at a station** |
-|-------------------------|-----------------------|
-| Rails, bridges and foundations with wood, scrap and nails | **Arc welding** for heavy train-body damage |
-| Small body patches | **New train wheels** |
-| | Special items found only at stations: **engine oil, repair hammer, nail gun** |
+### Hands-on repair (RV There Yet style: you do it with your hands, no "hold E")
+**Broken track**, step by step:
+1. Take **planks** from the cargo car (1 wood each) and carry them in both hands. Place them on the 2 glowing ghost sleepers.
+2. **Nail** each plank: 2 nails per plank, **3 hammer hits** per nail (or 1 shot with the **nail gun**). Each nail uses 1 nail.
+3. Take **rails** (2 scrap each) and place them on the 2 rail ghosts.
+4. **Weld** both ends of each rail with the **welder** (hold LMB). The torch is plugged into a **welder machine by a cable**
+   (35 m from the train's machine). Walk too far and the cable stops you; go much further and it unplugs.
 
-A badly damaged train has to **limp to the next station** to be fully fixed, which builds tension between stations.
+**Wheels:** a fallen wheel is gone. Buy a new one at a station, carry it from the cargo car, **lift it into place** (animated),
+then **bolt it on with 3 hammer hits**.
+
+**Train body:** damage shows as **glowing cracks** (each one = 10 %). Weld them with the welder.
+The train's own welder machine can only get the body back to **60 %**. The big **station welder** gets it to **100 %**,
+so a badly damaged train has to **limp to the next station**.
+
+Special items found only at stations: **engine oil, repair hammer, nail gun, wheels**.
+
+### Landscape between stations
+Stations are **1.5 km apart** (longer in the full game), each stretch with its own theme:
+1. Forest hills, with a small river bridge
+2. River valley, with a big river bridge
+3. Mountain pass: a long climb (uphill = slower and more coal) and a tall trestle over a gorge
+4. The lake: downhill to the shore, then a long bridge across the lake
+5. The coast: down to the sea and the port
+
+Bridges are wooden trestles. A broken bridge piece leaves a hole you can fall through into the water.
 
 ### Resources
 | Resource | Where | Used for |

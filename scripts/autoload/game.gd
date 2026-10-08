@@ -15,7 +15,7 @@ signal ui_changed(open: bool)
 const STATION_COUNT := 5
 const SAVE_PATH := "user://checkpoint.json"
 
-const START_INVENTORY := {"coal": 12, "wood": 6, "scrap": 4, "gold": 10, "nails": 10}
+const START_INVENTORY := {"coal": 14, "wood": 10, "scrap": 10, "gold": 15, "nails": 20, "wheel": 1}
 
 ## Station shop. "gives" is added to the crew inventory.
 const SHOP := {
@@ -32,6 +32,8 @@ const SHOP := {
 const INPUTS := {
 	"move_forward": [KEY_W], "move_back": [KEY_S], "move_left": [KEY_A], "move_right": [KEY_D],
 	"jump": [KEY_SPACE], "sprint": [KEY_SHIFT], "interact": [KEY_E], "interact_alt": [KEY_Q],
+	"tool_1": [KEY_1], "tool_2": [KEY_2], "tool_3": [KEY_3], "drop": [KEY_G],
+	"sabotage_menu": [KEY_TAB],
 	"sabotage_1": [KEY_1], "sabotage_2": [KEY_2], "sabotage_3": [KEY_3], "sabotage_4": [KEY_4],
 	"toggle_role": [KEY_F2], "toggle_world_sabotage": [KEY_F3],
 	"restart_checkpoint": [KEY_F5], "new_game": [KEY_F6], "toggle_help": [KEY_F1],
@@ -43,8 +45,9 @@ var inventory: Dictionary = {}
 var next_station := 1
 ## Last saved checkpoint ({} = new game).
 var checkpoint: Dictionary = {}
-## Debug role for solo testing: "crew" (world sabotage runs by itself) or "impostor" (you sabotage with keys 1-4).
+## Debug role for solo testing: "crew" (world sabotage runs by itself) or "impostor" ([Tab] menu, keys 1-4).
 var role := "crew"
+var sabotage_menu_open := false
 var world_sabotage := true
 var wind_active := false:
 	set(value):
@@ -91,7 +94,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		new_game(true)
 	elif event.is_action_pressed("toggle_role"):
 		role = "impostor" if role == "crew" else "crew"
-		say("Debug role: %s" % role.to_upper())
+		sabotage_menu_open = false
+		say("Debug role: %s%s" % [role.to_upper(), " ([Tab] = sabotage menu)" if role == "impostor" else ""])
 	elif event.is_action_pressed("toggle_world_sabotage"):
 		world_sabotage = not world_sabotage
 		say("World sabotage: %s" % ("ON" if world_sabotage else "OFF"))

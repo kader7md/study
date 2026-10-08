@@ -1,8 +1,10 @@
 class_name Train
 extends Node3D
-## The coal train. It follows the track by distance (no free physics, which keeps it stable online).
-## Systems: furnace fuel, 3-way lever, speed, body health, wheels, crashes at broken rails,
-## stopping at stations (checkpoints), on-track patching (station welding is in Station).
+## The coal train (Blender models in assets/models/train). It follows the track by distance
+## (no free physics, which keeps it stable online).
+## Systems: furnace fuel, 3-way lever, speed (slower uphill), body health shown as cracks that are
+## welded shut, 6 locomotive wheels that fall off and are refitted by hand, crashes at broken rails,
+## stopping at stations (checkpoints), cargo car where repair materials are taken out.
 
 signal damaged(amount: float)
 signal wheel_lost(remaining: int)
@@ -15,41 +17,53 @@ const CARS := [
 ]
 const CAR_GAP := 1.0
 const FLOOR_HEIGHT := 1.35
-const MAX_SPEED := 14.0          # m/s (~50 km/h)
+const DOOR := 1.0                 # gap in the side walls at each car end, for climbing aboard
+const MAX_SPEED := 14.0           # m/s (~50 km/h)
 const ACCEL := 1.6
 const BRAKE := 4.0
 const FRICTION := 0.35
 const MAX_FUEL := 100.0
-const COAL_FUEL := 12.0          # fuel per shovelled coal
+const COAL_FUEL := 12.0
 const MAX_WHEELS := 6
 const MIN_WHEELS_TO_MOVE := 3
-const PATCH_LIMIT := 60.0        # on-track patching can't go above this; welding at a station fixes the rest
-const PATCH_COST := {"scrap": 2}
-const PATCH_AMOUNT := 20.0
-const CRASH_SPEED := 4.0         # hitting a gap faster than this damages the train
+const WHEEL_BOLT_HITS := 3
+const PATCH_LIMIT := 60.0         # the train's own welder can't weld the body above this; station welder can
+const CRACK_HP := 10.0            # each crack is 10 % of body health
+const CRASH_SPEED := 4.0
 const OIL_BUFF_TIME := 120.0
+const WELDER_CABLE := 35.0
+
+## Things the crew carries out of the cargo car and what each costs from the inventory.
+const CARRY_COST := {"plank": {"wood": 1}, "rail": {"scrap": 2}, "wheel": {"wheel": 1}}
 
 var track: Track
-var distance := 0.0              # front of the locomotive along the track
-var speed := 0.0                 # m/s, negative = reverse
-var lever := 0                   # -1 reverse, 0 stop (brake), 1 forward
+var distance := 0.0
+var speed := 0.0
+var lever := 0
 var fuel := 60.0
 var health := 100.0
 var wheels := MAX_WHEELS
-var current_station := -1        # station the train is standing in, or -1
+var current_station := -1
 var oil_buff := 0.0
 var cars: Array[AnimatableBody3D] = []
 var total_length := 0.0
+var welder: WelderSource
 
 var _furnace: Node3D
-var _wheel_meshes: Array[MeshInstance3D] = []
+var _wheel_nodes: Array[Node3D] = []
+var _wheel_home: Array[Vector3] = []
+var _wheel_state: Array[int] = []   # 0 ok, 1 missing, 2 placed but not bolted
+var _wheel_slots: Array[Interactable] = []
+var _cracks: Array[Node3D] = []
 var _smoke: MeshInstance3D
 var _block_msg_cooldown := 0.0
+var _rng := RandomNumberGenerator.new()
 
 
 func setup(t: Track, front_distance: float) -> void:
 	track = t
 	distance = front_distance
+	_rng.seed = 7
 	total_length = 0.0
 	for c in CARS:
 		total_length += c.length + CAR_GAP
@@ -65,9 +79,11 @@ func save_state() -> Dictionary:
 
 func load_state(state: Dictionary) -> void:
 	health = state.get("health", health)
-	wheels = int(state.get("wheels", wheels))
 	fuel = state.get("fuel", fuel)
-	_update_wheel_meshes()
+	var target := int(state.get("wheels", wheels))
+	while wheels > target:
+		lose_wheel(false)
+	_sync_cracks()
 
 
 # --- Simulation -------------------------------------------------------------
@@ -78,6 +94,9 @@ func max_speed_now() -> float:
 	var s := MAX_SPEED
 	s *= 0.5 + 0.5 * health / 100.0
 	s *= 1.0 - 0.12 * (MAX_WHEELS - wheels)
+	# uphill is slow, downhill a bit faster (in the direction of travel)
+	var dir := 1.0 if lever >= 0 else -1.0
+	s *= clampf(1.0 - track.grade_at(center_distance()) * dir * 8.0, 0.45, 1.25)
 	if Game.wind_active:
 		s *= 0.6
 	if oil_buff > 0.0:
@@ -107,19 +126,20 @@ func _physics_process(delta: float) -> void:
 	_block_msg_cooldown = maxf(_block_msg_cooldown - delta, 0.0)
 	oil_buff = maxf(oil_buff - delta, 0.0)
 
-	# Fuel
-	var burn := (0.12 + 0.06 * absf(speed)) * (1.6 if Game.wind_active else 1.0)
+	var uphill := maxf(track.grade_at(center_distance()) * signf(speed), 0.0)
+	var burn := (0.12 + 0.06 * absf(speed)) * (1.6 if Game.wind_active else 1.0) * (1.0 + uphill * 15.0)
 	fuel = maxf(fuel - burn * delta, 0.0)
 
-	# Speed
 	var top := max_speed_now()
 	if lever != 0 and fuel > 0.0 and top > 0.0:
 		var rate := BRAKE if speed * lever < 0.0 else ACCEL
 		speed = move_toward(speed, lever * top, rate * delta)
 	else:
 		speed = move_toward(speed, 0.0, (BRAKE if lever == 0 else FRICTION) * delta)
+		# Without power or brake the train rolls downhill
+		if lever != 0:
+			speed -= track.grade_at(center_distance()) * 9.8 * 0.5 * delta
 
-	# Move, stopping at broken rails
 	var step := speed * delta
 	var new_front := distance + step
 	if step > 0.0:
@@ -140,6 +160,9 @@ func _physics_process(delta: float) -> void:
 	_place_cars()
 	_update_station()
 	_update_smoke(delta)
+	for i in _wheel_nodes.size():
+		if _wheel_state[i] == 0:
+			_wheel_nodes[i].rotation.x -= speed * delta / 0.45
 
 
 func _hit_gap() -> void:
@@ -151,7 +174,7 @@ func _hit_gap() -> void:
 			lose_wheel()
 		Game.say("CRASH! The train hit a broken rail!")
 	elif _block_msg_cooldown <= 0.0 and v > 0.05:
-		Game.say("Train stopped: broken rail ahead. Repair it!")
+		Game.say("Train stopped: broken track ahead. Rebuild it!")
 	_block_msg_cooldown = 3.0
 
 
@@ -167,17 +190,9 @@ func _update_station() -> void:
 func take_damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)
 	damaged.emit(amount)
+	_sync_cracks()
 	if health <= 0.0:
-		Game.say("The train is wrecked! Patch it with scrap to move again.")
-
-
-func lose_wheel() -> void:
-	if wheels <= 0:
-		return
-	wheels -= 1
-	_update_wheel_meshes()
-	wheel_lost.emit(wheels)
-	Game.say("A wheel fell off! (%d/%d left; new wheels are fitted at stations)" % [wheels, MAX_WHEELS])
+		Game.say("The train is wrecked! Weld the cracks to move again.")
 
 
 func add_coal() -> bool:
@@ -191,31 +206,124 @@ func add_coal() -> bool:
 	return true
 
 
-func patch() -> void:
-	if health >= PATCH_LIMIT:
-		Game.say("Heavy damage can only be welded at a station")
-		return
-	if not Game.pay(PATCH_COST):
-		Game.say("Need %s to patch the train" % Game.cost_text(PATCH_COST))
-		return
-	health = minf(health + PATCH_AMOUNT, PATCH_LIMIT)
-	Game.say("Train patched (%d%%)" % int(health))
-
-
-func weld_full() -> void:
-	health = 100.0
-
-
-func fit_wheel() -> void:
-	wheels = mini(wheels + 1, MAX_WHEELS)
-	_update_wheel_meshes()
-
-
 func lever_text() -> String:
 	return ["REVERSE", "STOP", "FORWARD"][lever + 1]
 
 
-# --- Building the cars (grey-box) ----------------------------------------------
+# --- Wheels: fall off, get carried back, placed and bolted ----------------------------
+
+func lose_wheel(announce := true) -> void:
+	var ok: Array[int] = []
+	for i in _wheel_state.size():
+		if _wheel_state[i] == 0:
+			ok.append(i)
+	if ok.is_empty():
+		return
+	var i := ok[_rng.randi() % ok.size()]
+	_wheel_state[i] = 1
+	wheels -= 1
+	_wheel_nodes[i].visible = false
+	_wheel_slots[i].collision_layer = Build.LAYER_INTERACT
+	if announce:
+		_drop_wheel_visual(_wheel_nodes[i].global_transform)
+		wheel_lost.emit(wheels)
+		Game.say("A wheel fell off! (%d/%d) New wheels are sold at stations." % [wheels, MAX_WHEELS])
+
+
+func _drop_wheel_visual(from: Transform3D) -> void:
+	var w := Props.instance("wheel")
+	get_parent().add_child(w)
+	w.global_transform = from
+	var tween := w.create_tween()
+	tween.tween_property(w, "global_position", from.origin + from.basis.x * 3.0 + Vector3.DOWN * 0.3, 0.8)
+	tween.parallel().tween_property(w, "rotation:z", 1.4, 0.8)
+	tween.tween_interval(8.0)
+	tween.tween_callback(w.queue_free)
+
+
+func wheel_state(i: int) -> int:
+	return _wheel_state[i]
+
+
+func wheel_slot(i: int) -> Interactable:
+	return _wheel_slots[i]
+
+
+## Wheel carried to slot i: lift it in (animated), then it needs bolting with the hammer.
+func place_wheel(i: int) -> void:
+	_wheel_state[i] = 2
+	var node := _wheel_nodes[i]
+	node.visible = true
+	var home := _wheel_home[i]
+	var side := signf(home.x)
+	node.position = home + Vector3(side * 1.2, 0.9, 0)
+	node.rotation = Vector3(0, 0, side * 0.6)
+	var tween := node.create_tween()
+	tween.tween_property(node, "position", home + Vector3(side * 0.5, 0.15, 0), 0.35).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(node, "rotation:z", 0.0, 0.35)
+	tween.tween_property(node, "position", home, 0.2).set_trans(Tween.TRANS_BACK)
+
+
+func bolt_wheel(i: int) -> void:
+	_wheel_state[i] = 0
+	wheels += 1
+	_wheel_slots[i].collision_layer = 0
+	Game.say("Wheel bolted on (%d/%d)" % [wheels, MAX_WHEELS])
+
+
+func _make_wheel_slot(car: Node3D, i: int) -> void:
+	var slot := WheelSlot.new()
+	slot.train = self
+	slot.index = i
+	slot.position = _wheel_home[i]
+	Build.collider(slot, Vector3(0.6, 1.1, 1.1), Vector3.ZERO)
+	slot.collision_layer = 0
+	car.add_child(slot)
+	_wheel_slots.append(slot)
+
+
+# --- Cracks: body damage you can see and weld -------------------------------------
+
+func crack_count() -> int:
+	return int(ceil((100.0 - health) / CRACK_HP - 0.001))
+
+
+func _sync_cracks() -> void:
+	var want := clampi(crack_count(), 0, 10)
+	while _cracks.size() > want:
+		_cracks.pop_back().queue_free()
+	while _cracks.size() < want:
+		var crack := Crack.new()
+		crack.train = self
+		var car := cars[_rng.randi() % cars.size()]
+		var length: float = CARS[cars.find(car)].length
+		var side := -1.0 if _rng.randf() < 0.5 else 1.0
+		crack.position = Vector3(side * 1.5, FLOOR_HEIGHT + _rng.randf_range(0.15, 0.6), _rng.randf_range(-length * 0.35, length * 0.35))
+		crack.rotation.y = PI * 0.5 * side
+		car.add_child(crack)
+		_cracks.append(crack)
+
+
+## A crack welded shut. The train's own welder stops at PATCH_LIMIT.
+func weld_crack(crack: Node3D, source: WelderSource) -> bool:
+	if source.kind != "station" and health >= PATCH_LIMIT:
+		Game.say("The train's welder is too weak above %d%%: use a station welder" % int(PATCH_LIMIT))
+		return false
+	var cap := 100.0 if source.kind == "station" else PATCH_LIMIT
+	health = minf(health + CRACK_HP, cap)
+	_cracks.erase(crack)
+	crack.queue_free()
+	_sync_cracks()
+	Game.say("Crack welded (%d%%)" % int(health))
+	return true
+
+
+func weld_full() -> void:
+	health = 100.0
+	_sync_cracks()
+
+
+# --- Cars --------------------------------------------------------------------------
 
 func _place_cars() -> void:
 	var d := distance
@@ -232,60 +340,60 @@ func _build_car(type: String, length: float) -> AnimatableBody3D:
 	car.collision_mask = 0
 	car.sync_to_physics = true
 	add_child(car)
+	var model := Props.instance(type)
+	car.add_child(model)
 
-	var body_color: Color = {
-		"locomotive": Color(0.25, 0.27, 0.3), "cargo": Color(0.55, 0.36, 0.2),
-		"utility": Color(0.35, 0.45, 0.35), "container": Color(0.6, 0.25, 0.2),
-	}[type]
-	var w := 2.8
-	var floor_y := FLOOR_HEIGHT
-	# Floor (collider is a bit longer so players can walk across the gap between cars)
-	Build.box(car, Vector3(w, 0.3, length), Vector3(0, floor_y - 0.15, 0), body_color.darkened(0.3))
-	Build.collider(car, Vector3(w, 0.3, length + CAR_GAP), Vector3(0, floor_y - 0.15, 0))
-	# Low side walls
-	for side in [-1, 1]:
-		Build.box(car, Vector3(0.12, 0.7, length), Vector3(side * w * 0.5, floor_y + 0.35, 0), body_color)
-		Build.collider(car, Vector3(0.12, 0.9, length), Vector3(side * w * 0.5, floor_y + 0.45, 0))
-	# Wheels (only the locomotive's are tracked for damage)
-	for i in 3:
+	# Floor (a bit longer than the car so players can walk across the gap) and side walls with door gaps
+	Build.collider(car, Vector3(2.8, 0.3, length + CAR_GAP), Vector3(0, FLOOR_HEIGHT - 0.15, 0))
+	var wall_len := length - 2.0 * DOOR
+	var wall_z := 0.0
+	if type == "locomotive":
+		wall_len = 3.6
+		wall_z = 2.1
+	if type != "container":
 		for side in [-1, 1]:
-			var z := -length * 0.35 + i * length * 0.35
-			var wheel := Build.cylinder(car, 0.45, 0.2, Vector3(side * 0.85, 0.5, z), Color(0.12, 0.12, 0.12))
-			wheel.rotation.z = PI * 0.5
-			if type == "locomotive":
-				_wheel_meshes.append(wheel)
+			Build.collider(car, Vector3(0.12, 0.9, wall_len), Vector3(side * 1.4, FLOOR_HEIGHT + 0.45, wall_z))
 
 	match type:
 		"locomotive":
-			_build_locomotive(car, length, floor_y)
+			_build_locomotive(car, model, length)
 		"cargo":
-			_build_cargo(car, length, floor_y)
+			_build_cargo(car, length)
 		"utility":
-			_build_utility(car, length, floor_y)
+			_build_utility(car, length)
 		"container":
-			_build_container(car, length, floor_y)
+			_build_container(car, length)
 	return car
 
 
-func _build_locomotive(car: Node3D, length: float, floor_y: float) -> void:
-	# Boiler at the front, open cab behind it
-	var boiler := Build.cylinder(car, 1.0, length * 0.5, Vector3(0, floor_y + 1.0, -length * 0.22), Color(0.18, 0.18, 0.2))
-	boiler.rotation.x = PI * 0.5
-	var boiler_body := StaticBody3D.new()
-	boiler_body.collision_layer = Build.LAYER_TRAIN
-	car.add_child(boiler_body)
-	Build.collider(boiler_body, Vector3(2.0, 2.0, length * 0.5), Vector3(0, floor_y + 1.0, -length * 0.22))
-	Build.cylinder(car, 0.3, 1.2, Vector3(0, floor_y + 2.4, -length * 0.4), Color(0.1, 0.1, 0.1))
-	_smoke = Build.sphere(car, 0.6, Vector3(0, floor_y + 3.4, -length * 0.4), Color(0.8, 0.8, 0.8, 0.6))
-	# Cab roof
-	Build.box(car, Vector3(2.9, 0.15, length * 0.42), Vector3(0, floor_y + 2.6, length * 0.27), Color(0.5, 0.15, 0.12))
+func _build_locomotive(car: Node3D, model: Node3D, length: float) -> void:
+	var f := FLOOR_HEIGHT
+	var boiler := StaticBody3D.new()
+	boiler.collision_layer = Build.LAYER_TRAIN
+	car.add_child(boiler)
+	Build.collider(boiler, Vector3(2.0, 2.0, 4.8), Vector3(0, f + 1.0, -2.3))
+	_smoke = Build.sphere(car, 0.6, Vector3(0, f + 3.9, -4.0), Color(0.85, 0.85, 0.85, 0.6))
 
-	# Furnace (shovel coal)
-	_furnace = Build.box(car, Vector3(1.2, 1.0, 0.6), Vector3(0, floor_y + 0.5, 0.15), Color(0.35, 0.1, 0.05))
+	for i in MAX_WHEELS:
+		var node: Node3D = model.find_child("Wheel_%d" % i, true, false)
+		_wheel_nodes.append(node)
+		_wheel_home.append(node.position)
+		_wheel_state.append(0)
+		_make_wheel_slot(car, i)
+
+	# Furnace door (shovel coal)
+	_furnace = Build.box(car, Vector3(1.0, 0.8, 0.2), Vector3(0, f + 0.6, 0.45), Color(0.15, 0.15, 0.15))
+	var glow := Build.box(_furnace, Vector3(0.6, 0.35, 0.05), Vector3(0, 0.05, 0.11), Color.WHITE)
+	var glow_mat := StandardMaterial3D.new()
+	glow_mat.albedo_color = Color(1.0, 0.5, 0.1)
+	glow_mat.emission_enabled = true
+	glow_mat.emission = Color(1.0, 0.4, 0.05)
+	glow_mat.emission_energy_multiplier = 2.5
+	glow.material_override = glow_mat
 	var furnace_prompt := func(_p):
 		var oil := "\n[Q] use engine oil (+20%% speed)" if Game.has("engine_oil") else ""
 		return "Furnace %d%%: shovel coal (have %d)  [E]%s" % [int(fuel), Game.count("coal"), oil]
-	var furnace_spot := ActionSpot.create(car, Vector3(1.4, 1.2, 0.9), Vector3(0, floor_y + 0.6, 0.2),
+	var furnace_spot := ActionSpot.create(car, Vector3(1.4, 1.2, 0.9), Vector3(0, f + 0.6, 0.6),
 		furnace_prompt, func(_p): add_coal())
 	furnace_spot.alt_fn = func(_p):
 		if Game.take("engine_oil"):
@@ -293,8 +401,9 @@ func _build_locomotive(car: Node3D, length: float, floor_y: float) -> void:
 			Game.say("Engine oiled: faster for %d s" % int(OIL_BUFF_TIME))
 
 	# Lever
-	var lever_mesh := Build.box(car, Vector3(0.12, 0.9, 0.12), Vector3(-0.9, floor_y + 0.6, 1.5), Color(0.8, 0.7, 0.2))
-	var lever_spot := ActionSpot.create(car, Vector3(0.6, 1.2, 0.6), Vector3(-0.9, floor_y + 0.6, 1.5),
+	var lever_mesh := Build.box(car, Vector3(0.1, 0.9, 0.1), Vector3(-0.9, f + 0.55, 1.6), Color(0.95, 0.7, 0.2))
+	Build.sphere(lever_mesh, 0.1, Vector3(0, 0.45, 0), Color(0.6, 0.1, 0.08))
+	var lever_spot := ActionSpot.create(car, Vector3(0.6, 1.2, 0.6), Vector3(-0.9, f + 0.6, 1.6),
 		func(_p): return "Lever: %s   [E] forward / [Q] back" % lever_text(),
 		func(_p):
 			lever = mini(lever + 1, 1)
@@ -303,52 +412,59 @@ func _build_locomotive(car: Node3D, length: float, floor_y: float) -> void:
 		lever = maxi(lever - 1, -1)
 		lever_mesh.rotation.x = -lever * 0.5
 
-	# Patch the body
-	var patch_spot := ActionSpot.create(car, Vector3(0.6, 1.2, 0.6), Vector3(0.9, floor_y + 0.6, 1.5),
-		func(_p):
-			if health >= PATCH_LIMIT:
-				return "Train body %d%%  (above %d%% needs welding at a station)" % [int(health), int(PATCH_LIMIT)]
-			return "Patch train body %d%% (%s)  [hold E]" % [int(health), Game.cost_text(PATCH_COST)],
-		func(_p): patch())
-	patch_spot.hold_fn = func(_p): return 2.5
-	Build.box(car, Vector3(0.5, 0.5, 0.5), Vector3(0.9, floor_y + 0.25, 1.5), Color(0.5, 0.5, 0.55))
+
+func _build_cargo(car: Node3D, length: float) -> void:
+	var f := FLOOR_HEIGHT
+	var takes := [["plank", Vector3(-0.6, f + 0.5, -2.0)], ["rail", Vector3(0.6, f + 0.5, -1.0)], ["wheel", Vector3(-0.5, f + 0.5, 1.2)]]
+	for entry in takes:
+		var item: String = entry[0]
+		var prompt := func(p):
+			if p and p.carried_item != "":
+				return "Hands full ([G] put back)"
+			return "Take a %s (%s)  [E]   · cargo: %s" % [item, Game.cost_text(CARRY_COST[item]), _cargo_summary()]
+		ActionSpot.create(car, Vector3(1.0, 1.0, 1.0), entry[1], prompt, func(p): take_item(p, item))
 
 
-func _build_cargo(car: Node3D, length: float, floor_y: float) -> void:
-	for i in 3:
-		Build.box(car, Vector3(0.9, 0.7, 0.9), Vector3(-0.7 + (i % 2) * 1.2, floor_y + 0.35, -2.5 + i * 1.6), Color(0.6, 0.45, 0.25))
-	ActionSpot.create(car, Vector3(2.4, 1.2, length * 0.8), Vector3(0, floor_y + 0.6, 0),
-		func(_p):
-			return "Cargo: coal %d · wood %d · scrap %d · gold %d · nails %d" % [
-				Game.count("coal"), Game.count("wood"), Game.count("scrap"), Game.count("gold"), Game.count("nails")],
+func _cargo_summary() -> String:
+	return "coal %d · wood %d · scrap %d · nails %d · wheels %d" % [
+		Game.count("coal"), Game.count("wood"), Game.count("scrap"), Game.count("nails"), Game.count("wheel")]
+
+
+## A player takes a repair item out of the cargo car (paid from the crew inventory).
+func take_item(player: Node, item: String) -> bool:
+	if player == null or player.carried_item != "":
+		return false
+	if not Game.pay(CARRY_COST[item]):
+		Game.say("Not enough for a %s (needs %s)" % [item, Game.cost_text(CARRY_COST[item])])
+		return false
+	player.carry(item)
+	return true
+
+
+func _build_utility(car: Node3D, length: float) -> void:
+	var f := FLOOR_HEIGHT
+	welder = WelderSource.create(car, "train", WELDER_CABLE, Vector3(0.7, f, 2.4))
+	ActionSpot.create(car, Vector3(1.2, 1.2, 1.0), Vector3(0.7, f + 0.5, 2.4),
+		func(_p): return "Welder machine (cable %d m). Pick the welder [2] near it to plug in" % int(WELDER_CABLE),
 		func(_p): pass)
-
-
-func _build_utility(car: Node3D, length: float, floor_y: float) -> void:
-	Build.box(car, Vector3(1.4, 0.9, 0.9), Vector3(0, floor_y + 0.45, -2.5), Color(0.5, 0.35, 0.2))
-	ActionSpot.create(car, Vector3(1.6, 1.2, 1.2), Vector3(0, floor_y + 0.6, -2.5),
+	Build.box(car, Vector3(1.4, 0.9, 0.9), Vector3(-0.5, f + 0.45, -2.5), Color(0.5, 0.35, 0.2))
+	ActionSpot.create(car, Vector3(1.6, 1.2, 1.2), Vector3(-0.5, f + 0.6, -2.5),
 		func(_p): return "Crafting table (spear, blueprints): coming in M7", func(_p): pass)
-	Build.cylinder(car, 0.7, 0.8, Vector3(0, floor_y + 0.4, 0), Color(0.45, 0.3, 0.15))
-	ActionSpot.create(car, Vector3(1.6, 1.2, 1.6), Vector3(0, floor_y + 0.6, 0),
+	Build.cylinder(car, 0.6, 0.8, Vector3(-0.5, f + 0.4, 0), Color(0.45, 0.3, 0.15))
+	ActionSpot.create(car, Vector3(1.4, 1.2, 1.4), Vector3(-0.5, f + 0.6, 0),
 		func(_p): return "Meeting table (vote): coming in M4", func(_p): pass)
-	Build.box(car, Vector3(1.0, 0.6, 1.0), Vector3(0, floor_y + 0.3, 2.6), Color(0.7, 0.68, 0.62))
-	ActionSpot.create(car, Vector3(1.2, 1.2, 1.2), Vector3(0, floor_y + 0.6, 2.6),
+	Build.box(car, Vector3(0.9, 0.6, 0.9), Vector3(-0.6, f + 0.3, 2.6), Color(0.7, 0.68, 0.62))
+	ActionSpot.create(car, Vector3(1.0, 1.2, 1.0), Vector3(-0.6, f + 0.6, 2.6),
 		func(_p): return "Sacrifice altar (goat revive): coming in M5", func(_p): pass)
 
 
-func _build_container(car: Node3D, length: float, floor_y: float) -> void:
-	Build.box(car, Vector3(2.5, 2.2, length * 0.8), Vector3(0, floor_y + 1.1, 0), Color(0.55, 0.2, 0.15))
+func _build_container(car: Node3D, length: float) -> void:
 	var body := StaticBody3D.new()
 	body.collision_layer = Build.LAYER_TRAIN
 	car.add_child(body)
-	Build.collider(body, Vector3(2.5, 2.2, length * 0.8), Vector3(0, floor_y + 1.1, 0))
-	ActionSpot.create(car, Vector3(2.7, 2.0, length * 0.85), Vector3(0, floor_y + 1.0, 0),
+	Build.collider(body, Vector3(2.5, 2.3, 6.4), Vector3(0, FLOOR_HEIGHT + 1.15, 0))
+	ActionSpot.create(car, Vector3(2.7, 2.2, 6.6), Vector3(0, FLOOR_HEIGHT + 1.1, 0),
 		func(_p): return "Locked container. What's inside…?", func(_p): Game.say("It's locked tight."))
-
-
-func _update_wheel_meshes() -> void:
-	for i in _wheel_meshes.size():
-		_wheel_meshes[i].visible = i < wheels
 
 
 func _update_smoke(delta: float) -> void:

@@ -11,27 +11,34 @@ A co-op train chase (then a sea chase) with a secret impostor. Made with **Godot
 Open the folder in **Godot 4.7** (standard build, 4.7.2), then press **F5** (Run Project).
 
 What's in it:
-- **Track** with 6 stations: departure + 5 checkpoints (420 m apart for now; the real game will be longer)
-- **Train**: locomotive, cargo, utility car, locked container. Furnace + coal, a 3-way lever (forward / stop / reverse)
-- **Track damage**: pre-placed broken rails and meteor craters. The train stops at a gap and **crashes** if it hits one fast
-- **Repairs**: rails (2 wood + 2 nails, hold E); train body patch up to 60 % (2 scrap)
-- **Station-only repairs**: arc welding to 100 %, fitting new wheels
-- **Shop** at every station (nails, wheel, engine oil, hammer, nail gun, medkit, grappler, coal)
-- **Checkpoints**: stopping in the next station saves. If all players die, you go back to the last checkpoint
-- **Sabotage** with cooldowns: ☄ meteor (aimed, falls for 3 s so it can miss), 🧟 zombies, 🦅 eagles (steal cargo), 🌬 freezing wind (slower train, more coal used, frost unless near the furnace)
-- **Resources** along the track: coal, wood, scrap, gold rocks (mine with E)
-- First-person player who can **ride the moving train**, a shovel attack, and frost
+- **Landscape**: 6 stations 1.5 km apart, through forest hills, a river valley, a mountain pass, a lake and the coast.
+  Hills slow the train, and wooden trestle bridges cross the rivers and the lake
+- **Train made in Blender** (`blender/scripts/build_train.py` → `assets/models/`): steam locomotive, cargo wagon,
+  utility wagon (welder machine), locked container. Furnace + coal, 3-way lever
+- **Hands-on track repair**: take planks → place → nail (hammer 3 hits / nail gun) → take rails → place → weld both ends
+- **Welder** with a **cable** to a welder machine (train: 35 m, rails + body up to 60 %; station: body up to 100 %)
+- **Wheels** fall off in crashes: carry a new one, lift it into place, bolt it with the hammer
+- **Body damage** shows as glowing cracks you weld shut
+- **Shop** at every station, **checkpoints**, back to the last checkpoint if everyone dies
+- **Sabotage**: meteor (aimed), zombies, eagles (steal cargo), freezing wind
+- First-person player with cartoony hands, a tool hotbar, and carrying items; can ride the moving train
 
 ### Controls
 | Key | Action |
 |-----|--------|
 | WASD / Shift / Space | Move / sprint / jump |
-| Mouse · LMB | Look · shovel attack |
-| E / hold E · Q | Use / repair · alternative use (e.g. pull the lever back) |
+| Mouse · LMB | Look · use tool (hammer hit, nail gun shot, hold to weld) |
+| 1 / 2 / 3 (or mouse wheel) | Hammer / welder / nail gun |
+| E · Q · G | Use / place carried item · alternative use · put the carried item back |
 | F1 | Show/hide help |
-| F2 | Debug: play as **impostor** (keys **1–4** = sabotage, meteor: aim + LMB) |
-| F3 | Debug: world sabotage on/off (random sabotage when there's no impostor) |
+| F2 | Debug: play as **impostor** (**Tab** = sabotage menu, then 1–4; meteor: aim + LMB) |
+| F3 | Debug: world sabotage on/off |
 | F5 / F6 | Last checkpoint / new game |
+
+### Rebuilding the train models
+```bash
+blender --background --python blender/scripts/build_train.py -- .
+```
 
 ### Tests
 ```bash

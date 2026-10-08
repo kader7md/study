@@ -1,7 +1,7 @@
 class_name SabotageManager
 extends Node
 ## The impostor's sabotage abilities, each with a cooldown.
-## - Impostor: uses them on purpose (debug: F2 to play as impostor, then keys 1-4).
+## - Impostor: uses them on purpose (debug: F2 to play as impostor, [Tab] menu, then keys 1-4).
 ## - No impostor (1-2 players): "the world" triggers random sabotage now and then.
 ## - A correct vote at the meeting table (M4) sets `locked`, silently disabling everything.
 
@@ -99,10 +99,9 @@ func _spawn_zombies(count: int) -> void:
 	var ahead := 1.0 if train.speed >= 0.0 else -1.0
 	var base := train.distance + 35.0 if ahead > 0.0 else train.rear_distance() - 35.0
 	for i in count:
-		var t := Game.track.transform_at(base + _rng.randf_range(-8.0, 8.0))
 		var side := -1.0 if i % 2 == 0 else 1.0
-		var pos := t.origin + t.basis.x * side * _rng.randf_range(5.0, 12.0) + Vector3.UP
-		Zombie.spawn(get_parent(), pos)
+		var pos := Game.track.ground_point(base + _rng.randf_range(-8.0, 8.0), side * _rng.randf_range(5.0, 12.0))
+		Zombie.spawn(get_parent(), pos + Vector3.UP)
 
 
 func _spawn_eagles(count: int) -> void:

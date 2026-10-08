@@ -1,11 +1,10 @@
 extends Node3D
-## Builds the Chapter 1 prototype level: sky, ground, track with 6 stations, train, pickups,
-## trees, sabotage, player and HUD. Everything is grey-box for now.
+## Builds the Chapter 1 level: sky, track with 6 stations over hills, rivers, a mountain pass,
+## a lake and the coast; terrain, train (Blender models), pickups, sabotage, player and HUD.
 
 const SEED := 20261008
 const PICKUP_SPACING := 22.0
-const GOLD_ROCKS_PER_SEGMENT := 3
-const TREES := 1200
+const GOLD_ROCKS_PER_SEGMENT := 6
 
 var track: Track
 var train: Train
@@ -18,7 +17,6 @@ var _rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	_rng.seed = SEED
 	_build_environment()
-	_build_ground()
 
 	track = Track.new()
 	track.name = "Track"
@@ -39,8 +37,11 @@ func _ready() -> void:
 		st.setup(track, i)
 		st.shop_requested.connect(func(s: Station): hud.open_shop(s))
 
+	var terrain := Terrain.new()
+	terrain.name = "Terrain"
+	add_child(terrain)
+	terrain.build(track, _rng)
 	_spawn_pickups()
-	_spawn_trees()
 
 	train = Train.new()
 	train.name = "Train"
@@ -61,7 +62,7 @@ func _ready() -> void:
 	add_child(player)
 	# Start on the station platform next to the locomotive
 	var t := track.transform_at(train.distance - 4.0)
-	player.global_position = t.origin + t.basis.x * 3.5 + Vector3.UP * 1.3
+	player.global_position = t.origin + t.basis.x * 3.5 + Vector3.UP * 1.4
 	player.look_at(train.cars[0].global_position + Vector3.UP * 1.5, Vector3.UP)
 	player.rotation.x = 0.0
 	player.rotation.z = 0.0
@@ -91,7 +92,7 @@ func _build_environment() -> void:
 	_env.ambient_light_energy = 0.6
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	_env.fog_enabled = true
-	_env.fog_density = 0.002
+	_env.fog_density = 0.0012
 	_env.fog_light_color = Color(0.75, 0.82, 0.9)
 	var we := WorldEnvironment.new()
 	we.environment = _env
@@ -101,31 +102,14 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-50, -35, 0)
 	sun.light_energy = 1.0
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 120.0
+	sun.directional_shadow_max_distance = 150.0
 	add_child(sun)
 
 
 func _on_wind_changed(active: bool) -> void:
 	var tween := create_tween()
-	tween.tween_property(_env, "fog_density", 0.02 if active else 0.002, 2.0)
+	tween.tween_property(_env, "fog_density", 0.02 if active else 0.0012, 2.0)
 	tween.parallel().tween_property(_env, "fog_light_color", Color(0.85, 0.92, 1.0) if active else Color(0.75, 0.82, 0.9), 2.0)
-
-
-func _build_ground() -> void:
-	var ground := StaticBody3D.new()
-	ground.name = "Ground"
-	ground.collision_layer = Build.LAYER_WORLD
-	var cs := CollisionShape3D.new()
-	cs.shape = WorldBoundaryShape3D.new()
-	ground.add_child(cs)
-	var mi := MeshInstance3D.new()
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(6000, 6000)
-	mi.mesh = plane
-	mi.material_override = Build.material(Color(0.36, 0.52, 0.24))
-	mi.position = Vector3(0, -0.01, -1200)
-	ground.add_child(mi)
-	add_child(ground)
 
 
 func _spawn_pickups() -> void:
@@ -135,49 +119,17 @@ func _spawn_pickups() -> void:
 	var items := ["coal", "coal", "wood", "wood", "scrap"]
 	var d := Track.LEAD_IN + Track.STATION_LENGTH
 	while d < track.get_length() - 20.0:
-		var t := track.transform_at(d)
 		var side := -1.0 if _rng.randf() < 0.5 else 1.0
 		var item: String = items[_rng.randi() % items.size()]
 		var amount := _rng.randi_range(2, 4) if item == "coal" else _rng.randi_range(1, 3)
-		Pickup.create(pickups, item, amount, t.origin + t.basis.x * side * _rng.randf_range(2.5, 7.0))
+		var p := track.ground_point(d, side * _rng.randf_range(2.5, 7.0))
+		if p.y > Track.WATER_LEVEL + 0.5 and not track.is_bridge_at(d):
+			Pickup.create(pickups, item, amount, p)
 		d += PICKUP_SPACING * _rng.randf_range(0.6, 1.4)
 	for s in track.station_distances.size() - 1:
 		for g in GOLD_ROCKS_PER_SEGMENT:
-			var t := track.transform_at(_rng.randf_range(track.station_distances[s] + 50.0, track.station_distances[s + 1] - 50.0))
+			var d2 := _rng.randf_range(track.station_distances[s] + 50.0, track.station_distances[s + 1] - 50.0)
 			var side := -1.0 if _rng.randf() < 0.5 else 1.0
-			Pickup.create_gold_rock(pickups, t.origin + t.basis.x * side * _rng.randf_range(6.0, 14.0))
-
-
-func _spawn_trees() -> void:
-	var trunk := CylinderMesh.new()
-	trunk.top_radius = 0.25
-	trunk.bottom_radius = 0.3
-	trunk.height = 2.0
-	trunk.material = Build.material(Color(0.4, 0.27, 0.15))
-	var crown := CylinderMesh.new()
-	crown.top_radius = 0.0
-	crown.bottom_radius = 1.8
-	crown.height = 4.5
-	crown.material = Build.material(Color(0.2, 0.5, 0.25))
-	var transforms: Array[Transform3D] = []
-	while transforms.size() < TREES:
-		var t := track.transform_at(_rng.randf_range(0.0, track.get_length()))
-		var side := -1.0 if _rng.randf() < 0.5 else 1.0
-		var pos := t.origin + t.basis.x * side * _rng.randf_range(12.0, 120.0)
-		pos += t.basis.z * _rng.randf_range(-15.0, 15.0)
-		var close := track.point_at(track.closest_distance(pos)).distance_to(pos)
-		if close < 10.0:
-			continue
-		var s := _rng.randf_range(0.8, 1.6)
-		transforms.append(Transform3D(Basis().scaled(Vector3.ONE * s), pos))
-	for part in [[trunk, 1.0], [crown, 4.2]]:
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = part[0]
-		mm.instance_count = transforms.size()
-		for i in transforms.size():
-			var tr := transforms[i]
-			mm.set_instance_transform(i, tr.translated(Vector3.UP * part[1] * tr.basis.get_scale().y))
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		add_child(mmi)
+			var p := track.ground_point(d2, side * _rng.randf_range(6.0, 14.0))
+			if p.y > Track.WATER_LEVEL + 0.5:
+				Pickup.create_gold_rock(pickups, p)
