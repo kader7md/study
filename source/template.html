@@ -148,6 +148,8 @@ body.flash .vcard:not(.open) .meaning, body.flash .vcard:not(.open) .def { visib
 body:not(.no-en) .showen { display: none; }
 body.no-en .q.peek .en { display: block; }
 .more { justify-self: center; }
+.hintbtn { justify-self: start; font: inherit; font-size: .85rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); border: 0; border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.hint { font-size: .9rem; background: var(--bg); border-radius: 8px; padding: 8px 12px; }
 
 @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
 @media (max-width: 520px) { .qtext { font-size: 1.08rem; } .anatomy { font-size: 1.05rem; } }
@@ -157,12 +159,13 @@ body.no-en .q.peek .en { display: block; }
   <header class="top">
     <span class="eyebrow">損害保険募集人一般試験 · 基礎単位 · your practice test</span>
     <h1><ruby>損害保険<rt>そんがいほけん</rt></ruby> Exam Study</h1>
-    <p>All the questions from your practice test, with hiragana on every kanji, an English translation, and the reason each answer is right or wrong. Start with <b>How to read</b>, then go to <b>Practice</b>.</p>
+    <p>All the questions from your practice test, with hiragana on every kanji, an English translation, and the reason each answer is right or wrong. Start with <b>Pass plan</b>, then <b>How to read</b>, then <b>Practice</b>.</p>
   </header>
 
   <div class="toolbar">
     <div class="tabs" role="tablist">
-      <button class="tab" role="tab" id="tab-method" aria-selected="true" data-tab="method">How to read</button>
+      <button class="tab" role="tab" id="tab-plan" aria-selected="true" data-tab="plan">Pass plan</button>
+      <button class="tab" role="tab" id="tab-method" aria-selected="false" data-tab="method">How to read</button>
       <button class="tab" role="tab" id="tab-practice" aria-selected="false" data-tab="practice">Practice</button>
       <button class="tab" role="tab" id="tab-words" aria-selected="false" data-tab="words">Words</button>
       <button class="tab" role="tab" id="tab-facts" aria-selected="false" data-tab="facts">Key facts</button>
@@ -173,8 +176,110 @@ body.no-en .q.peek .en { display: block; }
     </div>
   </div>
 
+
+  <!-- ============ PLAN ============ -->
+  <section class="panel" id="panel-plan">
+    <div class="block">
+      <h2>The real exam (基礎単位)</h2>
+      <div class="big-stat">
+        <div class="card"><b>50</b>questions</div>
+        <div class="card"><b>40 min</b>about 48 seconds each</div>
+        <div class="card"><b>2 pts</b>per question</div>
+        <div class="card"><b style="color:var(--ok)">35 / 50</b>correct needed (70 points)</div>
+      </div>
+      <p>You can miss <b>15 questions</b> and still pass. It is a computer test (CBT). You can flag a question and come back to it at the end.</p>
+      <div class="card block">
+        <h3>Since July 2025 there are 4 question formats</h3>
+        <ol class="steps">
+          <li><b>One sentence, 正 or 誤.</b> <span class="muted">(in your practice test)</span></li>
+          <li><b>Two sentences ア・イ, choose the 正誤 combination A–D.</b> <span class="muted">(in your practice test)</span></li>
+          <li><b>Two sentences with blanks (穴埋め), choose the word combination.</b> <span class="muted">New. Not in your practice test.</span></li>
+          <li><b>Three sentences, choose the one that is 正しい (correct) or 誤っている (wrong).</b> <span class="muted">New. Not in your practice test.</span></li>
+        </ol>
+        <p class="muted">The insurance association says the exam became harder with this change. The official study site (you get the login ID after you apply) has a mock exam in the new format. Do it at least once.</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Can you pass with tricks only?</h2>
+      <p>I tested a "keyword rule" on all 182 questions of your practice test. The rule does not read the content. It only looks for a few words:</p>
+      <div class="note"><b>Keyword rule:</b> answer <span class="lean x">誤</span> if the sentence has いっさい, 必ず, すべて, のみ (but not のみならず), 全額, 限り, 常に, or 必要はありません. Otherwise answer <span class="lean o">正</span>.</div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Strategy</th><th>Single 正誤</th><th>ア・イ combination</th><th>Likely exam score</th></tr></thead>
+          <tbody>
+            <tr><td>Always answer 正 (and A for combos)</td><td class="num">74%</td><td class="num">37%</td><td class="num"><span class="lean x">about 55–65</span></td></tr>
+            <tr><td>Keyword rule</td><td class="num">77%</td><td class="num">56%</td><td class="num"><span class="lean n">about 66–73</span></td></tr>
+            <tr><td>Keyword rule + learn the false-sentence list</td><td class="num">90%+</td><td class="num">80%+</td><td class="num"><span class="lean o">80+</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>Honest answer:</b> tricks alone land right around 70, so it's a coin flip. The two new formats are harder to guess. To pass safely, add one more thing: learn the <b>false-sentence list</b> (Key facts tab). That's 58 short facts. The exam is written from the same textbook, so the same traps come back again and again.</p>
+    </div>
+
+    <div class="block">
+      <h2>What to do for each format</h2>
+      <div class="traps">
+        <div class="card">
+          <h3>① One sentence 正・誤</h3>
+          <ol class="steps">
+            <li>Look at the ending only (last 10 characters).</li>
+            <li>Scan for the trap words: <span class="jp">いっさい・必ず・すべて・のみ・全額・限り・必要はありません</span>.</li>
+            <li>Do you recognize a topic from the false list? Use the fact.</li>
+            <li>Nothing found → <span class="lean o">正</span>. Move on. Don't spend more than 40 seconds.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>② ア・イ combination A–D</h3>
+          <ol class="steps">
+            <li>Judge ア and イ separately with method ①.</li>
+            <li>Not sure about one? Treat it as 正.</li>
+            <li><b>D (both false) is rare.</b> In your practice test it was correct only once in 27. A was 10, B was 9, C was 7.</li>
+            <li>If both look true, answer A.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>③ Fill-in-the-blank (穴埋め)</h3>
+          <ol class="steps">
+            <li>The blanks are almost always <b>key words</b>: who (保険会社 / 代理店 / 保険契約者 / 被保険者), a number, or a law name.</li>
+            <li>Learn the Words tab by shape: you only need to recognize them, not read every kanji.</li>
+            <li>Remove choices that make the sentence absolute (いっさい, 全額). Then choose.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>④ Three sentences, choose one</h3>
+          <ol class="steps">
+            <li>First read the question: <span class="jp">正しいもの</span> = choose the TRUE one. <span class="jp">誤っているもの</span> = choose the FALSE one.</li>
+            <li>Choosing the FALSE one: pick the sentence with a trap word or "必要はありません".</li>
+            <li>Choosing the TRUE one: pick the sentence with soft words (原則として, 一般的に, など) and no trap word.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>7-day plan</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Day</th><th>Do this</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td>Read <b>How to read</b>. Memorize the trap words and the 5 sentence endings by shape.</td></tr>
+            <tr><td class="num">2</td><td>Words tab with Flashcard mode, People and Contract groups. Learn to tell 保険契約者 / 被保険者 / 代理店 / 保険会社 apart at a glance.</td></tr>
+            <tr><td class="num">3</td><td>Key facts tab: numbers + the first 30 false sentences. Read the green "correct statement" lines.</td></tr>
+            <tr><td class="num">4</td><td>Key facts: the remaining false sentences. Practice tab → "Only questions with a false sentence".</td></tr>
+            <tr><td class="num">5</td><td>Practice all questions with <b>English OFF</b>. Use the "Rule hint" button only when stuck.</td></tr>
+            <tr><td class="num">6</td><td>Practice → "My mistakes". Repeat until you get 80%+. Do the official mock exam on the study site.</td></tr>
+            <tr><td class="num">7</td><td>Shuffle all questions, 48 seconds each, English OFF and hiragana OFF, like the real exam.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="muted" style="font-size:.85rem">Exam facts are from <a href="https://www.sonpo-dairiten.jp/oshirase/shiken_20250321.html">the General Insurance Association of Japan's notice on the July 2025 format change</a> and <a href="https://note.com/sonpotage_sensei/n/n9df02c7228be">a guide to the exam rules</a>. Check the official site before your exam in case anything changed.</p>
+  </section>
+
   <!-- ============ METHOD ============ -->
-  <section class="panel" id="panel-method">
+  <section class="panel" id="panel-method" hidden>
     <div class="block">
       <h2>Two kinds of questions</h2>
       <div class="card block">
@@ -341,6 +446,8 @@ body.no-en .q.peek .en { display: block; }
   function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
   var Q = DATA.Q, S = DATA.S;
+  var RULE = /いっさい|一切|必ず|すべて|全て|のみ(?!ならず)|に限り|どのような場合|いかなる|全額|(?<!非)常に|絶対|必要はありません|必要はない|までは/;
+  function plainJ(s) { return s.replace(/\{([^|{}]+)\|[^{}]+\}/g, '$1').replace(/\[\[|\]\]/g, ''); }
   Q.forEach(function (q, i) { q.id = i; });
 
   /* ---------- Method tab ---------- */
@@ -441,6 +548,7 @@ body.no-en .q.peek .en { display: block; }
     return '<article class="q' + (done ? ' done ' + (right ? 'right' : 'wrong') : '') + '" id="q' + q.id + '">' +
       '<div class="qhead"><span>' + head + '</span></div>' + body +
       '<button class="showen" data-peek="' + q.id + '">Show English</button>' +
+      (done ? '' : '<button class="hintbtn" data-hint="' + q.id + '">Rule hint</button><p class="hint" hidden></p>') +
       '<div class="answers">' + btns + '</div>' +
       (done ? '<div class="feedback">' + verdict + fb + '</div>' : '') + '</article>';
   }
@@ -483,6 +591,16 @@ body.no-en .q.peek .en { display: block; }
       $('scoreTxt').textContent = correct + ' / ' + answered;
       $('scoreBar').style.width = Math.round(correct / Q.length * 100) + '%';
       return;
+    }
+    var h = e.target.closest('.hintbtn');
+    if (h) {
+      var hq = Q[+h.dataset.hint], hp = h.nextElementSibling;
+      var parts = hq.k === 'tf' ? [hq.j] : hq.items.map(function (i) { return i.j; });
+      hp.innerHTML = parts.map(function (j, k) {
+        var m = plainJ(j).match(RULE), lbl = hq.k === 'tf' ? '' : (k ? 'イ: ' : 'ア: ');
+        return lbl + (m ? 'found <b class="jp">' + m[0] + '</b> → rule says <b>誤</b>' : 'no trap word → rule says <b>正</b>');
+      }).join('<br>') + '<br><span class="muted">The rule is right about 3 times out of 4. Check with what you know.</span>';
+      hp.hidden = !hp.hidden; return;
     }
     var p = e.target.closest('.showen');
     if (p) $('q' + p.dataset.peek).classList.toggle('peek');
@@ -557,7 +675,7 @@ body.no-en .q.peek .en { display: block; }
   }
   document.querySelectorAll('.tab').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); window.scrollTo(0, 0); }); });
   var startTab = (location.hash || '').slice(1) || store('sonpo-tab');
-  if (['method', 'practice', 'words', 'facts'].indexOf(startTab) !== -1) show(startTab);
+  if (['plan', 'method', 'practice', 'words', 'facts'].indexOf(startTab) !== -1) show(startTab);
   function applyOpts() {
     document.body.classList.toggle('no-furi', !$('opt-furi').checked);
     document.body.classList.toggle('no-en', !$('opt-en').checked);
