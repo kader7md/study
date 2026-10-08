@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+# Turn these on once the repo moves to your PC and you've run `git lfs install`
+# (big binary files like models/textures/audio belong in Git LFS):
+# *.blend filter=lfs diff=lfs merge=lfs -text
+# *.glb   filter=lfs diff=lfs merge=lfs -text
+# *.fbx   filter=lfs diff=lfs merge=lfs -text
+# *.png   filter=lfs diff=lfs merge=lfs -text
+# *.wav   filter=lfs diff=lfs merge=lfs -text
+# *.ogg   filter=lfs diff=lfs merge=lfs -text
