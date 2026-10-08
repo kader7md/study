@@ -11,6 +11,19 @@ A co-op train chase (then a sea chase) with a secret impostor. Made with **Godot
 
 Open the folder in **Godot 4.7** (standard build, 4.7.2), then press **F5** (Run Project).
 
+### Menu, hosting and joining
+- The game starts on the **title screen** (`scenes/menu/MainMenu.tscn`): **Host game**, **Join game**, **Settings**, **Quit**.
+  Type your name in the card at the bottom right.
+- **Host game** opens the lobby (once the multiplayer layer is in; until then it starts a solo run straight away).
+  Solo play is hosting with nobody else.
+- **Join game** asks for the host's **invite code** (or `IP:port`) and your name.
+- **Esc** in game opens the **pause menu**: Resume, Settings, Back to menu, Quit. Solo play pauses; online it keeps running.
+- **Settings** (also in the pause menu), saved in `user://settings.cfg`:
+  Controls (rebind every key or mouse button, reset to defaults, mouse sensitivity, invert Y) ·
+  Graphics (window mode, V-Sync, resolution scale, shadows, anti-aliasing, FOV, max FPS) ·
+  Audio (Master, Music, SFX, Voice) · Microphone (input device, live level meter, hear-yourself test, push to talk).
+  **F11** toggles fullscreen anywhere.
+
 What's in it:
 - **Landscape**: 6 stations 1.5 km apart, through forest hills, a river valley, a mountain pass, a lake and the coast.
   Hills slow the train, and wooden trestle bridges cross the rivers and the lake
@@ -32,9 +45,12 @@ What's in it:
 |-----|--------|
 | WASD / Shift / Space | Move / sprint / jump |
 | Mouse · LMB | Look · use tool (hammer hit, nail gun shot, hold to weld) |
-| 1 / 2 / 3 (or mouse wheel) | Hammer / nail gun / welder (only while holding a station torch) |
+| 1-5 (or mouse wheel) | Hammer / wrench / nail gun / welder (only while holding a station torch) / come-along |
 | E · Q · G | Use / place carried item · alternative use · put the carried item back |
+| Esc | Pause menu (closes the shop or Settings first) |
+| V | Push to talk (voice chat, with multiplayer) |
 | F1 | Show/hide help |
+| F11 | Fullscreen on/off |
 | F2 | Debug: play as **impostor** (**Tab** = sabotage menu, then 1–4; meteor: aim + LMB) |
 | F3 | Debug: world sabotage on/off |
 | F5 / F6 | Last checkpoint / new game |
@@ -46,10 +62,16 @@ blender --background --python blender/scripts/build_nature.py -- .      # trees,
 blender --background --python blender/scripts/render_showcase.py -- . renders   # preview pictures
 ```
 
+All keys can be changed in Settings > Controls.
+
 ### Tests
 ```bash
+godot --headless --path . --import                     # once after pulling (registers classes and imports assets)
 godot --headless --path . res://tests/TestTrain.tscn   # automated playthrough of the core loop, exit code 0 = pass
+godot --headless --path . res://tests/TestMenu.tscn    # settings save/load/rebind, main menu, pause menu, scene flow
+# Screenshots need a display (or xvfb-run); modes: repair, train, menu, hud
+xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/Screenshot.tscn -- <out_dir> menu
 ```
 
 ### Not built yet (see GDD milestones)
-Multiplayer (M1) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **locked routes + quest maps (next)** · Chapter 2 sea
+Multiplayer (M1, in progress) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **locked routes + quest maps (next)** · Chapter 2 sea

@@ -16,6 +16,7 @@ func _ready() -> void:
 	await _settings_checks()
 	await _menu_checks()
 	await _pause_checks()
+	await _flow_checks()
 	# Back to the real settings file
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
 	Settings.path = Settings.PATH
@@ -172,6 +173,33 @@ func _pause_checks() -> void:
 	check(not hud.pause_menu.is_open and not Game.ui_open, "Esc closes the shop first")
 	main.queue_free()
 	await _frames(3)
+
+
+## Menu -> Host (solo, no Net autoload) -> Main -> pause -> Back to menu.
+func _flow_checks() -> void:
+	print("Scene flow")
+	# Keep this test node alive across scene changes: a dummy node becomes the "current scene"
+	var dummy := Node.new()
+	get_tree().root.add_child(dummy)
+	get_tree().current_scene = dummy
+	get_tree().change_scene_to_file("res://scenes/menu/MainMenu.tscn")
+	await _frames(20)
+	check(get_tree().current_scene != null and get_tree().current_scene.name == "MainMenu", "main menu loads as a scene")
+	if get_tree().root.get_node_or_null("Net") == null:
+		get_tree().current_scene.call("_on_host")
+		await get_tree().create_timer(1.2).timeout
+		await _frames(5)
+		var cur := get_tree().current_scene
+		check(cur != null and cur.scene_file_path == "res://scenes/main/Main.tscn", "Host game (no Net yet) starts the game")
+		var hud: HUD = cur.get("hud") if cur else null
+		if hud:
+			hud.pause_menu.open()
+			await _frames(2)
+			hud.pause_menu.call("_back_to_menu")
+			await _frames(20)
+			cur = get_tree().current_scene
+			check(cur != null and cur.name == "MainMenu" and not get_tree().paused, "Back to menu returns to the main menu, unpaused")
+			check(not Game.ui_open, "UI flag cleared after leaving the game")
 
 
 func _press_pause() -> void:

@@ -37,6 +37,9 @@ func _ready() -> void:
 	background.name = "Background"
 	add_child(background)
 	move_child(background, 0)
+	var music := MenuMusic.new()
+	music.name = "Music"
+	add_child(music)
 	_intro.call_deferred()
 	var net := _net()
 	if net and net.has_signal("connection_failed"):
@@ -306,9 +309,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _join.visible:
 			get_viewport().set_input_as_handled()
 			_close_join()
-	elif event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_F11:
-		var fs := int(Settings.get_value("graphics", "window_mode")) != 0
-		Settings.set_value("graphics", "window_mode", 0 if fs else 1)
 
 
 func _on_host() -> void:
@@ -393,6 +393,9 @@ func _go(scene: String) -> void:
 	_fade.color.a = 0.0
 	var t := create_tween()
 	t.tween_property(_fade, "color:a", 1.0, 0.35)
+	var music := get_node_or_null("Music") as AudioStreamPlayer
+	if music:
+		t.parallel().tween_property(music, "volume_db", -40.0, 0.35)
 	await t.finished
 	get_tree().change_scene_to_file(scene)
 

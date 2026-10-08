@@ -130,6 +130,10 @@ func _back_to_menu() -> void:
 	if Game.has_method("return_to_menu"):
 		Game.call("return_to_menu")
 	else:
+		Game.track = null
+		Game.train = null
+		Game.sabotage = null
+		Game.terrain = null
 		get_tree().change_scene_to_file(MENU_SCENE)
 
 

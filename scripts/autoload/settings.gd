@@ -70,6 +70,7 @@ var mic_device: String:
 var default_bindings: Dictionary = {}
 
 var _save_queued := false
+var _loading := false
 var _click: AudioStreamPlayer
 var _hover: AudioStreamPlayer
 var _last_hover_ms := 0
@@ -90,6 +91,14 @@ func _ready() -> void:
 	_build_ui_sounds()
 	set_mic_monitor(false)  # never echo the microphone unless the Settings test toggle asks for it
 	get_tree().node_added.connect(_on_node_added)
+
+
+## F11 toggles fullscreen anywhere (saved like the Graphics tab setting).
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_F11:
+		var fs := int(get_value("graphics", "window_mode")) != 0
+		set_value("graphics", "window_mode", 0 if fs else 1)
+		get_viewport().set_input_as_handled()
 
 
 # --- Public API ---------------------------------------------------------------------------------
@@ -126,7 +135,9 @@ func load_settings() -> void:
 			push_warning("Settings: %s is unreadable (%s), using defaults" % [path, error_string(err)])
 			cfg = ConfigFile.new()
 	_validate()
+	_loading = true
 	apply_all()
+	_loading = false
 
 
 func apply_all() -> void:
@@ -380,7 +391,9 @@ func _apply_graphics(key: String) -> void:
 					DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 		"vsync":
 			var mode := DisplayServer.VSYNC_ENABLED if bool(v) else DisplayServer.VSYNC_DISABLED
-			if not headless and DisplayServer.window_get_vsync_mode() != mode:
+			# V-Sync is on by default (project setting), so startup only needs to act when it is off
+			var startup_default := _loading and bool(v)
+			if not headless and not startup_default and DisplayServer.window_get_vsync_mode() != mode:
 				DisplayServer.window_set_vsync_mode(mode)
 		"render_scale":
 			root.scaling_3d_scale = clampf(float(v), 0.5, 1.0)
