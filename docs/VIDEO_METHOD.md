@@ -1,5 +1,7 @@
 # The Video's Method (Elden Ring-style game with Claude Opus + Godot + Blender)
 
+> ⚠️ **Incomplete:** based on a short summary only. Full transcript analysis is pending, see [`TODO_LOCAL.md`](TODO_LOCAL.md).
+
 Source: *"САМЫЕ МОЩНЫЕ НЕЙРОСЕТИ СОЗДАЮТ ELDEN RING С НУЛЯ | Claude Opus vs GPT Astra в движке Godot"*, НейроЧел+
 (https://www.youtube.com/watch?v=oJ5PJcOGuaY). Taken from a summary of the video, not a full transcript.
 
