@@ -284,6 +284,12 @@ an automated test drives the whole route.
 
 ---
 
+## Known gaps (after review round 1)
+- Rejoining a run in progress after a dropped connection is not possible yet (the host has to start a new session).
+- Steam backend (invites through Steam) is a stub; ENet with invite codes and UPnP is what ships.
+- Reviving by carrying a body to the station grave is M5; until then: a medkit, or reaching the next station.
+- The quest mini-game maps that will guard each locked gate come later; the key lies beside each gate for now.
+
 ## Tester and critic checklist per merge
 1. `--import`, then TestTrain, then TestRoute, then `tests/run_net_test.sh` (when each exists).
 2. Screenshots: `menu`, `hud`, `repair`, `train`, `gate`, `end` (xvfb + opengl3). Post them in the review.

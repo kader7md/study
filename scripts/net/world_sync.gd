@@ -49,21 +49,17 @@ func setup(main_node: Node) -> void:
 	train = Game.train
 	_host = Net.is_host()
 	process_physics_priority = -10  # before Train, so the cars use this frame's distance
-	_name_pickups()
 	name_tree(main)
 	if train:
 		_hooks.assign(train.cars[0].find_children("*", "HookSpot", true, false))
 	if _host:
 		track.piece_broken.connect(_on_piece_broken)
 		track.piece_repaired.connect(_on_piece_repaired)
-		if track.has_signal("gate_opened"):
-			track.connect("gate_opened", _on_gate_opened)
+		track.gate_opened.connect(_on_gate_opened)
 		Game.inventory_changed.connect(func(): _inventory_dirty = true)
 		Game.station_reached.connect(_on_station_reached)
-		if Game.has_signal("run_finished"):
-			Game.connect("run_finished", _on_run_finished)
-		if Game.has_signal("objective_changed"):
-			Game.connect("objective_changed", _on_objective_changed)
+		Game.run_finished.connect(_on_run_finished)
+		Game.objective_changed.connect(_on_objective_changed)
 		main.child_entered_tree.connect(_on_main_child)
 
 
@@ -80,17 +76,6 @@ static func name_tree(root: Node) -> void:
 			counts[cls] = k + 1
 			c.name = "%s_%d" % [cls, k]
 		name_tree(c)
-
-
-func _name_pickups() -> void:
-	var pickups := main.get_node_or_null("Pickups")
-	if pickups == null:
-		return
-	var i := 0
-	for p in pickups.get_children():
-		if not String(p.name).begins_with("Pickup_"):
-			p.name = "Pickup_%d" % i
-		i += 1
 
 
 func _send(method: StringName, args: Array = []) -> void:
@@ -145,7 +130,7 @@ func snapshot() -> Dictionary:
 		"t": [train.distance, train.speed, train.lever, train.fuel, train.body_health, train.engine_damage,
 			train.chassis_damage, train.tipped, train.tip_target, train.current_station, hook_index, anchor_name],
 		"w": states, "ww": wear, "wh": bolt_hits,
-		"g": [Game.next_station, Game.wind_active],
+		"g": [Game.next_station, Game.wind_active, Game.run_timing, Game.run_complete],
 		"cd": cds,
 	}
 
@@ -270,9 +255,8 @@ func send_full_state(peer: int) -> void:
 			if p is Pickup and p.item == "gold" and p.hits_left < 3:
 				gold[String(p.name)] = p.hits_left
 	var gates := []
-	if track.has_method("is_gate_locked"):
-		for seg in Game.STATION_COUNT:
-			gates.append(bool(track.call("is_gate_locked", seg)))
+	for seg in track.gate_count():
+		gates.append(track.is_gate_locked(seg))
 	var state := {
 		"broken": _poll_repairs(true),
 		"rolls": rolls,
@@ -282,8 +266,9 @@ func send_full_state(peer: int) -> void:
 		"next_station": Game.next_station,
 		"parts": _poll_parts(true),
 		"gates": gates,
-		"objective": str(Game.get("objective")) if "objective" in Game else "",
+		"objective": Game.objective,
 		"stats": Game.stats,
+		"run": [Game.run_timing, Game.run_complete, Game.opened_gates.duplicate()],
 		"pickups": _runtime_pickups(),
 	}
 	_rpc_full_state.rpc_id(peer, state)
@@ -334,7 +319,7 @@ func _on_gate_opened(seg: int) -> void:
 
 
 func _on_station_reached(index: int) -> void:
-	_send(&"_rpc_station", [index, Game.get("stats") if "stats" in Game else {}])
+	_send(&"_rpc_station", [index, Game.stats])
 
 
 func _on_run_finished(stats: Dictionary) -> void:
@@ -468,6 +453,9 @@ func _rpc_snapshot(s: Dictionary) -> void:
 	var g: Array = s.g
 	Game.next_station = g[0]
 	Game.wind_active = g[1]
+	if g.size() >= 4:
+		Game.run_timing = g[2]  # the run clock ticks here too between station syncs
+		Game.run_complete = g[3]
 	var cds: PackedFloat32Array = s.cd
 	if Game.sabotage:
 		var k := 0
@@ -559,15 +547,21 @@ func _rpc_full_state(s: Dictionary) -> void:
 	var parts: Array = s.parts
 	for i in mini(parts.size(), train.parts.size()):
 		_apply_part(i, parts[i])
+	# gates both ways: open what the host opened, lock (and put the key back) what the host has locked
 	var gates: Array = s.gates
-	for seg in gates.size():
-		if not gates[seg] and track.has_method("is_gate_locked") and track.call("is_gate_locked", seg):
-			_rpc_gate(seg)
-	if str(s.objective) != "":
-		_rpc_objective(s.objective)
+	for seg in mini(gates.size(), track.gate_count()):
+		track.set_gate_locked(seg, bool(gates[seg]))
+	_rpc_objective(str(s.objective))
 	var host_stats: Dictionary = s.get("stats", {})
 	if not host_stats.is_empty():
 		Game.stats = host_stats.duplicate()
+	var run: Array = s.get("run", [])
+	if run.size() >= 3:
+		Game.run_timing = bool(run[0])
+		Game.run_complete = bool(run[1])
+		Game.opened_gates.clear()
+		for seg: Variant in run[2]:
+			Game.opened_gates.append(int(seg))
 	var runtime: Array = s.get("pickups", [])
 	for e: Array in runtime:
 		_rpc_pickup(e)
@@ -671,15 +665,17 @@ func _rpc_meteor(n: String, target: Vector3) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_gate(seg: int) -> void:
-	if track.has_method("open_gate"):
-		track.call("open_gate", seg)
+	track.open_gate(seg)
 
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_station(index: int, stats: Dictionary) -> void:
-	if "stats" in Game and not stats.is_empty():
-		Game.set("stats", stats)
+	if not stats.is_empty():
+		Game.stats = stats.duplicate()
 	Game.next_station = maxi(Game.next_station, index + 1)
+	if index >= Game.STATION_COUNT:
+		Game.run_timing = false
+		Game.run_complete = true
 	Game.station_reached.emit(index)
 	if index >= Game.STATION_COUNT:
 		Game.chapter_completed.emit()
@@ -687,13 +683,12 @@ func _rpc_station(index: int, stats: Dictionary) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_run_finished(stats: Dictionary) -> void:
-	if "stats" in Game:
-		Game.set("stats", stats)
-	if Game.has_signal("run_finished"):
-		Game.emit_signal("run_finished", stats)
+	Game.stats = stats.duplicate()
+	Game.run_timing = false
+	Game.run_complete = true
+	Game.run_finished.emit(stats)
 
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_objective(text: String) -> void:
-	if "objective" in Game:
-		Game.set("objective", text)
+	Game.objective = text

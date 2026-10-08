@@ -115,10 +115,13 @@ func setup(p: CharacterBody3D, cam: Camera3D) -> void:
 	_show_tool(tool)
 
 
+## Leather work glove and jacket sleeve (Blender model arm.glb): hand at the pivot, forearm towards the camera.
 func _arm(pivot: Node3D) -> void:
-	Build.box(pivot, Vector3(0.11, 0.11, 0.4), Vector3(0, -0.04, 0.22), SKIN)
-	Build.sphere(pivot, 0.07, Vector3(0, 0, 0), SKIN)  # chunky hand
-	Build.box(pivot, Vector3(0.13, 0.13, 0.12), Vector3(0, -0.04, 0.42), SLEEVE)  # sleeve
+	var arm := Props.instance("arm")
+	arm.scale = Vector3.ONE * 1.15
+	if pivot == left:
+		arm.scale.x = -arm.scale.x  # mirrored for the left hand
+	pivot.add_child(arm)
 
 
 func _build_tools() -> void:

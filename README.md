@@ -12,11 +12,15 @@ A co-op train chase (then a sea chase) with a secret impostor. Made with **Godot
 Open the folder in **Godot 4.7** (standard build, 4.7.2), then press **F5** (Run Project).
 
 ### Menu, hosting and joining
-- The game starts on the **title screen** (`scenes/menu/MainMenu.tscn`): **Host game**, **Join game**, **Settings**, **Quit**.
-  Type your name in the card at the bottom right.
-- **Host game** opens the lobby (once the multiplayer layer is in; until then it starts a solo run straight away).
-  Solo play is hosting with nobody else.
-- **Join game** asks for the host's **invite code** (or `IP:port`) and your name.
+- The game starts on the **title screen** (`scenes/menu/MainMenu.tscn`): **Continue** (only when there is a save),
+  **Play solo**, **Host game**, **Join game**, **Settings**, **Quit**. Type your name in the card at the bottom right.
+- **Play solo** starts an offline run (no network port, no firewall prompt).
+- **Continue (station N)** carries on from the last station you reached: every station saves the run to
+  `user://checkpoint.json` (inventory, train, run stats, opened gates). A finished run is not offered.
+- **Host game** opens the crew lobby. If port 24565 is busy it uses the next free one (the invite code carries it).
+  With a save on disk the host can also press **Continue from station N** in the lobby (everyone starts there).
+- **Join game** asks for the host's **invite code** (or `IP:port`) and your name. The dialog stays open while
+  connecting and shows why a join failed; once the host lets you in, the lobby opens.
 - **Esc** in game opens the **pause menu**: Resume, Settings, Back to menu, Quit. Solo play pauses; online it keeps running.
 - **Settings** (also in the pause menu), saved in `user://settings.cfg`:
   Controls (rebind every key or mouse button, reset to defaults, mouse sensitivity, invert Y) ·
@@ -66,13 +70,24 @@ What's in it:
 | F11 | Fullscreen on/off |
 | F2 | Debug: play as **impostor** (**Tab** = sabotage menu, then 1–4; meteor: aim + LMB) |
 | F3 | Debug: world sabotage on/off |
-| F5 / F6 | Last checkpoint / new game (offline or host only) |
+| F5 / F6 | Debug: last checkpoint / new game (offline or host only) |
+
+The F2/F3/F5/F6 debug keys only work in debug builds (the editor, or `developer/debug_keys=true` in
+`user://settings.cfg`), only during a run, and they only show in the F1 help then. Every key hint on screen follows
+your own bindings from Settings > Controls.
+
+Going down: a player whose health reaches 0 is **down**. A **medkit** (station shop) saves you once when you would go
+down, or a crewmate aims at you and presses **E** with a medkit to revive you. Everyone who is down gets back up when the
+train reaches the next station. If the whole crew is down, the run goes back to the last checkpoint. Health comes back
+slowly over time, and quickly near the warm furnace or in a station.
 
 ### Rebuilding the models
 ```bash
 blender --background --python blender/scripts/build_assets.py -- .      # train, tools, repair items, gate, key
 blender --background --python blender/scripts/build_assets.py -- . only=gate   # just the locked gate, signal post, key
 blender --background --python blender/scripts/build_nature.py -- .      # trees, rocks, cliffs, bushes
+blender --background --python blender/scripts/build_station.py -- .     # station canopy, shop kiosk, name board,
+                                                                         # come-along, first-person glove and sleeve
 blender --background --python blender/scripts/render_icons.py -- . [only=key]   # item icons (assets/icons)
 blender --background --python blender/scripts/render_showcase.py -- . renders [shots=gate]   # preview pictures
 ```
@@ -80,13 +95,15 @@ blender --background --python blender/scripts/render_showcase.py -- . renders [s
 All keys can be changed in Settings > Controls.
 
 ### Playing together (1 to 5 players)
-- **Host:** *Host game* in the main menu opens the **crew lobby** (or run `res://scenes/net/Lobby.tscn`, which also offers
-  solo / host / join on its own). Share the **invite code** (Copy code), e.g. `60N00-H8QZN`: it is your IP and port.
+- **Host:** *Host game* in the main menu opens the **crew lobby** (run `res://scenes/net/Lobby.tscn` on its own and it
+  offers solo / host / join too). Share the **invite code** (Copy code), e.g. `60N00-H8QZN`: it is your IP and port.
   Friends on your Wi-Fi join right away. Over the internet, forward **UDP port 24565** on your router or press
   **Open the port (UPnP)**. Press **Start the run** when everyone is ready (alone it says *Start solo*: plain offline play).
 - **Join:** *Join game*, paste the code (or type `192.168.1.20` / `192.168.1.20:24565`), then **I'm ready**.
 - The host's PC runs the game; everyone sees the same train, track, repairs and inventory. With 3 to 5 players one of
-  you is secretly the **impostor** (a private banner tells only them). If the host leaves, everyone goes back to the menu.
+  you is secretly the **impostor** (a private banner tells only them). If the host leaves, everyone goes back to the menu
+  ("The host ended the run" when the host chose Back to menu). A player who drops out cannot rejoin a run in
+  progress yet.
 - Details, the Steam plug-in steps and the invite-code format: [`docs/NETWORK.md`](docs/NETWORK.md).
 
 ### Tests

@@ -111,19 +111,25 @@ func _on_shop_requested(s: Station) -> void:
 
 func _build_environment() -> void:
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.35, 0.6, 0.95)
-	sky_mat.sky_horizon_color = Color(0.75, 0.85, 0.95)
-	sky_mat.ground_horizon_color = Color(0.6, 0.7, 0.55)
+	sky_mat.sky_top_color = Color(0.3, 0.52, 0.85)
+	sky_mat.sky_horizon_color = Color(0.68, 0.77, 0.86)
+	sky_mat.ground_horizon_color = Color(0.5, 0.56, 0.48)
+	sky_mat.ground_bottom_color = Color(0.25, 0.28, 0.22)
+	sky_mat.sky_energy_multiplier = 0.9
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	_env = Environment.new()
 	_env.background_mode = Environment.BG_SKY
 	_env.sky = sky
 	_env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	_env.ambient_light_energy = 0.6
+	_env.ambient_light_energy = 0.45
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	_env.tonemap_exposure = 0.92
+	_env.tonemap_white = 6.0
+	_env.adjustment_enabled = true
+	_env.adjustment_saturation = 1.0
 	_env.fog_enabled = true
-	_env.fog_density = 0.0012
+	_env.fog_density = 0.0008
 	_env.fog_light_color = Color(0.75, 0.82, 0.9)
 	var we := WorldEnvironment.new()
 	we.environment = _env
@@ -139,7 +145,7 @@ func _build_environment() -> void:
 
 func _on_wind_changed(active: bool) -> void:
 	var tween := create_tween()
-	tween.tween_property(_env, "fog_density", 0.02 if active else 0.0012, 2.0)
+	tween.tween_property(_env, "fog_density", 0.02 if active else 0.0008, 2.0)
 	tween.parallel().tween_property(_env, "fog_light_color", Color(0.85, 0.92, 1.0) if active else Color(0.75, 0.82, 0.9), 2.0)
 
 

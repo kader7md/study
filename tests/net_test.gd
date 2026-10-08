@@ -291,7 +291,11 @@ func _host() -> void:
 	await _wait_until(func(): return _flags.has("client_checked"), 30.0)
 	check(them != null and them.has_node("VoiceOut"), "a voice frame from the client plays at its body")
 
-	print("Everyone back to the start (the crew-wiped / F6 path)")
+	print("A gate opens, then everyone goes back to the start (the crew-wiped / F6 path)")
+	Game.track.open_gate(0)
+	check(not Game.track.is_gate_locked(0) and 0 in Game.opened_gates, "the host opened gate 0")
+	_tell.rpc_id(cid, "gate_open", true)
+	check(await _wait_until(func(): return _flags.has("client_gate_open"), 20.0), "the client saw gate 0 open")
 	var old_main := main.get_instance_id()
 	Game.new_game(true)  # online: the host reloads the world on every peer
 	var reloaded := await _wait_until(func(): return _main() != null and _main().get_instance_id() != old_main and Game.train != null and Net.is_peer_ready(cid), 60.0)
@@ -300,14 +304,15 @@ func _host() -> void:
 		await _wait(1.0)
 		check(_main().get_node_or_null("Players/Player_%d" % cid) != null, "the client's player is back")
 		check(Game.train.distance < Game.track.station_distances[0] + 40.0, "the train is back at the departure station")
+		check(Game.track.is_gate_locked(0) and _main().get_node_or_null("Track/Key_0") != null, "gate 0 is locked again, its key is back")
 		Game.train.chassis_damage = 6.0  # for the client to weld at the station
 	_tell.rpc_id(cid, "reloaded", true)
 	await _wait_until(func(): return _flags.has("client_reloaded"), 40.0)
 	check(Game.train and Game.train.chassis_damage < 6.0, "the client welded the chassis (%.1f left)" % Game.train.chassis_damage)
 
-	print("Host leaves")
+	print("Host ends the run (Back to menu)")
 	await _wait(0.5)
-	Net.leave_to_menu()
+	Game.return_to_menu()
 	await _wait(2.0)
 	check(not Net.is_online(), "the host is offline again")
 
@@ -518,6 +523,12 @@ func _client() -> void:
 	await _wait(0.5)
 	_tell.rpc_id(1, "client_checked", true)
 
+	print("A gate opens on the host")
+	check(await _wait_until(func(): return _flags.has("gate_open"), 40.0), "the host opened a gate")
+	check(await _wait_until(func(): return not track.is_gate_locked(0), 5.0), "gate 0 opens here too")
+	check(main.get_node_or_null("Track/Key_0") == null or main.get_node("Track/Key_0").is_queued_for_deletion(), "its key is gone here")
+	_tell.rpc_id(1, "client_gate_open", true)
+
 	print("Back to the start")
 	var old_main := main.get_instance_id()
 	var back := await _wait_until(func(): return _main() != null and _main().get_instance_id() != old_main and _main().player != null, 60.0)
@@ -525,14 +536,16 @@ func _client() -> void:
 	if back:
 		check(Game.train.distance < Game.track.station_distances[0] + 40.0, "the train is back at the departure station")
 		check(Game.count("gold") == Game.START_INVENTORY.gold, "the inventory is back to the start")
+		check(Game.track.is_gate_locked(0) and Game.opened_gates.is_empty(), "gate 0 is locked again here (no stale opened gates)")
+		check(_main().get_node_or_null("Track/Key_0") is GateKey, "and its key lies beside the track again")
 		await _wait_until(func(): return _flags.has("reloaded"), 20.0)
 		await _client_welds(_main())
 	_tell.rpc_id(1, "client_reloaded", true)
 
-	print("The host leaves")
+	print("The host ends the run")
 	_expect_disconnect = true
 	var dropped := await _wait_until(func(): return _disconnect_reason != "", 30.0)
-	check(dropped and _disconnect_reason == "Host left the game", "told: '%s'" % _disconnect_reason)
+	check(dropped and _disconnect_reason == "The host ended the run", "told: '%s'" % _disconnect_reason)
 	await _wait(1.0)
 	check(_main() == null and not Net.is_online(), "back at the menu, offline")
 

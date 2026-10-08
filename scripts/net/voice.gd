@@ -30,7 +30,8 @@ func _process(delta: float) -> void:
 	if not _checked:
 		_checked = true
 		_available = _can_capture()
-	var want := _available and enabled and Net.is_online() and Net.run_active and _wants_to_talk()
+	# the Settings mic test reads the same capture buffer: voice pauses while it runs
+	var want := _available and enabled and Net.is_online() and Net.run_active and MicMeter.active == 0 and _wants_to_talk()
 	if want != _talking:
 		_set_talking(want)
 	if _talking:
@@ -50,8 +51,7 @@ func _wants_to_talk() -> bool:
 		InputMap.add_action("push_to_talk")
 		InputMap.action_add_event("push_to_talk", ev)
 	# Settings > Microphone: push-to-talk off = open microphone while in a run
-	var settings := get_node_or_null(^"/root/Settings")
-	if settings and not bool(settings.call("get_value", "mic", "push_to_talk", true)):
+	if not bool(Settings.get_value("mic", "push_to_talk", true)):
 		return true
 	if Game.ui_open:
 		return false

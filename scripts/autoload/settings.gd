@@ -26,6 +26,12 @@ const DEFAULTS := {
 ## Actions added on top of Game.INPUTS (Game registers attack/cancel itself).
 const EXTRA_INPUTS := {"push_to_talk": [KEY_V], "pause": [KEY_ESCAPE]}
 
+## Default key names used in game texts -> the action they stand for (see hint()).
+const HINT_ACTIONS := {
+	"E": "interact", "Q": "interact_alt", "G": "drop", "Tab": "sabotage_menu", "LMB": "attack", "RMB": "cancel",
+	"Esc": "pause", "V": "push_to_talk", "F1": "toggle_help", "Space": "jump", "Shift": "sprint",
+}
+
 ## Shadow quality presets: [sun shadows, directional atlas size, soft filter quality, max distance].
 const SHADOW_PRESETS := [
 	[false, 1024, RenderingServer.SHADOW_QUALITY_HARD, 60.0],
@@ -42,9 +48,9 @@ var headless := false
 var player_name: String:
 	get:
 		var n: String = str(get_value("profile", "name", ""))
-		return n if n.strip_edges() != "" else "Player"
+		return n if n.strip_edges() != "" else "Player"  # = Net.DEFAULT_NAME
 	set(value):
-		set_value("profile", "name", value.strip_edges().left(20))
+		set_value("profile", "name", value.strip_edges().left(20))  # Net.NAME_MAX
 var mouse_sensitivity: float:
 	get:
 		return float(get_value("controls", "mouse_sensitivity", 0.0025))
@@ -68,6 +74,7 @@ var mic_device: String:
 
 ## Default bindings per action as event descriptors ("key:<physical keycode>" / "mouse:<button>").
 var default_bindings: Dictionary = {}
+var _hint_re: RegEx
 
 var _save_queued := false
 var _loading := false
@@ -222,6 +229,48 @@ func binding_text(action: String) -> String:
 	if descs.is_empty():
 		return "Unbound"
 	return desc_to_text(descs[0])
+
+
+## Short label of the action's current key for on-screen hints: "E", "LMB", "Esc", "Tab"...
+func key_label(action: String) -> String:
+	var descs := action_descs(action)
+	if descs.is_empty():
+		return "unbound"
+	var t := desc_to_text(descs[0])
+	match t:
+		"Mouse Left": return "LMB"
+		"Mouse Right": return "RMB"
+		"Mouse Middle": return "MMB"
+		"Escape": return "Esc"
+	return t
+
+
+## Key hint for an action in brackets, e.g. "[E]" (or "[F]" after rebinding "interact" to F).
+func key_hint(action: String) -> String:
+	return "[%s]" % key_label(action)
+
+
+## Hints in game texts are written with the default keys ("[E]", "[Q]", "[Tab]", "[LMB]", "[E / Esc]").
+## This puts the player's current bindings in their place.
+func hint(text: String) -> String:
+	if not "[" in text:
+		return text
+	if _hint_re == null:
+		_hint_re = RegEx.create_from_string("\\[([^\\[\\]]{1,12})\\]")
+	var out := ""
+	var last := 0
+	for m in _hint_re.search_all(text):
+		var parts := m.get_string(1).split(" / ")
+		var changed_any := false
+		for i in parts.size():
+			var action: String = HINT_ACTIONS.get(parts[i].strip_edges(), "")
+			if action != "":
+				parts[i] = key_label(action)
+				changed_any = true
+		if changed_any:
+			out += text.substr(last, m.get_start() - last) + "[" + " / ".join(parts) + "]"
+			last = m.get_end()
+	return out + text.substr(last)
 
 
 static func event_to_desc(ev: InputEvent) -> String:

@@ -19,6 +19,7 @@ var _guard_tick := 0.0
 var _crates := {}            # piece index -> true: one supply crate per gap
 var _coal_crates: Array[float] = []
 var _emergency_wheel := {}   # station index -> true
+var _coal_ration := {}       # station index -> true
 
 
 func _ready() -> void:
@@ -26,6 +27,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if not Game.is_host():
+		return  # NET: clients get the objective from the host (WorldSync._rpc_objective); guards are host-side
 	_objective_tick -= delta
 	if _objective_tick <= 0.0:
 		_objective_tick = 0.25
@@ -128,10 +131,16 @@ func guard() -> void:
 			var p := _crate_spot(track.piece_center(piece) - 6.0)
 			_spawn_crate(items, p)
 			Game.say("Short of supplies? A supply crate lies beside the broken track (%s)" % Game.cost_text(items))
-	# 2. No fuel, no coal, no gold for coal: a coal crate (at most one every 200 m)
-	if train.fuel <= 0.0 and not Game.has("coal") and Game.count("gold") < int(Game.SHOP.coal.price) and train.current_station == -1:
+	# 2. No fuel, no coal, no gold for coal: a coal crate (at most one every 200 m). At a station the station
+	#    master hands over a coal ration instead (once per station).
+	if train.fuel <= 0.0 and not Game.has("coal") and Game.count("gold") < int(Game.SHOP.coal.price):
 		var d := train.distance
-		if not _coal_crates.any(func(c: float): return absf(c - d) < 200.0):
+		if train.current_station >= 0:
+			if not _coal_ration.has(train.current_station):
+				_coal_ration[train.current_station] = true
+				Game.add("coal", int(COAL_CRATE.coal))
+				Game.say("The station master shovels you a ration of coal (%d). Feed the furnace!" % int(COAL_CRATE.coal))
+		elif not _coal_crates.any(func(c: float): return absf(c - d) < 200.0):
 			_coal_crates.append(d)
 			_spawn_crate(COAL_CRATE, _crate_spot(d - 10.0))
 			Game.say("Out of coal and gold: someone left a crate of coal beside the track")

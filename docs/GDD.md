@@ -188,7 +188,7 @@ One broken piece on solid ground costs about **4 wood** (planks), **4 scrap** (2
 | Beside every gate | 4 coal and a gold rock | The crew stops there anyway |
 | Along the line | a pile every ~34 m (60 % coal, 20 % wood, 20 % scrap), 3 extra gold rocks per segment 6-14 m out | Coal near the track is 4-8x the burn; the coal at the gaps and gate alone is ~1.5-2.5x (checked by TestRoute) |
 | Gold rock | 3 hits x 2 gold | Each segment has 30+ gold near the track: a wheel + oil (14) and more |
-| Shop | nails x10 = 4, wood x5 = 3, scrap x5 = 3, coal x5 = 2, wheel = 8, oil = 6, medkit = 7, come-along = 10, grappling hook = 12, nail gun = 15 | Wood and scrap are the softlock fallback |
+| Shop | nails x10 = 4, wood x5 = 3, scrap x5 = 3, coal x5 = 2, wheel = 8, oil = 6, medkit = 7, come-along = 10, nail gun = 15 (grappling hook = 12 once the climbing maps exist) | Wood and scrap are the softlock fallback |
 | Crash | (speed - 4 m/s) x 3.5 + 4 damage (a locked gate: half) | Full speed into a gap ≈ 39 of 100 |
 | Wheels | wear at 2.5 falls off; bumpy track (4-8° tilt) +0.4 per crossing; crash damage spreads over 2 wheels | Tighten with the wrench in time |
 | World sabotage (1-2 players) | every 100-160 s in segment 1, 80-140, 65-120, 55-105, 50-95 s by segment 5; never within 20 s of leaving a station; world meteors avoid bridges and gates | Calm start, busier towards the port |
@@ -264,6 +264,9 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
      and sacrifice it. That revives a **random** dead player.
   3. **Station grave:** carry the body to the **grave at the next checkpoint station**.
 - Dead players spectate until revived.
+- *Prototype stopgap until M5:* a downed player is revived by a crewmate's medkit (aim + E), a medkit in the crew
+  inventory saves a player once when they would go down, and everyone who is down gets up when the train reaches the
+  next station. Health regenerates slowly, faster by the warm furnace or in a station.
 
 ## 9. Look, camera and UI (reference: RV There Yet)
 - **Art style: stylized realism** (updated: assets should be detailed, not childish): realistic proportions with slight

@@ -9,13 +9,10 @@ extends CanvasLayer
 ##  bottom       health and frost (left), tool hotbar + help (centre), impostor sabotage panel (right)
 ## Also the station shop window and the Esc pause menu.
 
-const HELP := """WASD move · Shift sprint · Space jump · E use / place · Q alt · G put item back · Esc pause
-Tools: 1 hammer · 2 wrench · 3 nail gun · 4 welder (station torch) · 5 come-along · LMB use
-Broken track: planks (nail on ground, NAIL GUN over water) → rails → bolt · tilt over 8° tips the train!
-F1 help · F2 play as impostor ([Tab] sabotage) · F3 world sabotage · F5 last checkpoint · F6 new game"""
-const HELP_AUTO_HIDE := 30.0
+## The help panel shows by itself only on a player's first run (Settings profile/seen_help), for this long.
+const HELP_AUTO_HIDE := 20.0
 const MAX_TOASTS := 5
-const ITEM_ORDER := ["gold", "coal", "wood", "scrap", "nails", "wheel", "engine_oil", "medkit", "come_along", "nail_gun", "grappler"]
+const ITEM_ORDER := ["gold", "coal", "wood", "scrap", "nails", "wheel", "engine_oil", "medkit", "come_along", "nail_gun"]
 
 var player: Player
 
@@ -62,6 +59,10 @@ var _tool_slots := {}          # tool id -> PanelContainer
 var _help: PanelContainer
 var _help_hint: Label
 var _help_timer := HELP_AUTO_HIDE
+var _help_label: Label
+var _downed: PanelContainer
+var _downed_label: Label
+var _shop_dim: ColorRect
 # shop
 var _shop: PanelContainer
 var _shop_list: GridContainer
@@ -86,6 +87,7 @@ func _ready() -> void:
 	_build_centre()
 	_build_bottom()
 	_build_messages()
+	_build_downed()
 	_build_shop()
 
 	pause_menu = PauseMenu.instantiate()
@@ -94,12 +96,41 @@ func _ready() -> void:
 	Game.message.connect(_add_message)
 	Game.banner.connect(_show_banner)
 	Game.inventory_changed.connect(_refresh_inventory)
-	if Game.has_signal("objective_changed"):
-		Game.connect("objective_changed", _on_objective_changed)
-	var obj: Variant = Game.get("objective")
-	if obj is String:
-		_on_objective_changed(obj)
+	Game.objective_changed.connect(_on_objective_changed)
+	_on_objective_changed(Game.objective)
 	_refresh_inventory()
+	Settings.changed.connect(_on_settings_changed)
+	# the help panel opens by itself only on a player's first run; F1 shows it any time
+	var first := not bool(Settings.get_value("profile", "seen_help", false))
+	_set_help(first)
+	_help_timer = HELP_AUTO_HIDE if first else 0.0
+	if first:
+		Settings.set_value("profile", "seen_help", true)
+
+
+func _on_settings_changed(section: String, _key: String) -> void:
+	if section == "controls" and _help_label:
+		_help_label.text = help_text()
+		_help_hint.text = Settings.hint("[F1] help   ·   [Esc] pause")
+
+
+## The help text with the player's current key bindings (debug keys only when they are enabled).
+static func help_text() -> String:
+	var k := func(action: String) -> String: return Settings.key_label(action)
+	var move := "%s%s%s%s" % [k.call("move_forward"), k.call("move_left"), k.call("move_back"), k.call("move_right")]
+	var lines := PackedStringArray([
+		"%s move · %s sprint · %s jump · %s use / place · %s alt · %s put item back · %s pause" % [
+			move, k.call("sprint"), k.call("jump"), k.call("interact"), k.call("interact_alt"), k.call("drop"), k.call("pause")],
+		"Tools: %s hammer · %s wrench · %s nail gun · %s welder (station torch) · %s come-along · %s use" % [
+			k.call("tool_1"), k.call("tool_2"), k.call("tool_3"), k.call("tool_4"), k.call("tool_5"), k.call("attack")],
+		"Broken track: planks (nail on ground, NAIL GUN over water) → rails → bolt · tilt over 8° tips the train!",
+		"%s help · %s push to talk" % [k.call("toggle_help"), k.call("push_to_talk")],
+	])
+	if Game.debug_keys_enabled():
+		lines.append("Debug: %s impostor ([%s] sabotage) · %s world sabotage · %s last checkpoint · %s new game" % [
+			k.call("toggle_role"), k.call("sabotage_menu"), k.call("toggle_world_sabotage"), k.call("restart_checkpoint"),
+			k.call("new_game")])
+	return "\n".join(lines)
 
 
 ## Multiplayer and other systems put small widgets (player list, speaking icons) under the inventory.
@@ -374,13 +405,14 @@ func _build_bottom() -> void:
 	_help.theme_type_variation = &"DarkPanel"
 	col.add_child(_help)
 	var hl := Label.new()
-	hl.text = HELP
+	hl.text = help_text()
+	_help_label = hl
 	hl.theme_type_variation = &"HudSmall"
 	hl.add_theme_font_size_override("font_size", 16)
 	hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_help.add_child(hl)
 	_help_hint = Label.new()
-	_help_hint.text = "[F1] help   ·   [Esc] pause"
+	_help_hint.text = Settings.hint("[F1] help   ·   [Esc] pause")
 	_help_hint.theme_type_variation = &"HudSmall"
 	_help_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_help_hint.visible = false
@@ -407,6 +439,29 @@ func _build_messages() -> void:
 	_place(_toasts, 1.0, 0.5, Vector2(-454, -40), Vector2(440, 0))
 
 
+## "You are down" card in the middle of the screen while the local player is downed.
+func _build_downed() -> void:
+	_downed = PanelContainer.new()
+	_downed.theme_type_variation = &"DarkPanel"
+	_downed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_downed)
+	_place(_downed, 0.5, 0.5, Vector2(-320, -150), Vector2(640, 0))
+	_downed.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	_downed.add_child(v)
+	var t := UiTheme.title_label("YOU ARE DOWN", 44)
+	t.add_theme_color_override("font_color", Color("ff9a86"))
+	v.add_child(t)
+	_downed_label = Label.new()
+	_downed_label.theme_type_variation = &"HudLabel"
+	_downed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_downed_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_downed_label.text = "A crewmate can revive you with a medkit,\nor you get back up when the train reaches the next station."
+	v.add_child(_downed_label)
+	_downed.visible = false
+
+
 func _slot_style(active: bool) -> StyleBoxFlat:
 	var sb := UiTheme.panel(UiTheme.HONEY if active else Color(UiTheme.CREAM, 0.92), 14, 4 if active else 3, true)
 	sb.border_color = UiTheme.INK if active else Color(UiTheme.INK, 0.8)
@@ -426,6 +481,13 @@ func _process(delta: float) -> void:
 		_help_timer -= delta
 		if _help_timer <= 0.0:
 			_set_help(false)
+	# modal windows (shop, pause, end screen) hide the help, toasts and prompts behind them
+	var modal := Game.ui_open
+	_toasts.visible = not modal
+	_help.visible = _help.visible and not modal
+	_help_hint.visible = not _help.visible and not modal
+	_downed.visible = player != null and player.downed and not modal
+	_note_holder.visible = _objective_text != "" and not modal
 	var shop_just_opened := Engine.get_process_frames() == _shop_opened_frame
 	if _shop.visible and not shop_just_opened and (Input.is_action_just_pressed("pause") or Input.is_action_just_pressed("interact")):
 		close_shop()
@@ -463,11 +525,8 @@ func _update_train(train: Train, track: Track) -> void:
 	_journey.next_station = Game.next_station
 	_journey.train_frac = _route_frac(sd, center)
 	var gates: Array = []
-	if track.has_method("gate_distance") and track.has_method("is_gate_locked"):
-		for seg in sd.size() - 1:
-			var gd: float = float(track.call("gate_distance", seg))
-			if gd >= 0.0:
-				gates.append([_route_frac(sd, gd), bool(track.call("is_gate_locked", seg))])
+	for seg in track.gate_count():
+		gates.append([_route_frac(sd, track.gate_distance(seg)), track.is_gate_locked(seg)])
 	_journey.gates = gates
 	_journey.queue_redraw()
 	if Game.next_station > Game.STATION_COUNT:
@@ -492,8 +551,6 @@ func _update_train(train: Train, track: Track) -> void:
 	_lever_chip.add_theme_stylebox_override("panel", lsb)
 	_set_bar(_fuel_bar, train.fuel / Train.MAX_FUEL * 100.0, "Fuel %d%%" % int(train.fuel / Train.MAX_FUEL * 100.0))
 	_wind_row.visible = Game.wind_active
-	if _objective_text == "" and not Game.has_signal("objective_changed"):
-		_set_objective_label(_fallback_objective(train))
 
 
 ## Position along the whole route as 0..1, with the stations equally spaced.
@@ -509,27 +566,16 @@ static func _route_frac(sd: Array[float], d: float) -> float:
 	return 1.0
 
 
-func _fallback_objective(train: Train) -> String:
-	if Game.next_station > Game.STATION_COUNT:
-		return "You made it to the port. Chapter 1 complete!"
-	if Game.track and Game.track.broken_count() > 0 and train.is_stopped() and train.lever != 0:
-		return "Broken track ahead: rebuild it (planks, nails, rails, bolts)."
-	if train.fuel < 15.0:
-		return "The furnace is almost out: shovel coal into it."
-	return "Get the train to %s. Keep the furnace fed and the rails whole." % (
-		"the port" if Game.next_station == Game.STATION_COUNT else "Station %d" % Game.next_station)
-
-
 func _update_player() -> void:
 	if player == null:
 		return
 	_set_bar(_health_bar, player.health, "%d" % int(player.health))
 	_set_bar(_frost_bar, player.frost, "Frost %d%%" % int(player.frost) if player.frost > 1.0 else "Warm")
-	var prompt := player.focused.get_prompt(player) if player.focused else ""
+	var prompt := player.focused.get_prompt(player) if player.focused and not player.downed else ""
 	if player.aiming_meteor:
 		prompt = "Aiming meteor: [LMB] drop · [RMB] cancel"
-	_prompt.text = prompt
-	_prompt_pill.visible = prompt != ""
+	_prompt.text = Settings.hint(prompt)
+	_prompt_pill.visible = prompt != "" and not Game.ui_open
 	_hold_bar.visible = player.hold_needed > 0.0 and player.hold_progress > 0.0
 	if _hold_bar.visible:
 		_hold_bar.value = player.hold_progress / player.hold_needed * 100.0
@@ -551,7 +597,7 @@ func _update_player() -> void:
 			line += "   ·   cable %d%%%s" % [int(player.cable_tension * 100.0), "  ⚠ LIMIT" if player.cable_tension > 0.95 else ""]
 		else:
 			line += "   ·   no torch: take one from a station welder"
-	_hotbar.text = line
+	_hotbar.text = Settings.hint(line)
 	_crosshair.visible = not Game.ui_open
 
 
@@ -565,8 +611,8 @@ func _update_sabotage() -> void:
 			var info: Dictionary = SabotageManager.ABILITIES[id]
 			var cd: float = Game.sabotage.cooldowns[id]
 			var state := "unavailable" if Game.sabotage.locked else ("ready" if cd <= 0.0 else "%ds" % int(cd))
-			lines.append("%d  %s  [%s]" % [info.key, info.label, state])
-		_sabotage_label.text = "\n".join(lines)
+			lines.append("%d  %s  (%s)" % [info.key, info.label, state])
+		_sabotage_label.text = Settings.hint("\n".join(lines))
 
 
 func _set_help(on: bool) -> void:
@@ -606,7 +652,7 @@ func _refresh_inventory() -> void:
 			row.add_child(ic)
 			var nm := Label.new()
 			nm.text = _short_name(item)
-			nm.add_theme_font_size_override("font_size", 15)
+			nm.add_theme_font_size_override("font_size", 15 if nm.text.length() <= 8 else 12)
 			nm.add_theme_color_override("font_color", UiTheme.INK_SOFT)
 			nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			nm.clip_text = true
@@ -628,9 +674,8 @@ func _refresh_inventory() -> void:
 static func _short_name(item: String) -> String:
 	match item:
 		"engine_oil": return "Oil"
-		"come_along": return "Winch"
+		"come_along": return "Come-along"
 		"nail_gun": return "Nail gun"
-		"grappler": return "Hook"
 	return item.replace("_", " ").capitalize()
 
 
@@ -661,6 +706,13 @@ func _set_objective_label(text: String) -> void:
 # --- Shop ---------------------------------------------------------------------------------------------
 
 func _build_shop() -> void:
+	# a dim layer behind the shop window, so the game and the HUD behind it don't show through
+	_shop_dim = ColorRect.new()
+	_shop_dim.color = Color(UiTheme.INK, 0.5)
+	_shop_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_shop_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_shop_dim.visible = false
+	_root.add_child(_shop_dim)
 	_shop = PanelContainer.new()
 	_shop.theme_type_variation = &"WoodPanel"
 	_shop.visible = false
@@ -704,7 +756,8 @@ func _build_shop() -> void:
 	foot.alignment = BoxContainer.ALIGNMENT_END
 	box.add_child(foot)
 	var close := Button.new()
-	close.text = "Close  [E / Esc]"
+	close.text = Settings.hint("Close  [E / Esc]")
+	close.set_meta("hint", "Close  [E / Esc]")
 	close.pressed.connect(close_shop)
 	foot.add_child(close)
 	Game.inventory_changed.connect(_refresh_shop)
@@ -718,6 +771,10 @@ func open_shop(station: Station) -> void:
 		_shop_list.add_child(_shop_card(id))
 	_refresh_shop()
 	_shop.visible = true
+	_shop_dim.visible = true
+	for b in _shop.find_children("*", "Button", true, false):
+		if b.has_meta("hint"):
+			(b as Button).text = Settings.hint(str(b.get_meta("hint")))
 	_shop.modulate.a = 0.0
 	_shop.create_tween().tween_property(_shop, "modulate:a", 1.0, 0.15)
 	_shop_opened_frame = Engine.get_process_frames()
@@ -757,7 +814,7 @@ func _shop_card(id: String) -> Control:
 	v.add_child(t)
 	if desc != "":
 		var d := Label.new()
-		d.text = desc
+		d.text = Settings.hint(desc)
 		d.theme_type_variation = &"MutedLabel"
 		d.add_theme_font_size_override("font_size", 14)
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -791,6 +848,7 @@ func _refresh_shop() -> void:
 
 func close_shop() -> void:
 	_shop.visible = false
+	_shop_dim.visible = false
 	Game.ui_open = false
 
 
@@ -808,7 +866,7 @@ func _add_message(text: String) -> void:
 	sb.content_margin_bottom = 8
 	toast.add_theme_stylebox_override("panel", sb)
 	var l := Label.new()
-	l.text = text
+	l.text = Settings.hint(text)
 	l.add_theme_font_size_override("font_size", 18)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(400, 0)
@@ -832,7 +890,7 @@ func _add_message(text: String) -> void:
 
 
 func _show_banner(text: String) -> void:
-	_banner_label.text = text
+	_banner_label.text = Settings.hint(text)
 	_banner.visible = true
 	if _banner_tween and _banner_tween.is_valid():
 		_banner_tween.kill()

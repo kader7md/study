@@ -494,6 +494,23 @@ func open_gate(seg: int) -> void:
 	gate_opened.emit(seg)
 
 
+## NET: sets a gate's state to match the host's. Locking it again (a client that missed a checkpoint reload)
+## closes the boom and puts its key back beside the track. Opening it goes through open_gate().
+func set_gate_locked(seg: int, locked: bool) -> void:
+	if seg < 0 or seg >= _gate_locked.size() or _gate_locked[seg] == locked:
+		return
+	if not locked:
+		open_gate(seg)
+		return
+	_gate_locked[seg] = true
+	Game.opened_gates.erase(seg)
+	var gate := get_node_or_null("Gate_%d" % seg) as TrackGate
+	if gate:
+		gate.relock()
+	if get_node_or_null("Key_%d" % seg) == null:
+		GateKey.create(self, seg, key_position(seg))
+
+
 ## The next locked gate whose boom is ahead of distance d within `within` metres, or -1.
 func locked_gate_ahead(d: float, within: float) -> int:
 	for s in gate_distances.size():

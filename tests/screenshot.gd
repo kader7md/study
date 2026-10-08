@@ -2,6 +2,7 @@ extends Node
 ## Saves preview screenshots (needs a real or virtual display, not --headless):
 ##   godot --path . res://tests/Screenshot.tscn -- <output_dir> [repair|train|menu|hud|gate|end|tools]
 ## menu: title screen, settings tabs, join dialog. hud: in-game HUD (1600x900 and 1280x720), shop, pause menu.
+## station: station 1 (canopy, name board, shop kiosk) from the track and from the platform.
 ## gate: locked gate and key. end: Chapter 1 end screen. tools: tool animations and carry poses.
 
 var main: Node3D
@@ -31,6 +32,10 @@ func _ready() -> void:
 		get_tree().quit()
 		return
 	# gameplay modes: the locked gate and its key, the Chapter 1 end screen, tool animations and carry poses
+	if args.has("station"):
+		await _station_shots(main.get_node("Station1") as Station)
+		get_tree().quit()
+		return
 	if args.has("gate") or args.has("end") or args.has("tools"):
 		if args.has("gate"):
 			await _gate_shots(track, train, player)
@@ -280,6 +285,24 @@ func _tools_shots(track: Track, train: Train, player: Player) -> void:
 		await _shot("carry_%s" % item, 0.0)
 		player.consume_carried()
 		await get_tree().create_timer(0.5).timeout
+
+
+func _station_shots(st: Station) -> void:
+	main.hud.visible = false
+	var cam := Camera3D.new()
+	cam.far = 2000.0
+	main.add_child(cam)
+	cam.make_current()
+	var views := [
+		["station_1_track", Vector3(-6.0, 3.0, 30.0), Vector3(4.0, 2.5, 0.0)],
+		["station_2_kiosk", Vector3(1.0, 2.6, Station.SHOP_Z - 6.0), Vector3(4.6, 2.4, Station.SHOP_Z)],
+		["station_3_sign", Vector3(0.5, 2.8, Station.SIGN_Z + 7.0), Vector3(Station.SIGN_X, 3.6, Station.SIGN_Z)],
+	]
+	for v: Array in views:
+		cam.global_position = st.to_global(v[1])
+		cam.look_at(st.to_global(v[2]), Vector3.UP)
+		await _shot(v[0], 0.6)
+	main.hud.visible = true
 
 
 func _view_player(player: Player, pos: Vector3, look: Vector3) -> void:

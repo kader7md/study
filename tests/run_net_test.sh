@@ -2,12 +2,28 @@
 # Multiplayer test: a headless host and a headless client on 127.0.0.1 (plus a latecomer who must be turned away).
 #   tests/run_net_test.sh            (uses $GODOT, else `godot` from PATH)
 #   GODOT=/path/to/godot NET_TEST_PORT=24599 tests/run_net_test.sh
+# Without NET_TEST_PORT a random free UDP port is used, so parallel runs on one machine don't cross-connect.
 # Then a 3-player run (host + 2 clients) checks that exactly one player becomes the secret impostor.
 # Prints every log's results; exits 0 only if all of them print PASSED.
 set -u
 cd "$(dirname "$0")/.."
 GODOT="${GODOT:-godot}"
-PORT="${NET_TEST_PORT:-24599}"
+# true if something already listens on UDP port $1 (needs `ss`; without it every port counts as free)
+port_busy() {
+	command -v ss >/dev/null 2>&1 && ss -Hlun 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1\$"
+}
+if [ -n "${NET_TEST_PORT:-}" ]; then
+	PORT="$NET_TEST_PORT"
+	if port_busy "$PORT" || port_busy $((PORT + 1)); then
+		echo "UDP port $PORT or $((PORT + 1)) is already in use: pick another NET_TEST_PORT" >&2
+		exit 2
+	fi
+else
+	for try in $(seq 1 50); do
+		PORT=$((20000 + RANDOM % 20000))
+		port_busy "$PORT" || port_busy $((PORT + 1)) || break
+	done
+fi
 LIMIT="${NET_TEST_TIMEOUT:-175}"
 LOGS="${NET_TEST_LOGS:-$(mktemp -d)}"
 mkdir -p "$LOGS"

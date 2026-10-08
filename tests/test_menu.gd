@@ -13,10 +13,20 @@ func _ready() -> void:
 	Settings.path = TEST_PATH
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
 	Settings.load_settings()
+	# keep the player's real checkpoint save: these checks write their own
+	var real_save := FileAccess.get_file_as_string(Game.SAVE_PATH) if FileAccess.file_exists(Game.SAVE_PATH) else ""
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Game.SAVE_PATH))
 	await _settings_checks()
+	await _hint_checks()
 	await _menu_checks()
 	await _pause_checks()
+	await _continue_checks()
 	await _flow_checks()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Game.SAVE_PATH))
+	if real_save != "":
+		var sf := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
+		sf.store_string(real_save)
+		sf.close()
 	# Back to the real settings file
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
 	Settings.path = Settings.PATH
@@ -97,7 +107,8 @@ func _settings_checks() -> void:
 	Settings.reset_section("audio")
 	check(is_equal_approx(get_tree().root.scaling_3d_scale, 1.0) and Engine.max_fps == 0, "graphics reset")
 
-	# Corrupt file falls back to defaults (the engine prints a ConfigFile parse error here: expected)
+	# Corrupt file falls back to defaults
+	print("  (an engine 'ConfigFile parse error' follows: expected, this case writes a corrupt file)")
 	var f := FileAccess.open(TEST_PATH, FileAccess.WRITE)
 	f.store_string("[controls\nthis is = = not a config }{")
 	f.close()
@@ -120,7 +131,16 @@ func _menu_checks() -> void:
 	check(Game.train == null and Game.track == null, "menu does not set Game.train / Game.track")
 	check(get_tree().get_nodes_in_group("player").is_empty(), "no Player in the menu")
 	var buttons: Array = menu.get("_buttons")
-	check(buttons.size() == 4, "four menu buttons")
+	var texts: Array = buttons.map(func(b: Button) -> String: return b.text)
+	check(buttons.size() == 5 and texts.has("Play solo") and texts.has("Host game"), "menu buttons: Play solo, Host, Join, Settings, Quit (%s)" % ", ".join(texts))
+	check(not texts.any(func(t: String) -> bool: return t.begins_with("Continue")), "no Continue without a save")
+	# debug keys do nothing outside a run (F5 used to reload the menu)
+	var ev := InputEventAction.new()
+	ev.action = "restart_checkpoint"
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	await _frames(5)
+	check(is_instance_valid(menu) and menu.is_inside_tree() and menu.get("_buttons").size() == 5, "F5 in the main menu does nothing")
 	var settings: SettingsMenu = menu.get("_settings")
 	settings.open()
 	await _frames(3)
@@ -151,6 +171,13 @@ func _pause_checks() -> void:
 	Settings.fov = 95.0
 	check(is_equal_approx(player.camera.fov, 95.0), "FOV setting reaches the player camera")
 	Settings.fov = 80.0
+	# a medkit saves a player who would go down; the shop no longer sells items without a use
+	Game.add("medkit")
+	player.take_damage(500.0)
+	check(not player.downed and player.health > 0.0 and not Game.has("medkit"), "a medkit saves the player (health %d)" % int(player.health))
+	check(not Game.SHOP.has("grappler") and Game.SHOP.has("medkit"), "shop: medkit yes, grappling hook not yet")
+	player.take_damage(-50.0)
+	check(player.health <= Game.REVIVE_HEALTH, "negative damage does not heal")
 
 	# Clear the track ahead and drive
 	for i in range(Game.track.piece_at(train.distance), Game.track.piece_at(train.distance + 200.0)):
@@ -175,7 +202,68 @@ func _pause_checks() -> void:
 	await _frames(3)
 
 
-## Menu -> Host (solo, no Net autoload) -> Main -> pause -> Back to menu.
+## Key hints follow the player's bindings: rebind "interact" to F and the prompts say [F].
+func _hint_checks() -> void:
+	print("Key hints")
+	check(Settings.hint("Pick up the gate key  [E]") == "Pick up the gate key  [E]", "default binding: [E] stays")
+	var f := InputEventKey.new()
+	f.physical_keycode = KEY_F
+	Settings.rebind("interact", f)
+	check(Settings.hint("Pick up the gate key  [E]") == "Pick up the gate key  [F]", "interact on F: '%s'" % Settings.hint("Pick up the gate key  [E]"))
+	check(Settings.hint("Close  [E / Esc]") == "Close  [F / Esc]", "combined hints: '%s'" % Settings.hint("Close  [E / Esc]"))
+	check(Settings.hint("[LMB] drop · [RMB] cancel") == "[LMB] drop · [RMB] cancel", "mouse hints: LMB / RMB")
+	check(HUD.help_text().contains("F use / place"), "the help panel shows the new key")
+	var key := GateKey.new()
+	check(Settings.hint(key.get_prompt(null)).ends_with("[F]"), "the gate key prompt shows [F] (%s)" % Settings.hint(key.get_prompt(null)))
+	key.free()
+	Settings.reset_controls()
+	check(Settings.hint("Use [E]") == "Use [E]", "back to E after a reset")
+	Game.debug_keys = false
+	check(not HUD.help_text().contains("new game"), "no debug keys in the help of a release build")
+	Game.debug_keys = OS.is_debug_build()
+	await _frames(1)
+
+
+## Save at station 2, leave, Continue: the run starts at station 2 with gates 0 and 1 open.
+func _continue_checks() -> void:
+	print("Continue from the save on disk")
+	Game.new_game(false)
+	Game.world_sabotage = false
+	var main: Node3D = load("res://scenes/main/Main.tscn").instantiate()
+	add_child(main)
+	await _frames(3)
+	Game.add("gold", 27)
+	Game.track.open_gate(0)
+	Game.track.open_gate(1)
+	Game.next_station = 2
+	Game.on_train_stopped_at_station(2)
+	check(FileAccess.file_exists(Game.SAVE_PATH), "station 2 saved the checkpoint to disk")
+	main.queue_free()
+	await _frames(3)
+	Game.new_game(false)
+	check(Game.saved_station() == 2, "the save says station 2")
+	var menu: Node = load("res://scenes/menu/MainMenu.tscn").instantiate()
+	add_child(menu)
+	await _frames(3)
+	var texts: Array = (menu.get("_buttons") as Array).map(func(b: Button) -> String: return b.text)
+	check(texts.has("Continue  (station 2)"), "the main menu offers Continue (station 2)")
+	menu.queue_free()
+	await _frames(2)
+	check(Game.continue_from_save(), "continue_from_save reads it")
+	main = load("res://scenes/main/Main.tscn").instantiate()
+	add_child(main)
+	await _frames(3)
+	check(Game.train.current_station == 2 and Game.next_station == 3, "the train starts at station 2 (next %d)" % Game.next_station)
+	check(not Game.track.is_gate_locked(0) and not Game.track.is_gate_locked(1) and Game.track.is_gate_locked(2), "gates 0-1 open, gate 2 locked")
+	check(main.get_node_or_null("Track/Key_2") != null and main.get_node_or_null("Track/Key_1") == null, "only the locked gate has its key")
+	check(Game.count("gold") == Game.START_INVENTORY.gold + 27 and typeof(Game.inventory.gold) == TYPE_INT, "the inventory came back (gold %s)" % str(Game.inventory.gold))
+	check(Game.stat("gates") >= 2.0, "and the run stats")
+	main.queue_free()
+	await _frames(3)
+	Game.new_game(false)
+
+
+## Menu -> Play solo -> Main -> pause -> Back to menu.
 func _flow_checks() -> void:
 	print("Scene flow")
 	# Keep this test node alive across scene changes: a dummy node becomes the "current scene"
@@ -185,12 +273,13 @@ func _flow_checks() -> void:
 	get_tree().change_scene_to_file("res://scenes/menu/MainMenu.tscn")
 	await _frames(20)
 	check(get_tree().current_scene != null and get_tree().current_scene.name == "MainMenu", "main menu loads as a scene")
-	if get_tree().root.get_node_or_null("Net") == null:
-		get_tree().current_scene.call("_on_host")
+	if true:
+		get_tree().current_scene.call("_on_solo")
 		await get_tree().create_timer(1.2).timeout
 		await _frames(5)
 		var cur := get_tree().current_scene
-		check(cur != null and cur.scene_file_path == "res://scenes/main/Main.tscn", "Host game (no Net yet) starts the game")
+		check(cur != null and cur.scene_file_path == "res://scenes/main/Main.tscn", "Play solo starts the game")
+		check(not Net.is_online() and Net.backend == null, "solo opens no network socket")
 		var hud: HUD = cur.get("hud") if cur else null
 		if hud:
 			hud.pause_menu.open()

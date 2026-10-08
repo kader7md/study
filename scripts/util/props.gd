@@ -17,6 +17,11 @@ const PATHS := {
 	"track_gate": "res://assets/models/props/track_gate.glb",
 	"gate_signal": "res://assets/models/props/gate_signal.glb",
 	"gate_key": "res://assets/models/props/gate_key.glb",
+	"come_along": "res://assets/models/props/come_along.glb",
+	"arm": "res://assets/models/props/arm.glb",
+	"station_shelter": "res://assets/models/props/station_shelter.glb",
+	"shop_kiosk": "res://assets/models/props/shop_kiosk.glb",
+	"station_sign": "res://assets/models/props/station_sign.glb",
 }
 
 static var _cache := {}
@@ -30,17 +35,6 @@ static func instance(id: String) -> Node3D:
 		Build.box(n, Vector3(1.64, 0.12, 0.12), Vector3(0, 0.3, 0), Color(0.36, 0.2, 0.1))
 		Build.box(n, Vector3(1.64, 0.12, 0.12), Vector3(0, -0.3, 0), Color(0.36, 0.2, 0.1))
 		return n
-	if id == "come_along":
-		# hand winch / ratchet puller: red body, long pump handle, two hooks
-		var c := Node3D.new()
-		var red := Color(0.75, 0.08, 0.06)
-		Build.cylinder(c, 0.035, 0.22, Vector3(0, 0, 0), red).rotation.x = PI * 0.5
-		Build.box(c, Vector3(0.025, 0.04, 0.42), Vector3(0, 0.06, -0.18), red).rotation.x = -0.5
-		Build.cylinder(c, 0.06, 0.03, Vector3(0, 0, 0), Color(0.3, 0.3, 0.32)).rotation.z = PI * 0.5
-		for z in [-0.16, 0.16]:
-			var hk := Build.cylinder(c, 0.03, 0.015, Vector3(0, -0.04, z), red)
-			hk.rotation.x = PI * 0.5
-		return c
 	if not _cache.has(id):
 		_cache[id] = load(PATHS[id])
 	return _cache[id].instantiate()

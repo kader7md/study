@@ -3,33 +3,29 @@ extends Control
 ##   Host:   player cards (colour, name, crown, ready tick, kick), the invite code with Copy, LAN addresses,
 ##           optional UPnP, and Start (when everyone is ready, or alone = a plain offline solo run).
 ##   Client: the same cards and a big Ready toggle; the host starts.
-## Opened without a connection (no main menu in this build, or after a disconnect) it shows a small Play card:
-## solo, host, or join by code / IP. Uses the shared UiTheme when it exists (menus workstream), else a matching
-## fallback built here.
+##   Host with a saved run on disk: also "Continue from station N" (everyone starts at that checkpoint).
+## Opened without a connection (normally the main menu handles solo / host / join; this is the fallback after a
+## lost connection) it shows a small Play card: solo, host, or join by code / IP. Uses the shared UiTheme.
 
-const UI_THEME_PATH := "res://scripts/ui/menu/ui_theme.gd"
-const MENU_BACKGROUND_PATH := "res://scripts/ui/menu/menu_background.gd"
-
-# Palette (same values as UiTheme's, so the lobby looks the same with or without it)
-const CREAM := Color("f7ecd6")
-const CREAM_DARK := Color("e9d6b1")
-const PAPER := Color("fff6e0")
-const WOOD := Color("9a6a42")
-const WOOD_DARK := Color("6b4428")
-const WOOD_LIGHT := Color("b98a5c")
-const INK := Color("2a1c13")
-const INK_SOFT := Color("5a4334")
-const RUST := Color("cf5b2e")
-const RUST_DARK := Color("a5431f")
-const TEAL := Color("2e8c84")
-const TEAL_DARK := Color("1f6660")
-const HONEY := Color("ffd27a")
-const GREEN := Color("62b84a")
+# Palette (UiTheme's)
+const CREAM := UiTheme.CREAM
+const CREAM_DARK := UiTheme.CREAM_DARK
+const PAPER := UiTheme.PAPER
+const WOOD := UiTheme.WOOD
+const WOOD_DARK := UiTheme.WOOD_DARK
+const WOOD_LIGHT := UiTheme.WOOD_LIGHT
+const INK := UiTheme.INK
+const INK_SOFT := UiTheme.INK_SOFT
+const RUST := UiTheme.RUST
+const RUST_DARK := UiTheme.RUST_DARK
+const TEAL := UiTheme.TEAL
+const TEAL_DARK := UiTheme.TEAL_DARK
+const HONEY := UiTheme.HONEY
+const GREEN := UiTheme.BODY_GREEN
 
 enum Mode { PLAY, CONNECTING, ROOM }
 
 var _mode := -1
-var _ui_theme: Script
 var _status: Label
 var _title_label: Label
 var _tagline: Label
@@ -42,6 +38,7 @@ var _lan_label: Label
 var _upnp_label: Label
 var _upnp_button: Button
 var _start_button: Button
+var _continue_button: Button
 var _ready_button: Button
 var _hint: Label
 var _name_edit: LineEdit
@@ -55,11 +52,7 @@ func _ready() -> void:
 	Game.ui_open = false
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if ResourceLoader.exists(UI_THEME_PATH):
-		_ui_theme = load(UI_THEME_PATH)
-		theme = _ui_theme.call("build")
-	else:
-		theme = _fallback_theme()
+	theme = UiTheme.build()
 	_build_backdrop()
 	_build_frame()
 	Net.players_changed.connect(_refresh)
@@ -84,37 +77,15 @@ func _process(_delta: float) -> void:
 # --- Frame ------------------------------------------------------------------------------------
 
 func _build_backdrop() -> void:
-	if ResourceLoader.exists(MENU_BACKGROUND_PATH):
-		# the menu's slow camera over the station, under a warm shade
-		var bg: Node = load(MENU_BACKGROUND_PATH).new()
-		bg.name = "Background"
-		add_child(bg)
-		var shade := ColorRect.new()
-		shade.color = Color(INK, 0.45)
-		shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(shade)
-		return
-	var grad := Gradient.new()
-	grad.set_color(0, Color("4a2f1c"))
-	grad.set_color(1, Color("21150d"))
-	var tex := GradientTexture2D.new()
-	tex.gradient = grad
-	tex.fill = GradientTexture2D.FILL_RADIAL
-	tex.fill_from = Vector2(0.5, 0.35)
-	tex.fill_to = Vector2(1.1, 1.1)
-	var bg_rect := TextureRect.new()
-	bg_rect.texture = tex
-	bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg_rect.stretch_mode = TextureRect.STRETCH_SCALE
-	bg_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg_rect)
-	# railway sleepers along the bottom, a little nod to the track
-	var rails := _Sleepers.new()
-	rails.set_anchors_preset(Control.PRESET_FULL_RECT)
-	rails.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(rails)
+	# the menu's slow camera over the station, under a warm shade
+	var bg := MenuBackground.new()
+	bg.name = "Background"
+	add_child(bg)
+	var shade := ColorRect.new()
+	shade.color = Color(INK, 0.45)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(shade)
 
 
 func _build_frame() -> void:
@@ -199,7 +170,7 @@ func _build_play() -> void:
 	col.add_theme_constant_override("separation", 14)
 	paper.add_child(col)
 	col.add_child(_header("Your name"))
-	_name_edit = _line(Net.my_name(), "Engineer")
+	_name_edit = _line(Net.my_name(), Net.DEFAULT_NAME)
 	_name_edit.text_changed.connect(_on_name_changed)
 	col.add_child(_name_edit)
 	col.add_child(HSeparator.new())
@@ -253,9 +224,8 @@ func _on_failed(reason: String) -> void:
 
 func _on_name_changed(text: String) -> void:
 	Net.set_local_name(text)
-	var settings := get_node_or_null(^"/root/Settings")
-	if settings and settings.has_method("set_value") and text.strip_edges() != "":
-		settings.call("set_value", "profile", "name", Net.clean_name(text))
+	if text.strip_edges() != "":
+		Settings.set_value("profile", "name", Net.clean_name(text))
 
 
 # --- CONNECTING ----------------------------------------------------------------------------------
@@ -378,7 +348,7 @@ func _build_room() -> void:
 	nl.text = "Your name"
 	nl.theme_type_variation = &"HudLabel"
 	name_row.add_child(nl)
-	_name_edit = _line(Net.player_name(Net.local_id()), "Engineer")
+	_name_edit = _line(Net.player_name(Net.local_id()), Net.DEFAULT_NAME)
 	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_edit.text_changed.connect(_on_name_changed)
 	name_row.add_child(_name_edit)
@@ -406,6 +376,10 @@ func _build_room() -> void:
 	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(_hint)
 	if Net.is_host():
+		var saved := Game.saved_station()
+		if saved >= 0:
+			_continue_button = _button("Continue from station %d" % saved, &"BigButton", func(): Net.start_run(true))
+			bar.add_child(_continue_button)
 		_start_button = _button("Start the run", &"AccentButton", func(): Net.start_run())
 		_start_button.custom_minimum_size.x = 300
 		bar.add_child(_start_button)
@@ -485,6 +459,8 @@ func _refresh_room() -> void:
 			if not Net.players[id].host and not Net.players[id].ready:
 				waiting += 1
 		_start_button.disabled = not Net.can_start()
+		if _continue_button:
+			_continue_button.disabled = not Net.can_start()
 		_start_button.text = "Start solo" if ids.size() == 1 else "Start the run"
 		if ids.size() == 1:
 			_hint.text = "Alone? Start solo, or share the code and wait for friends."
@@ -634,13 +610,7 @@ func _empty_card() -> Control:
 # --- Small builders ------------------------------------------------------------------------------
 
 func _title(text: String, size: int) -> Label:
-	if _ui_theme:
-		return _ui_theme.call("title_label", text, size)
-	var l := Label.new()
-	l.text = text
-	l.theme_type_variation = &"TitleLabel"
-	l.add_theme_font_size_override("font_size", size)
-	return l
+	return UiTheme.title_label(text, size)
 
 
 func _header(text: String) -> Label:
@@ -692,120 +662,8 @@ func _line(text: String, placeholder: String) -> LineEdit:
 	var e := LineEdit.new()
 	e.text = text
 	e.placeholder_text = placeholder
-	e.max_length = 24
+	e.max_length = Net.NAME_MAX
 	return e
-
-
-# --- Fallback theme (when the shared UiTheme is not in this build) ---------------------------------
-
-static func _fallback_theme() -> Theme:
-	var t := Theme.new()
-	var base := ThemeDB.fallback_font
-	var bold := FontVariation.new()
-	bold.base_font = base
-	bold.variation_embolden = 0.6
-	var heavy := FontVariation.new()
-	heavy.base_font = base
-	heavy.variation_embolden = 1.1
-	heavy.spacing_glyph = 1
-	t.default_font = bold
-	t.default_font_size = 22
-	t.set_color("font_color", "Label", INK)
-	t.set_type_variation("TitleLabel", "Label")
-	t.set_font("font", "TitleLabel", heavy)
-	t.set_color("font_color", "TitleLabel", CREAM)
-	t.set_color("font_outline_color", "TitleLabel", INK)
-	t.set_constant("outline_size", "TitleLabel", 14)
-	t.set_color("font_shadow_color", "TitleLabel", Color(INK, 0.55))
-	t.set_constant("shadow_offset_y", "TitleLabel", 7)
-	t.set_constant("shadow_outline_size", "TitleLabel", 14)
-	t.set_type_variation("HeaderLabel", "Label")
-	t.set_font("font", "HeaderLabel", heavy)
-	t.set_color("font_color", "HeaderLabel", RUST_DARK)
-	t.set_type_variation("MutedLabel", "Label")
-	t.set_font_size("font_size", "MutedLabel", 18)
-	t.set_color("font_color", "MutedLabel", INK_SOFT)
-	for v in ["HudLabel", "HudSmall"]:
-		t.set_type_variation(v, "Label")
-		t.set_color("font_color", v, CREAM)
-		t.set_color("font_outline_color", v, INK)
-		t.set_constant("outline_size", v, 7 if v == "HudLabel" else 5)
-	t.set_font_size("font_size", "HudSmall", 16)
-	t.set_type_variation("WoodPanel", "PanelContainer")
-	t.set_stylebox("panel", "WoodPanel", _box(WOOD, 18, 4, true))
-	t.set_type_variation("PaperPanel", "PanelContainer")
-	t.set_stylebox("panel", "PaperPanel", _box(PAPER, 14, 3, true))
-	t.set_stylebox("panel", "PanelContainer", _box(CREAM, 16, 4, true))
-	_buttons(t, "Button", CREAM, HONEY, Color("f0b452"), INK, bold, 22)
-	t.set_type_variation("BigButton", "Button")
-	_buttons(t, "BigButton", CREAM, HONEY, Color("f0b452"), INK, heavy, 26)
-	t.set_type_variation("AccentButton", "Button")
-	_buttons(t, "AccentButton", RUST, Color("e87a45"), RUST_DARK, CREAM, heavy, 28)
-	t.set_color("font_outline_color", "AccentButton", INK)
-	t.set_constant("outline_size", "AccentButton", 6)
-	t.set_type_variation("DangerButton", "Button")
-	_buttons(t, "DangerButton", Color("e9c7a8"), Color("f08a6e"), Color("c8382a"), INK, bold, 22)
-	var le := _box(PAPER, 10, 3, false)
-	le.content_margin_left = 14
-	le.content_margin_top = 8
-	le.content_margin_bottom = 8
-	t.set_stylebox("normal", "LineEdit", le)
-	var focus := _box(PAPER, 10, 3, false)
-	focus.border_color = TEAL
-	focus.content_margin_left = 14
-	focus.content_margin_top = 8
-	focus.content_margin_bottom = 8
-	t.set_stylebox("focus", "LineEdit", focus)
-	t.set_color("font_color", "LineEdit", INK)
-	t.set_color("font_placeholder_color", "LineEdit", Color(INK, 0.4))
-	t.set_color("caret_color", "LineEdit", RUST)
-	var sep := StyleBoxLine.new()
-	sep.color = Color(WOOD, 0.5)
-	sep.thickness = 3
-	t.set_stylebox("separator", "HSeparator", sep)
-	return t
-
-
-static func _box(color: Color, radius: int, outline: int, shadow: bool) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = color
-	sb.set_corner_radius_all(radius)
-	sb.set_border_width_all(outline)
-	sb.border_color = INK
-	sb.corner_detail = 10
-	if shadow:
-		sb.shadow_color = Color(0.12, 0.07, 0.03, 0.45)
-		sb.shadow_size = 6
-		sb.shadow_offset = Vector2(0, 5)
-	sb.set_content_margin_all(radius + 4)
-	return sb
-
-
-static func _buttons(t: Theme, type: String, base: Color, hover: Color, pressed: Color, text: Color, font: Font, size: int) -> void:
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
-		var c := base
-		if state == "hover":
-			c = hover
-		elif state.contains("pressed"):
-			c = pressed
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(c, 0.5) if state == "disabled" else c
-		sb.set_corner_radius_all(16)
-		sb.corner_detail = 10
-		sb.set_border_width_all(3)
-		sb.border_width_bottom = 4 if state.contains("pressed") else 8
-		sb.border_color = Color(INK, 0.45) if state == "disabled" else INK
-		sb.content_margin_left = 26
-		sb.content_margin_right = 26
-		sb.content_margin_top = 10 + (3 if state.contains("pressed") else 0)
-		sb.content_margin_bottom = 10 - (3 if state.contains("pressed") else 0)
-		t.set_stylebox(state, type, sb)
-	t.set_stylebox("focus", type, StyleBoxEmpty.new())
-	t.set_font("font", type, font)
-	t.set_font_size("font_size", type, size)
-	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
-		t.set_color(key, type, text)
-	t.set_color("font_disabled_color", type, Color(text, 0.45))
 
 
 # --- Little drawn bits -------------------------------------------------------------------------------
@@ -848,17 +706,3 @@ class _Spinner extends Control:
 			var y := size.y * 0.5 - absf(sin(t * 4.0 - i * 0.6)) * 14.0
 			draw_circle(Vector2(size.x * 0.5 + (i - 1) * 30.0, y), 9.0, Color("2a1c13"))
 			draw_circle(Vector2(size.x * 0.5 + (i - 1) * 30.0, y), 6.0, Color("cf5b2e"))
-
-
-## Sleepers and two rails across the bottom of the plain backdrop.
-class _Sleepers extends Control:
-	func _draw() -> void:
-		var y := size.y - 34.0
-		var x := -20.0
-		while x < size.x + 40.0:
-			draw_rect(Rect2(x, y - 6, 26, 54), Color("3a2414"))
-			draw_rect(Rect2(x + 3, y - 3, 20, 48), Color("4d311c"))
-			x += 64.0
-		for ry in [y + 4.0, y + 32.0]:
-			draw_rect(Rect2(0, ry, size.x, 8), Color("7d746c"))
-			draw_rect(Rect2(0, ry, size.x, 3), Color("a39a90"))

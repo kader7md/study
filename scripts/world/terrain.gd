@@ -11,17 +11,22 @@ const EXTEND := 220.0  # ribbon continues this far before the start and after th
 ## Sideways vertex offsets (denser near the track).
 const U_OFFSETS := [0.0, 2.0, 4.0, 6.0, 9.0, 12.0, 16.0, 21.0, 27.0, 35.0, 45.0, 58.0, 74.0, 94.0, 118.0, 145.0, 175.0]
 
-const GRASS := Color(0.36, 0.56, 0.24)
-const GRASS_DARK := Color(0.28, 0.46, 0.2)
-const DIRT := Color(0.5, 0.38, 0.24)
-const SAND := Color(0.84, 0.76, 0.52)
-const ROCK := Color(0.47, 0.45, 0.43)
-const SNOW := Color(0.93, 0.95, 0.97)
+## Ground palette: muted meadow greens, dry grass, earth, sand, rock and snow (vertex colours, then a detail
+## texture breaks up every triangle).
+const GRASS := Color(0.3, 0.42, 0.2)
+const GRASS_DARK := Color(0.2, 0.32, 0.15)
+const GRASS_DRY := Color(0.48, 0.47, 0.27)
+const DIRT := Color(0.4, 0.31, 0.2)
+const SAND := Color(0.7, 0.63, 0.45)
+const ROCK := Color(0.4, 0.38, 0.36)
+const SNOW := Color(0.86, 0.88, 0.9)
 
 var track: Track
 ## Tree and boulder positions near the track: anchor points for the come-along.
 var anchor_points: Array[Vector3] = []
 var _us: Array[float] = []
+var _patches := FastNoiseLite.new()
+var _dry := FastNoiseLite.new()
 
 
 func build(t: Track, rng: RandomNumberGenerator) -> void:
@@ -30,9 +35,18 @@ func build(t: Track, rng: RandomNumberGenerator) -> void:
 		_us.append(-float(U_OFFSETS[k]))
 	for k in U_OFFSETS:
 		_us.append(float(k))
+	_patches.seed = 11
+	_patches.frequency = 0.03
+	_patches.fractal_octaves = 3
+	_dry.seed = 23
+	_dry.frequency = 0.008
 	var mat := StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.95
+	mat.roughness = 0.97
+	mat.albedo_texture = detail_texture()
+	mat.uv1_triplanar = true
+	mat.uv1_world_triplanar = true
+	mat.uv1_scale = Vector3(0.18, 0.18, 0.18)
 	var d := -EXTEND
 	var end := track.get_length() + EXTEND
 	while d < end:
@@ -93,11 +107,37 @@ func _color_at(v: Vector3, a: Vector3, b: Vector3, c: Vector3) -> Color:
 		return SNOW
 	if slope > 0.45:
 		return ROCK
-	var noise := fmod(absf(v.x * 0.37 + v.z * 0.23), 1.0)
-	var col := GRASS.lerp(GRASS_DARK, noise * 0.6)
+	# meadow: dark and light patches, wide areas of dry grass, earth on the slopes
+	var patch := _patches.get_noise_2d(v.x, v.z) * 0.5 + 0.5
+	var dry := clampf(_dry.get_noise_2d(v.x, v.z) * 1.6, 0.0, 1.0)
+	var col := GRASS.lerp(GRASS_DARK, patch * 0.8).lerp(GRASS_DRY, dry * 0.7)
 	if slope > 0.25:
-		col = col.lerp(DIRT, 0.6)
+		col = col.lerp(DIRT, clampf((slope - 0.25) * 4.0, 0.0, 0.7))
+	if h < Track.WATER_LEVEL + 2.2:
+		col = col.lerp(SAND, (Track.WATER_LEVEL + 2.2 - h))  # a soft shore
+	if h > 60.0:
+		col = col.lerp(SNOW, clampf((h - 60.0) / 10.0, 0.0, 1.0))
 	return col
+
+
+## Grey-white grain multiplied over the vertex colours (clumps of grass, pebbles), tiling in world space.
+static func detail_texture() -> Texture2D:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_CELLULAR
+	noise.frequency = 0.06
+	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	noise.fractal_octaves = 3
+	var tex := NoiseTexture2D.new()
+	tex.noise = noise
+	tex.seamless = true
+	tex.width = 256
+	tex.height = 256
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(0.72, 0.72, 0.72))
+	ramp.set_color(1, Color(1.0, 1.0, 1.0))
+	tex.color_ramp = ramp
+	tex.generate_mipmaps = true
+	return tex
 
 
 func _build_water() -> void:

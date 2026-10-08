@@ -81,12 +81,18 @@ static func solid_box(parent: Node, size: Vector3, pos: Vector3, color: Color) -
 	return body
 
 
+## Sign text in the world: the UI's bold title font, rendered at twice the size and half the pixel size (crisp),
+## cream with a thick ink outline, facing the camera.
 static func label(parent: Node, text: String, pos: Vector3, size := 64) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
 	l.position = pos
-	l.font_size = size
-	l.outline_size = 12
+	l.font = UiTheme.title_font()
+	l.font_size = size * 2
+	l.pixel_size = 0.0025
+	l.outline_size = 28
+	l.modulate = Color(1.0, 0.97, 0.9)
+	l.outline_modulate = Color(0.16, 0.1, 0.06)
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = false
 	parent.add_child(l)

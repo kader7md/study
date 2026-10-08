@@ -27,6 +27,8 @@ signal local_player_spawned(player: Player)
 signal upnp_finished(ok: bool, text: String)
 
 const DEFAULT_PORT := 24565
+## host_game() with the default port tries this many ports in a row when one is busy.
+const PORT_TRIES := 10
 const MAX_PLAYERS := 5
 ## Bumped whenever the RPC layout changes; the host refuses other versions.
 const PROTOCOL := 1
@@ -185,7 +187,7 @@ func local_player() -> Player:
 	return player_node(local_id())
 
 
-## This player's name: the override, else Settings.player_name, else "Engineer".
+## This player's name: the override, else Settings.player_name, else "Player".
 func my_name() -> String:
 	var n := local_name
 	if n.strip_edges().is_empty():
@@ -195,11 +197,16 @@ func my_name() -> String:
 	return clean_name(n)
 
 
+## Default player name and the longest name allowed (the same in Settings, the menu and the lobby).
+const DEFAULT_NAME := "Player"
+const NAME_MAX := 20
+
+
 static func clean_name(n: String) -> String:
 	var s := n.strip_edges().replace("[", "(").replace("]", ")").replace("\n", " ")
 	if s.is_empty():
-		s = "Engineer"
-	return s.substr(0, 16)
+		s = DEFAULT_NAME
+	return s.substr(0, NAME_MAX)
 
 
 func set_local_name(n: String) -> void:
@@ -216,10 +223,19 @@ func set_local_name(n: String) -> void:
 
 # --- Host, join, leave ---------------------------------------------------------------
 
+## Opens a lobby on port `p`. With the default port, a busy port falls back to the next free one
+## (DEFAULT_PORT + 1 .. + PORT_TRIES - 1); the invite code carries the port.
 func host_game(p := DEFAULT_PORT) -> Error:
 	leave()
-	backend = EnetBackend.new()
-	var err := backend.host(p, MAX_PLAYERS)
+	var tries := PORT_TRIES if p == DEFAULT_PORT else 1
+	var err: Error = FAILED
+	for k in tries:
+		backend = EnetBackend.new()
+		err = backend.host(p + k, MAX_PLAYERS)
+		if err == OK:
+			p += k
+			break
+		backend = null
 	if err != OK:
 		backend = null
 		last_error = "Could not host on port %d (%s). Is another game using it?" % [p, error_string(err)]
@@ -287,6 +303,21 @@ func leave() -> void:
 func leave_to_menu() -> void:
 	leave()
 	go_to_menu()
+
+
+## Host: tells every client why the session ends (`reason` shows on their main menu), then leaves.
+## A client just leaves.
+func end_session(reason: String) -> void:
+	if is_online() and is_host() and players.size() > 1:
+		_rpc_rejected.rpc(reason)
+		# give the message a moment to go out before the connection closes (nothing else runs meanwhile)
+		run_active = false
+		var b := backend
+		get_tree().create_timer(0.3, true, false, true).timeout.connect(func():
+			if backend == b:
+				leave())
+		return
+	leave()
 
 
 func go_to_menu() -> void:
@@ -369,26 +400,29 @@ func _run_thread(fn: Callable) -> void:
 # --- Starting the run --------------------------------------------------------------------
 
 ## Host: everyone goes to Main. With only the host, the server closes and the run is plain offline solo.
-func start_run() -> void:
+## `from_save`: the run continues from the checkpoint on disk (the host's save; clients get it with the start).
+func start_run(from_save := false) -> void:
 	if not is_host():
 		return
 	if not is_online() or players.size() <= 1:
-		start_solo()
+		start_solo(from_save)
 		return
 	if not all_ready():
 		return
 	run_seed = _main_seed()
 	_assign_roles()
 	Game.world_sabotage = _impostor == 0  # 1-2 players: the world sabotages (GDD 2)
-	_rpc_start_run.rpc(run_seed)
+	var cp: Dictionary = Game.read_save() if from_save else {}
+	_rpc_start_run.rpc(run_seed, cp)
 	_send_roles()
 
 
-## Offline solo run: exactly the old single-player game.
-func start_solo() -> void:
+## Offline solo run: exactly the old single-player game. `from_save`: continue from the checkpoint on disk.
+func start_solo(from_save := false) -> void:
 	if backend:
 		leave()
-	Game.new_game(false)
+	if not (from_save and Game.continue_from_save()):
+		Game.new_game(false)
 	Game.role = "crew"
 	run_started.emit()
 	get_tree().paused = false
@@ -403,7 +437,7 @@ func reload_world() -> void:
 	_clear_players()
 	await get_tree().create_timer(0.25).timeout
 	if is_online() and run_active:
-		_rpc_reload.rpc(Game.checkpoint, Game.inventory, Game.next_station)
+		_rpc_reload.rpc(Game.checkpoint, Game.inventory, Game.next_station, Game.stats)
 
 
 func _clear_players() -> void:
@@ -553,11 +587,7 @@ func _add_crew_widget(hud: Node) -> void:
 		return
 	var w := CrewList.new()
 	w.name = "CrewList"
-	if hud.has_method("add_corner_widget"):
-		hud.call("add_corner_widget", w)
-	else:
-		hud.add_child(w)
-		w.place_default()
+	(hud as HUD).add_corner_widget(w)
 
 
 func _show_role_banner(role: String) -> void:
@@ -836,7 +866,7 @@ func _unique_name(n: String, id: int) -> String:
 			if other != id and players[other].name == name_out:
 				taken = true
 		if taken:
-			name_out = "%s %d" % [n.substr(0, 13), k]
+			name_out = "%s %d" % [n.substr(0, NAME_MAX - 3), k]
 			k += 1
 	return name_out
 
@@ -908,10 +938,14 @@ func _rpc_rejected(reason: String) -> void:
 	if _joining:
 		_joining = false
 		_fail_join.call_deferred(reason)
+	elif run_active:
+		# the host ended the run: leave right away (no more packets for a world the host already closed)
+		run_active = false
+		_drop_to_menu.call_deferred(reason)
 
 
 @rpc("authority", "call_local", "reliable")
-func _rpc_start_run(new_seed: int) -> void:
+func _rpc_start_run(new_seed: int, cp: Dictionary = {}) -> void:
 	run_active = true
 	run_seed = new_seed
 	_host_world_ready = false
@@ -919,7 +953,7 @@ func _rpc_start_run(new_seed: int) -> void:
 		_ready_peers.clear()
 		_reset_world_marks()
 	_pending_role = ""
-	Game.new_game(false)
+	Game.use_checkpoint(cp)  # {} = a new game
 	Game.role = "crew"
 	get_tree().paused = false
 	print("[net] run started (%d players)" % players.size())
@@ -937,8 +971,13 @@ func _rpc_role(role: String, with_impostor: bool) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _rpc_reload(checkpoint: Dictionary, inventory: Dictionary, next_station: int) -> void:
-	Game.checkpoint = checkpoint
+func _rpc_reload(checkpoint: Dictionary, inventory: Dictionary, next_station: int, stats: Dictionary = {}) -> void:
+	if not is_host():
+		# mirror the host: the checkpoint's run state (opened gates, stats, run_complete) or a fresh game,
+		# so gates opened after the checkpoint are locked again here too, with their keys
+		Game.use_checkpoint(checkpoint)
+		if not stats.is_empty():
+			Game.stats = stats.duplicate()
 	Game.inventory = inventory.duplicate()
 	Game.next_station = next_station
 	Game.wind_active = false

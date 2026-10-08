@@ -5,7 +5,6 @@ extends CanvasLayer
 ## Esc closes Settings first; a shop window (Game.ui_open without us) is closed by its owner instead.
 
 const SCENE := "res://scenes/menu/PauseMenu.tscn"
-const MENU_SCENE := "res://scenes/menu/MainMenu.tscn"
 
 var is_open := false
 var _root: Control
@@ -85,9 +84,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 static func online() -> bool:
-	var tree := Engine.get_main_loop() as SceneTree
-	var net := tree.root.get_node_or_null("Net") if tree else null
-	return net != null and net.has_method("is_online") and bool(net.call("is_online"))
+	return Net.is_online()
 
 
 func open() -> void:
@@ -127,14 +124,7 @@ func _open_settings() -> void:
 
 func _back_to_menu() -> void:
 	close()
-	if Game.has_method("return_to_menu"):
-		Game.call("return_to_menu")
-	else:
-		Game.track = null
-		Game.train = null
-		Game.sabotage = null
-		Game.terrain = null
-		get_tree().change_scene_to_file(MENU_SCENE)
+	Game.return_to_menu()
 
 
 func _quit() -> void:

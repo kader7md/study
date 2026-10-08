@@ -34,10 +34,11 @@ const SHOP := {
 	"wheel": {"label": "Train wheel", "price": 8, "gives": {"wheel": 1}},
 	"engine_oil": {"label": "Engine oil (repairs the engine)", "price": 6, "gives": {"engine_oil": 1}},
 	"nail_gun": {"label": "Nail gun (faster rail repair, joins planks over water)", "price": 15, "gives": {"nail_gun": 1}},
-	"medkit": {"label": "Medkit", "price": 7, "gives": {"medkit": 1}},
+	"medkit": {"label": "Medkit (saves you when you go down, or [E] revives a downed crewmate)", "price": 7, "gives": {"medkit": 1}},
 	"come_along": {"label": "Come-along (hand winch: pulls a tipped train back up)", "price": 10, "gives": {"come_along": 1}},
-	"grappler": {"label": "Grappling hook", "price": 12, "gives": {"grappler": 1}},
 }
+## Health a player gets back when revived (medkit, or the crew reaching a station).
+const REVIVE_HEALTH := 60.0
 
 ## Run statistics shown on the Chapter 1 end screen (and saved in the checkpoint).
 const STAT_KEYS := ["time", "distance", "repairs", "panels", "wheels_lost", "gates", "gold_found"]
@@ -80,6 +81,10 @@ var run_timing := false
 var run_complete := false
 ## Segments whose locked gate has been opened (gate state for the checkpoint).
 var opened_gates: Array[int] = []
+## Developer keys (F2 role, F3 world sabotage, F5 checkpoint, F6 new game): only in debug builds, or when
+## Settings > developer > debug_keys is on. They only work inside a run (Main), and online only on the host.
+var debug_keys := OS.is_debug_build()
+var _run_gen := 0           # bumped by new_game / return_to_menu: stale crew-wipe timers do nothing
 var objective := "":
 	set(value):
 		if objective != value:
@@ -120,9 +125,15 @@ func _process(delta: float) -> void:
 		stats.time = float(stats.get("time", 0.0)) + delta
 
 
+func debug_keys_enabled() -> bool:
+	var settings := get_node_or_null(^"/root/Settings")
+	return debug_keys or (settings != null and bool(settings.get_value("developer", "debug_keys", false)))
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	# NET: debug keys only offline or on the host (F2 offline only: online the roles come from Net)
-	if not is_host():
+	# NET: debug keys only offline or on the host (F2 offline only: online the roles come from Net),
+	# only inside a run, and only in debug builds (or with the developer setting on)
+	if not is_host() or not is_instance_valid(track) or not track.is_inside_tree() or not debug_keys_enabled():
 		return
 	if event.is_action_pressed("restart_checkpoint"):
 		restart_from_checkpoint()
@@ -270,6 +281,7 @@ func on_train_stopped_at_station(index: int) -> void:
 	if index != next_station:
 		return
 	next_station += 1
+	revive_all()
 	if index >= STATION_COUNT:
 		run_timing = false
 		run_complete = true
@@ -298,6 +310,60 @@ func save_checkpoint(station_index: int) -> void:
 		f.store_string(JSON.stringify(checkpoint))
 
 
+## The checkpoint saved on disk (user://checkpoint.json), or {} when there is none or it is unusable.
+## Finished runs are not offered for Continue.
+static func read_save() -> Dictionary:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return {}
+	var text := FileAccess.get_file_as_string(SAVE_PATH)
+	var data: Variant = JSON.parse_string(text)
+	if not data is Dictionary:
+		return {}
+	var d: Dictionary = data
+	if not d.has("station") or not d.has("inventory") or not d.inventory is Dictionary:
+		return {}
+	if bool(d.get("complete", false)):
+		return {}
+	# JSON numbers come back as floats: inventory counts and gates are ints
+	var inv := {}
+	for k: String in d.inventory:
+		inv[k] = int(d.inventory[k])
+	d.inventory = inv
+	d.station = int(d.station)
+	var gates: Array = []
+	for g: Variant in d.get("gates", []):
+		gates.append(int(g))
+	d.gates = gates
+	return d
+
+
+## Station number of the save on disk (for "Continue (station N)"), or -1 when there is none.
+static func saved_station() -> int:
+	var d := read_save()
+	return int(d.station) if not d.is_empty() else -1
+
+
+## Prepares the run state from the save on disk (Main then builds the world at that station). False if no save.
+func continue_from_save() -> bool:
+	var d := read_save()
+	if d.is_empty():
+		return false
+	use_checkpoint(d)
+	return true
+
+
+## Takes `cp` as the current checkpoint and restores the run state from it ({} = a new game).
+func use_checkpoint(cp: Dictionary) -> void:
+	_run_gen += 1
+	wind_active = false
+	ui_open = false
+	if cp.is_empty():
+		new_game(false)
+		return
+	checkpoint = cp.duplicate(true)
+	load_checkpoint_state()
+
+
 func on_player_downed(_player: Node) -> void:
 	for p in get_tree().get_nodes_in_group("player"):
 		if not p.downed:
@@ -305,10 +371,24 @@ func on_player_downed(_player: Node) -> void:
 	# TODO(M4/M5): if only the impostor is alive, they choose: kill themself (crew loses) or revive everyone.
 	show_banner("THE CREW IS DEAD\nBack to the last checkpoint…")
 	crew_lost.emit()
-	get_tree().create_timer(3.0).timeout.connect(restart_from_checkpoint)
+	var gen := _run_gen
+	get_tree().create_timer(3.0).timeout.connect(func():
+		# not if the run was left (back to the menu) or restarted in the meantime
+		if gen == _run_gen and is_instance_valid(track) and track.is_inside_tree():
+			restart_from_checkpoint())
+
+
+## Host: everyone who is down gets back up (the train reached a station). Until revives by carrying (M5).
+func revive_all() -> void:
+	if not is_host():
+		return
+	for p in get_tree().get_nodes_in_group("player"):
+		if p.downed and p.has_method("revive"):
+			p.revive(REVIVE_HEALTH)
 
 
 func restart_from_checkpoint() -> void:
+	_run_gen += 1
 	wind_active = false
 	ui_open = false
 	if checkpoint.is_empty():
@@ -336,6 +416,7 @@ func load_checkpoint_state() -> void:
 
 
 func new_game(reload: bool) -> void:
+	_run_gen += 1
 	checkpoint = {}
 	inventory = START_INVENTORY.duplicate()
 	next_station = 1
@@ -351,16 +432,17 @@ func new_game(reload: bool) -> void:
 		_reload_world()
 
 
-## Leaves the run: closes the network session (if the Net autoload exists), then goes to the main menu,
-## or starts a fresh run in Main when the menu scene does not exist (yet).
+## Leaves the run: closes the network session (online, the host tells everyone it ended the run), then goes to the
+## main menu. The checkpoint on disk stays, so the main menu offers Continue.
 func return_to_menu() -> void:
-	var net := get_node_or_null("/root/Net")
-	if net and net.has_method("leave"):
-		net.leave()
+	var net := get_node_or_null(^"/root/Net")
+	if net:
+		net.end_session("The host ended the run")
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	new_game(false)
-	if ResourceLoader.exists(MENU_SCENE):
-		get_tree().change_scene_to_file.call_deferred(MENU_SCENE)
-	else:
-		get_tree().change_scene_to_file.call_deferred(MAIN_SCENE)
+	track = null
+	train = null
+	sabotage = null
+	terrain = null
+	get_tree().change_scene_to_file.call_deferred(MENU_SCENE)

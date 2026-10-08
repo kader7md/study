@@ -26,6 +26,8 @@ var _sign: Label3D
 var _lock_spot: GateLock
 var _creak: AudioStreamPlayer3D
 var _warned := false
+var _padlock_rest := Transform3D.IDENTITY
+var _boom_rest := 0.0
 
 
 ## The padlock / boom: what the player aims at to unlock the gate.
@@ -56,6 +58,10 @@ func _ready() -> void:
 	add_child(_model)
 	_boom = _model.find_child("Boom", true, false)
 	_padlock = _model.find_child("Padlock", true, false)
+	if _padlock:
+		_padlock_rest = _padlock.transform
+	if _boom:
+		_boom_rest = _boom.rotation.z
 	_lamp = _model.find_child("Lamp", true, false) as MeshInstance3D
 	if _lamp == null and _model.find_child("Lamp", true, false):
 		_lamp = _model.find_child("Lamp", true, false).find_children("*", "MeshInstance3D", true, false)[0]
@@ -164,6 +170,22 @@ func _on_gate_opened(seg: int) -> void:
 	if _boom:
 		tween.tween_interval(0.15)
 		tween.tween_property(_boom, "rotation:z", deg_to_rad(OPEN_ANGLE), 1.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## NET: back to locked (the host still has this gate locked): boom down, padlock on, red lamps.
+func relock() -> void:
+	locked = true
+	_warned = false
+	_lock_spot.collision_layer = Build.LAYER_INTERACT
+	_sign.text = "LOCKED\nkey nearby"
+	_sign.modulate = Color(1.0, 0.85, 0.75)
+	_sign.visible = true
+	if _boom:
+		_boom.rotation.z = _boom_rest
+	if _padlock:
+		_padlock.transform = _padlock_rest
+		_padlock.visible = true
+	_set_lamps(true)
 
 
 func _set_open_pose() -> void:

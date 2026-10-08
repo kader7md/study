@@ -6,6 +6,9 @@ extends Control
 
 const SEGMENTS := 24
 
+## Meters running right now. Voice chat pauses while one runs: both would drain the same capture buffer.
+static var active := 0
+
 var level := 0.0          # 0..1 smoothed
 var peak_hold := 0.0
 var running := false
@@ -44,6 +47,7 @@ func start() -> bool:
 	add_child(_player)
 	_player.play()
 	running = true
+	active += 1
 	set_process(true)
 	return true
 
@@ -55,6 +59,8 @@ func stop() -> void:
 		_player = null
 	if _capture:
 		_capture.clear_buffer()
+	if running:
+		active = maxi(active - 1, 0)
 	running = false
 	level = 0.0
 	peak_hold = 0.0

@@ -18,6 +18,9 @@ const AIM_RANGE := 500.0
 const HAMMER_DAMAGE := 20.0
 const NAIL_GUN_DAMAGE := 8.0
 const WARM_RADIUS := 7.0
+## Health regeneration per second: by the furnace or in a station, and anywhere else.
+const REGEN_WARM := 4.0
+const REGEN_IDLE := 0.5
 const SKIN := Color(1.0, 0.76, 0.6)
 const TOOLS := ["hammer", "wrench", "nail_gun", "welder", "come_along"]
 const TOOL_NAMES := {"hammer": "Hammer", "wrench": "Wrench", "welder": "Welder", "nail_gun": "Nail gun", "come_along": "Come-along"}
@@ -71,6 +74,8 @@ var _weld_acc := 0.0
 var _last_net_pos := Vector3.ZERO
 var _remote_car := -1
 var _remote_local := Vector3.ZERO
+var _revive_spot: ReviveSpot
+var _was_downed := false
 
 
 func _ready() -> void:
@@ -130,6 +135,14 @@ func _ready() -> void:
 	_cable = WelderCable.new()
 	add_child(_cable)
 	_cable.visible = false
+
+	# a crewmate aims at a downed player (lying on the ground) and presses [E] with a medkit
+	_revive_spot = ReviveSpot.new()
+	_revive_spot.name = "Revive"
+	_revive_spot.target = self
+	Build.collider(_revive_spot, Vector3(1.2, 1.0, 1.8), Vector3(0, 0.5, 0))
+	add_child(_revive_spot)
+	_update_revive_spot()
 
 	if is_local():
 		if DisplayServer.get_name() != "headless":
@@ -343,12 +356,23 @@ func use_tool() -> void:
 ## A tool hits `hit`: repair work first (nails, bolts, wheels...), otherwise damage (zombies, eagles).
 ## NET: runs on the host (directly offline). Returns true if the hit did something.
 func tool_hit(hit: Node, tool: String, damage: float) -> bool:
+	if Net.remote_actor() != 0:
+		damage = tool_damage(tool)  # NET: the host decides the damage, not the client
 	if hit is Interactable and hit.on_tool_hit(tool, self):
 		return true
 	if hit and hit.has_method("take_hit"):
 		hit.take_hit(damage)
 		return true
 	return false
+
+
+## Damage a tool does to zombies and eagles.
+static func tool_damage(tool: String) -> float:
+	match tool:
+		"hammer": return HAMMER_DAMAGE
+		"wrench": return HAMMER_DAMAGE * 0.75
+		"nail_gun": return NAIL_GUN_DAMAGE
+	return 0.0
 
 
 ## The come-along used on `hit`: hook it to the train, chain it to an anchor, or crank. NET: runs on the host.
@@ -457,6 +481,10 @@ func _remote_update(delta: float) -> void:
 
 
 func _process(_delta: float) -> void:
+	if downed != _was_downed:
+		_was_downed = downed  # NET: downed is host state (StateSync); show it the same way everywhere
+		_update_revive_spot()
+		_show_downed(downed)
 	# NET: carried items and the welder torch can change on the host; refresh the hands here
 	if carried_item != _shown_carry:
 		_show_carry(carried_item)
@@ -564,6 +592,18 @@ func _update_welder(delta: float) -> void:
 	_set_weld_fx(welding)
 
 
+## Downed: the camera drops to the ground and tilts (local player), the body lies down (others).
+func _show_downed(on: bool) -> void:
+	var tw := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if is_local():
+		tw.tween_property(camera, "position:y", 0.35 if on else 1.6, 0.6)
+		tw.parallel().tween_property(camera, "rotation:z", 0.5 if on else 0.0, 0.6)
+		viewmodel.visible = not on
+	elif _remote_body:
+		tw.tween_property(_remote_body, "rotation:x", -PI * 0.5 if on else 0.0, 0.5)
+		tw.parallel().tween_property(_remote_body, "position:y", 0.3 if on else 0.0, 0.5)
+
+
 ## Where the player is looking (within reach), or Vector3.INF.
 func aim_point() -> Vector3:
 	if _test_aim != Vector3.INF:
@@ -577,6 +617,8 @@ func weld_tick(target: Interactable, delta: float) -> bool:
 	## Test helper: weld `target` for `delta` seconds as if aiming at it with LMB held.
 	if not is_instance_valid(welder_source):
 		return false
+	if Net.remote_actor() != 0:
+		delta = clampf(delta, 0.0, 0.2)  # NET: a client sends about 0.1 s of welding per request
 	if not is_local():
 		# NET: a client's torch only reaches as far as the cable
 		var plug := welder_source.plug_position()
@@ -628,16 +670,67 @@ func _update_cold(delta: float) -> void:
 		frost = maxf(frost - 12.0 * delta, 0.0)
 	if frost >= 100.0:
 		take_damage(4.0 * delta)
+	elif not downed and health < 100.0 and frost <= 0.0:
+		# warmth heals: quickly by the furnace or in a station, slowly anywhere else
+		var at_station := train != null and train.current_station >= 0 and train.is_stopped()
+		var rate := REGEN_WARM if warm or at_station else REGEN_IDLE
+		health = minf(health + rate * delta, 100.0)
 
 
 func take_damage(amount: float) -> void:
 	if downed:
 		return
+	if Net.remote_actor() != 0:
+		amount = clampf(amount, 0.0, 25.0)  # NET: never a negative (healing) or huge amount from a client
+	amount = maxf(amount, 0.0)
 	health = maxf(health - amount, 0.0)
 	if health <= 0.0:
+		if Game.take("medkit"):
+			health = Game.REVIVE_HEALTH
+			frost = 0.0
+			Game.say("A medkit saved you! (%d left)" % Game.count("medkit"))
+			return
 		downed = true
-		Game.say("You died! (A friend must carry your body to be revived: M5)")
+		_update_revive_spot()
+		Game.say("You are down! A crewmate can revive you with a medkit [E], or reach the next station")
 		Game.on_player_downed(self)
+
+
+## Host: back on their feet with `hp` health (a medkit, or the train reached a station).
+func revive(hp: float) -> void:
+	if not downed:
+		return
+	downed = false
+	health = clampf(hp, 1.0, 100.0)
+	frost = 0.0
+	_update_revive_spot()
+	Net.run_as(peer_id, Game.say, ["You are back on your feet!"])
+
+
+## The [E] target on a downed player: a crewmate with a medkit revives them.
+class ReviveSpot extends Interactable:
+	var target: Player
+
+	func get_prompt(player: Node) -> String:
+		if not target.downed or player == target:
+			return ""
+		if Game.has("medkit"):
+			return "Revive %s with a medkit  [E]" % target.display_name
+		return "%s is down: a medkit revives them (station shop)" % target.display_name
+
+	func interact(player: Node) -> void:
+		if not target.downed or player == target:
+			return
+		if not Game.take("medkit"):
+			Game.say("You need a medkit to revive %s (station shop, 7 gold)" % target.display_name)
+			return
+		target.revive(Game.REVIVE_HEALTH)
+		Game.say("You revived %s" % target.display_name)
+
+
+func _update_revive_spot() -> void:
+	if _revive_spot:
+		_revive_spot.collision_layer = Build.LAYER_INTERACT if downed and not is_local() else 0
 
 
 func respawn_on_train() -> void:

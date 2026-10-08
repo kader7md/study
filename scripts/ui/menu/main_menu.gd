@@ -1,7 +1,9 @@
 extends Node
 ## Title screen (run/main_scene): TRUST ISSUES over a slow camera at the departure station.
-## Host game -> Net.host_game() -> Lobby (or straight into Main when there is no Net autoload yet),
-## Join game -> invite code / IP:port dialog -> Net.join_game() -> Lobby, Settings, Quit.
+## Continue (station N) -> solo run from the checkpoint on disk (only when there is one),
+## Play solo -> Net.start_solo() (no network socket), Host game -> Net.host_game() -> Lobby,
+## Join game -> invite code / IP:port dialog -> Net.join_game(); the dialog stays open while connecting and shows
+## why a join failed; once the host lets us in -> Lobby. Settings, Quit.
 
 const MAIN_SCENE := "res://scenes/main/Main.tscn"
 const LOBBY_SCENE := "res://scenes/net/Lobby.tscn"
@@ -25,6 +27,8 @@ var _name_edit: LineEdit
 var _toast: Label
 var _fade: ColorRect
 var _busy := false
+var _settings_button: Button
+var _joining := false
 
 
 func _ready() -> void:
@@ -41,13 +45,8 @@ func _ready() -> void:
 	music.name = "Music"
 	add_child(music)
 	_intro.call_deferred()
-	var net := _net()
-	if net and net.has_signal("connection_failed"):
-		net.connect("connection_failed", _on_connection_failed)
-
-
-func _net() -> Node:
-	return get_tree().root.get_node_or_null("Net")
+	Net.connection_failed.connect(_on_connection_failed)
+	Net.joined.connect(_on_joined)
 
 
 # --- UI -----------------------------------------------------------------------------------------
@@ -84,7 +83,7 @@ func _build_ui() -> void:
 	_column.anchor_top = 0.5
 	_column.anchor_bottom = 0.5
 	_column.offset_left = 96
-	_column.offset_top = -330
+	_column.offset_top = -380
 	_column.offset_right = 96 + 560
 	_root.add_child(_column)
 
@@ -119,9 +118,13 @@ func _build_ui() -> void:
 	gap.custom_minimum_size.y = 18
 	_column.add_child(gap)
 
-	_add_button("Host game", &"AccentButton", _on_host)
+	var saved := Game.saved_station()
+	if saved >= 0:
+		_add_button("Continue  (station %d)" % saved, &"AccentButton", _on_continue)
+	_add_button("Play solo", &"AccentButton" if saved < 0 else &"BigButton", _on_solo)
+	_add_button("Host game", &"BigButton", _on_host)
 	_add_button("Join game", &"BigButton", _open_join)
-	_add_button("Settings", &"BigButton", _open_settings)
+	_settings_button = _add_button("Settings", &"BigButton", _open_settings)
 	_add_button("Quit", &"BigButton", _on_quit)
 
 	# Bottom left: build info. Bottom right: your name card.
@@ -164,10 +167,10 @@ func _build_ui() -> void:
 	cl.add_theme_font_size_override("font_size", 15)
 	cv.add_child(cl)
 	_name_edit = LineEdit.new()
-	_name_edit.max_length = 20
-	_name_edit.placeholder_text = "Player"
+	_name_edit.max_length = Net.NAME_MAX
+	_name_edit.placeholder_text = Net.DEFAULT_NAME
 	_name_edit.text = str(Settings.get_value("profile", "name", ""))
-	_name_edit.text_changed.connect(func(t: String) -> void: Settings.set_value("profile", "name", t.strip_edges().left(20)))
+	_name_edit.text_changed.connect(func(t: String) -> void: Settings.set_value("profile", "name", t.strip_edges().left(Net.NAME_MAX)))
 	cv.add_child(_name_edit)
 
 	_toast = Label.new()
@@ -197,7 +200,7 @@ func _build_ui() -> void:
 	_root.add_child(_fade)
 
 
-func _add_button(text: String, variation: StringName, action: Callable) -> void:
+func _add_button(text: String, variation: StringName, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.theme_type_variation = variation
@@ -210,6 +213,7 @@ func _add_button(text: String, variation: StringName, action: Callable) -> void:
 	b.modulate.a = 0.0
 	_column.add_child(b)
 	_buttons.append(b)
+	return b
 
 
 func _nudge(b: Button, x: float) -> void:
@@ -278,8 +282,8 @@ func _build_join_dialog() -> void:
 	l2.text = "Your name"
 	col.add_child(l2)
 	_join_name = LineEdit.new()
-	_join_name.max_length = 20
-	_join_name.placeholder_text = "Player"
+	_join_name.max_length = Net.NAME_MAX
+	_join_name.placeholder_text = Net.DEFAULT_NAME
 	_join_name.text_submitted.connect(func(_t: String) -> void: _on_join())
 	col.add_child(_join_name)
 	_join_status = Label.new()
@@ -293,7 +297,7 @@ func _build_join_dialog() -> void:
 	col.add_child(row)
 	var cancel := Button.new()
 	cancel.text = "Cancel"
-	cancel.pressed.connect(_close_join)
+	cancel.pressed.connect(_cancel_join)
 	row.add_child(cancel)
 	var join := Button.new()
 	join.text = "Join"
@@ -308,28 +312,37 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel"):
 		if _join.visible:
 			get_viewport().set_input_as_handled()
-			_close_join()
+			_cancel_join()
+
+
+func _on_solo() -> void:
+	if _busy:
+		return
+	_save_name(_name_edit.text)
+	_go(MAIN_SCENE)
+
+
+## Solo run from the checkpoint on disk.
+func _on_continue() -> void:
+	if _busy:
+		return
+	_save_name(_name_edit.text)
+	_go(MAIN_SCENE, true)
 
 
 func _on_host() -> void:
 	if _busy:
 		return
 	_save_name(_name_edit.text)
-	var net := _net()
-	if net == null or not net.has_method("host_game"):
-		# No multiplayer layer yet: solo run straight into the game
-		_go(MAIN_SCENE)
+	if Net.host_game() != OK:
+		_say("Could not host: %s\nPlay solo still works." % Net.last_error)
 		return
-	var err: int = net.call("host_game")
-	if err != OK:
-		_say("Could not host: %s" % error_string(err))
-		return
-	_go(LOBBY_SCENE if ResourceLoader.exists(LOBBY_SCENE) else MAIN_SCENE)
+	_go(LOBBY_SCENE)
 
 
 func _open_join() -> void:
 	_join_name.text = str(Settings.get_value("profile", "name", ""))
-	_join_status.text = "" if _net() else "Multiplayer is not in this build yet. Use Host game to play solo."
+	_join_status.text = ""
 	_join.show()
 	_join_code.grab_focus()
 
@@ -338,8 +351,16 @@ func _close_join() -> void:
 	_join.hide()
 
 
+## Cancel (or Esc) in the join dialog: stops a join that is still connecting.
+func _cancel_join() -> void:
+	if _joining:
+		_joining = false
+		Net.leave()
+	_close_join()
+
+
 func _on_join() -> void:
-	if _busy:
+	if _busy or _joining:
 		return
 	var code := _join_code.text.strip_edges()
 	if code == "":
@@ -347,21 +368,28 @@ func _on_join() -> void:
 		_join_code.grab_focus()
 		return
 	_save_name(_join_name.text)
-	var net := _net()
-	if net == null or not net.has_method("join_game"):
-		_join_status.text = "Multiplayer is not in this build yet. Use Host game to play solo."
+	if Net.join_game(code) != OK:
+		_join_status.text = Net.last_error  # connection_failed is ignored while the dialog shows it
 		return
-	var err: int = net.call("join_game", code)
-	if err != OK:
-		_join_status.text = "That code doesn't look right (%s). Check it and try again." % error_string(err)
-		return
-	_join_status.text = "Connecting…"
-	_go(LOBBY_SCENE if ResourceLoader.exists(LOBBY_SCENE) else MAIN_SCENE)
+	_joining = true
+	_join_status.text = "Connecting to %s…" % Net.joined_address
 
 
+## The host let us into its lobby.
+func _on_joined() -> void:
+	if _joining:
+		_joining = false
+		_go(LOBBY_SCENE)
+
+
+## A join failed: the reason goes in the join dialog's status line (or a toast when the dialog is closed).
 func _on_connection_failed(reason: Variant = "") -> void:
 	_busy = false
-	_say("Connection failed. %s" % str(reason))
+	_joining = false
+	if _join.visible:
+		_join_status.text = str(reason)
+	else:
+		_say(str(reason))
 
 
 func _open_settings() -> void:
@@ -370,7 +398,7 @@ func _open_settings() -> void:
 
 func _on_overlay_closed() -> void:
 	if DisplayServer.get_name() != "headless":
-		_buttons[2].grab_focus()
+		_settings_button.grab_focus()
 
 
 func _on_quit() -> void:
@@ -378,16 +406,14 @@ func _on_quit() -> void:
 
 
 func _save_name(n: String) -> void:
-	var clean := n.strip_edges().left(20)
+	var clean := n.strip_edges().left(Net.NAME_MAX)
 	if clean != "":
 		Settings.set_value("profile", "name", clean)
 		_name_edit.text = clean
 
 
-func _go(scene: String) -> void:
+func _go(scene: String, from_save := false) -> void:
 	_busy = true
-	if scene == MAIN_SCENE:
-		Game.new_game(false)
 	Settings.save()
 	_fade.show()
 	_fade.color.a = 0.0
@@ -397,7 +423,10 @@ func _go(scene: String) -> void:
 	if music:
 		t.parallel().tween_property(music, "volume_db", -40.0, 0.35)
 	await t.finished
-	get_tree().change_scene_to_file(scene)
+	if scene == MAIN_SCENE:
+		Net.start_solo(from_save)  # offline: no socket, no firewall prompt
+	else:
+		get_tree().change_scene_to_file(scene)
 
 
 func _say(text: String) -> void:

@@ -1,7 +1,7 @@
 # Trust Issues: notes for Claude
 
 - Godot 4.7.2, GDScript, typed. Models come from Blender 4.5 scripts: `blender/scripts/build_assets.py` (train, tools,
-  repair items) and `build_nature.py` (trees, rocks, cliffs). Procedural wear is baked into one texture per model; `.glb`
+  repair items) and `build_nature.py` (trees, rocks, cliffs), `build_station.py` (station canopy, shop kiosk, name board, come-along, arm). Procedural wear is baked into one texture per model; `.glb`
   goes to `assets/models/`, loaded via `Props` / `Terrain.nature_mesh`. `render_showcase.py` renders preview pictures. Other grey-box geometry is built in code (`scripts/util/build.gd`).
 - `Game` autoload (`scripts/autoload/game.gd`) holds shared state: inventory, checkpoints, signals, debug role, run
   `stats` (`add_stat`), `objective` (+ `objective_changed`), `run_finished`, `return_to_menu()`, balance (`SHOP`, `START_INVENTORY`).
@@ -13,5 +13,8 @@
   (`Key_<seg>`). `RunDirector` (objective, softlock guards, ending) shows the `EndScreen`. Node names are deterministic
   (`Repair_<piece>`, `Pickup_<n>`, `Station<i>`) because every peer builds the world from `Main.SEED`.
 - The design source of truth is `docs/GDD.md`. Open TODOs for local work: `docs/TODO_LOCAL.md`.
-- Before pushing: `godot --headless --path . --import` then `godot --headless --path . res://tests/TestTrain.tscn` and
-  `res://tests/TestRoute.tscn` (both must print PASSED).
+- Before pushing: `godot --headless --path . --import` then `godot --headless --path . res://tests/TestTrain.tscn`,
+  `res://tests/TestRoute.tscn` and `res://tests/TestMenu.tscn` (all must print PASSED; TestMenu prints one expected
+  ConfigFile parse error), and `GODOT=<godot> tests/run_net_test.sh` (prints NET TEST PASSED; picks a random free port).
+- Screenshot runs (`tests/Screenshot.tscn` under xvfb with opengl3) are slow on software rendering: allow up to
+  20 minutes per mode (`timeout 1200`).
