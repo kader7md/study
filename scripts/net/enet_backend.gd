@@ -43,6 +43,16 @@ func get_peer() -> MultiplayerPeer:
 	return _peer
 
 
+## Building the world takes a few seconds in which a peer does not answer: allow 30-60 s before calling it gone
+## (ENet's default gives up after 5-30 s). A real disconnect (closing the game) is still seen at once.
+func on_peer_connected(id: int) -> void:
+	if _peer == null:
+		return
+	var pp := _peer.get_peer(id)
+	if pp:
+		pp.set_timeout(64, 30000, 60000)
+
+
 func supports_upnp() -> bool:
 	return true
 

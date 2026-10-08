@@ -8,6 +8,9 @@ extends Node
 ## (after the client worked on it) finishes the repair and drives across. The client joins with an invite code,
 ## checks the world it sees, and does real work through requests: picks up a pickup, takes a plank from the cargo car,
 ## places it on the gap and nails it down. Each process prints PASSED / FAILED and exits 0 / 1.
+## Screenshots (needs a display, e.g. xvfb-run, and --rendering-driver opengl3):
+##   ... res://tests/NetTest.tscn -- shots <out_dir>                  lobby (host view with 3 players) + play card
+##   ... -- host --shot <out_dir>  /  -- client --shot <out_dir>      each one looks at the other player in game
 
 const TIMEOUT := 160.0
 
@@ -16,14 +19,19 @@ var port := 24599
 var failures := 0
 var _flags := {}       # set by the other process through _tell()
 var _disconnect_reason := ""
+var shot_dir := ""
+var _finished := false
 
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	mode = "host" if args.has("host") else ("client" if args.has("client") else "")
+	mode = "host" if args.has("host") else ("client" if args.has("client") else ("shots" if args.has("shots") else ""))
 	var i := args.find("--port")
 	if i >= 0 and i + 1 < args.size():
 		port = args[i + 1].to_int()
+	var s := args.find("--shot")
+	if s >= 0 and s + 1 < args.size():
+		shot_dir = args[s + 1]
 	if mode == "":
 		print("usage: -- host|client [--port N]")
 		get_tree().quit(2)
@@ -34,6 +42,11 @@ func _ready() -> void:
 	stand_in.name = "StandIn"
 	get_tree().root.add_child(stand_in)
 	get_tree().current_scene = stand_in
+	if mode == "shots":
+		shot_dir = args[args.find("shots") + 1] if args.find("shots") + 1 < args.size() else "user://"
+		await _lobby_shots()
+		get_tree().quit()
+		return
 	get_tree().create_timer(TIMEOUT, true, false, true).timeout.connect(func():
 		check(false, "finished within %d s" % int(TIMEOUT))
 		_finish())
@@ -46,7 +59,50 @@ func _ready() -> void:
 	_finish()
 
 
+func _shot(file: String) -> void:
+	if shot_dir == "":
+		return
+	await get_tree().create_timer(0.5).timeout
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/%s.png" % [shot_dir, file])
+	print("saved ", file)
+
+
+## Lobby screenshots: the host's room with three players (two of them made up locally), then the Play card.
+func _lobby_shots() -> void:
+	await get_tree().process_frame
+	Net.local_name = "Kader"
+	Net.host_game(port)
+	Net.players[2] = {"name": "Ana", "ready": true, "color": Net.COLORS[1], "host": false}
+	Net.players[3] = {"name": "Bo", "ready": false, "color": Net.COLORS[2], "host": false}
+	get_tree().change_scene_to_file(Net.LOBBY_SCENE)
+	await get_tree().create_timer(1.2).timeout
+	Net.players_changed.emit()
+	await _shot("lobby_host")
+	Net.leave()
+	Net.last_error = ""
+	get_tree().change_scene_to_file(Net.LOBBY_SCENE)
+	await get_tree().create_timer(1.0).timeout
+	await _shot("lobby_play")
+
+
+## Puts `me` a few metres in front of `other` and looks at them.
+func _look_at_player(me: Player, other: Player) -> void:
+	var fwd := -other.global_basis.z
+	var pos := other.global_position + fwd * 3.2 + other.global_basis.x * 0.6
+	me.global_position = pos
+	me.velocity = Vector3.ZERO
+	var target := other.global_position + Vector3.UP * 1.2
+	me.look_at(Vector3(target.x, pos.y, target.z), Vector3.UP)
+	me.rotation.x = 0.0
+	me.rotation.z = 0.0
+	me.camera.rotation.x = -0.12
+
+
 func _finish() -> void:
+	if _finished:
+		return
+	_finished = true
 	print("\n%s %s: %d failure(s)" % [mode.to_upper(), "PASSED" if failures == 0 else "FAILED", failures])
 	if Net.backend:
 		Net.leave()
@@ -118,6 +174,14 @@ func _host() -> void:
 	check(them != null and not them.is_local(), "the client's player exists on the host (remote)")
 	if them:
 		check(them.get_node_or_null("Body") != null and not them.camera.visible, "remote player: a body, no first-person arms")
+	if shot_dir != "" and them:
+		me.carry("plank")
+		await _wait(5.0)  # the client looks at us, then steps aside
+		_look_at_player(me, them)
+		await _wait(0.8)
+		print("host at %s looks at the client at %s" % [me.global_position, them.global_position])
+		await _shot("host_sees_client")
+		me.consume_carried()
 
 	print("Train")
 	var train := Game.train
@@ -158,6 +222,29 @@ func _host() -> void:
 	train.lever = 0
 	await _wait_until(func(): return train.is_stopped(), 20.0)
 	_tell.rpc_id(cid, "host_done", true)
+
+	print("World events: sabotage, damage, cover pieces")
+	var sab := Game.sabotage
+	for id: String in sab.cooldowns:
+		sab.cooldowns[id] = 0.0
+	check(sab.use("zombies") and sab.use("eagles"), "zombies and eagles attack")
+	var ahead := track.point_at(train.distance + 90.0)
+	check(sab.use("meteor", ahead), "a meteor falls on the track ahead")
+	train.weld_full()
+	train.take_damage(36.0)
+	var attached := train.attached_count()
+	check(attached < train.parts.size(), "damage knocks cover pieces off (%d/%d left)" % [attached, train.parts.size()])
+	_tell.rpc_id(cid, "events", attached)
+	check(await _wait_until(func(): return _flags.has("enemies_seen"), 30.0), "the client saw the attack")
+	for e in get_tree().get_nodes_in_group("enemy"):
+		e.queue_free()
+	await _wait(Meteor.FALL_TIME + 0.5)
+	_tell.rpc_id(cid, "cleared", track.broken_count())
+	var refit := await _wait_until(func(): return _flags.has("refit"), 60.0)
+	check(refit, "the client says it refitted a panel")
+	if refit:
+		var part := train.parts[int(_flags.refit)]
+		check(part.attached, "the client's panel is back on, on the host (%s)" % part.name)
 
 	print("Roles and sabotage")
 	var got_role := await _wait_until(func(): return _flags.has("role"), 30.0)
@@ -218,6 +305,14 @@ func _client() -> void:
 		check(host_player.get_node_or_null("Body") != null and not host_player.camera.visible, "the host's body shows, without floating arms")
 		check(host_player.display_name == "Host", "with the host's name")
 	check(main.get_node_or_null("WorldSync") != null, "world sync is running")
+	if shot_dir != "" and host_player:
+		_look_at_player(me, host_player)
+		await _wait(1.5)
+		await _shot("client_sees_host")
+		# step back onto the platform, facing the train, holding the wrench
+		var t := Game.track.transform_at(Game.train.distance - 10.0)
+		_teleport(me, t.origin + t.basis.x * 3.5 + Vector3.UP * 1.2)
+		me.select_tool("wrench")
 
 	print("Train")
 	var train := Game.train
@@ -296,6 +391,54 @@ func _client() -> void:
 	check(not track.is_broken(gap), "the repaired piece is whole on the client")
 	check(Game.count("gold") >= gold + 7, "the inventory change arrived (gold %d -> %d)" % [gold, Game.count("gold")])
 	check(train.rear_distance() > (gap + 1) * Track.PIECE_LENGTH, "the train crossed it on the client too")
+
+	print("World events: sabotage, damage, cover pieces")
+	check(await _wait_until(func(): return _flags.has("events"), 30.0), "the host started the attack")
+	var named := func(prefix: String) -> int:
+		return main.get_children().filter(func(n): return String(n.name).begins_with(prefix)).size()
+	check(await _wait_until(func(): return named.call("Zombie_") >= 5, 5.0), "5 zombies run at the train here too (%d)" % named.call("Zombie_"))
+	check(await _wait_until(func(): return named.call("Eagle_") >= 2, 5.0), "2 eagles dive at the cargo")
+	check(await _wait_until(func(): return named.call("Meteor_") >= 1, 5.0), "the meteor falls here too")
+	var zombie := main.get_children().filter(func(n): return String(n.name).begins_with("Zombie_"))[0] as Node3D
+	var z_from := zombie.global_position
+	check(await _wait_until(func(): return is_instance_valid(zombie) and zombie.global_position.distance_to(z_from) > 1.0, 5.0), "zombie puppets follow the host's zombies")
+	var host_attached: int = _flags.events
+	check(await _wait_until(func(): return train.attached_count() == host_attached, 5.0), "the same cover pieces are off (%d/%d)" % [train.attached_count(), train.parts.size()])
+	check(await _wait_until(func(): return named.call("Fallen_") > 0, 5.0), "broken pieces lie around (%d)" % named.call("Fallen_"))
+	_tell.rpc_id(1, "enemies_seen", true)
+	check(await _wait_until(func(): return _flags.has("cleared"), 30.0), "the host cleared the attackers")
+	check(await _wait_until(func(): return named.call("Zombie_") == 0 and named.call("Eagle_") == 0, 5.0), "and they are gone here too")
+	var host_broken: int = _flags.cleared
+	check(await _wait_until(func(): return track.broken_count() == host_broken, 5.0), "the meteor's damage to the track matches (%d broken pieces)" % track.broken_count())
+	# refit one wooden panel: take a new panel from the cargo car, place it, nail it
+	var wpart: BodyPart = null
+	for p in train.parts:
+		if not p.attached and p.material == "wood" and p.slot() != null and wpart == null:
+			wpart = p
+	check(wpart != null, "a wooden piece is missing")
+	if wpart:
+		var slot := wpart.slot()
+		check(slot.name == "Slot_%s" % wpart.name, "its slot has the host's name (%s)" % slot.name)
+		var panel_spot: Interactable = null
+		for s in cargo.find_children("*", "ActionSpot", true, false):
+			if (s as ActionSpot).get_prompt(me).contains("panel"):
+				panel_spot = s
+		_teleport(me, panel_spot.global_position + cargo.global_basis.x * 1.8 + Vector3.UP * 0.3)
+		await _wait(0.4)
+		Net.request(panel_spot, &"interact", [me])
+		check(await _wait_until(func(): return me.carried_item == "panel", 5.0), "carrying a new panel")
+		_teleport(me, slot.global_position + Vector3.UP * 0.5 + (slot.global_position - wpart.car.global_position).normalized() * 1.5)
+		await _wait(0.4)
+		Net.request(slot, &"interact", [me])
+		check(await _wait_until(func(): return wpart.is_pending(), 5.0), "the panel is in place, waiting for nails")
+		var fixes := wpart.car.get_children().filter(func(n): return String(n.name).begins_with("Fix_%s_" % wpart.name))
+		check(fixes.size() == 2, "2 nails to drive (%d)" % fixes.size())
+		for f in fixes:
+			for k in NailSpot.HAMMER_HITS:
+				Net.request(me, &"tool_hit", [f, "hammer", Player.HAMMER_DAMAGE])
+				await _wait(0.12)
+		check(await _wait_until(func(): return wpart.attached, 5.0), "nailed on: the piece is back (on the client)")
+		_tell.rpc_id(1, "refit", train.parts.find(wpart))
 
 	print("Roles and sabotage")
 	check(Game.role == "crew" or Game.role == "impostor", "got a role (%s)" % Game.role)

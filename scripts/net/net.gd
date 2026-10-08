@@ -699,8 +699,10 @@ func _rpc_open_shop(station_index: int) -> void:
 
 # --- Connection events --------------------------------------------------------------------
 
-func _on_peer_connected(_id: int) -> void:
-	pass  # a client says hello with _rpc_register once it is connected
+func _on_peer_connected(id: int) -> void:
+	# a client says hello with _rpc_register once it is connected
+	if backend and (is_host() or id == 1):
+		backend.on_peer_connected(id)
 
 
 func _on_peer_disconnected(id: int) -> void:
@@ -722,6 +724,8 @@ func _on_peer_disconnected(id: int) -> void:
 
 
 func _on_connected_to_server() -> void:
+	if backend:
+		backend.on_peer_connected(1)
 	_rpc_register.rpc_id(1, PROTOCOL, my_name())
 
 

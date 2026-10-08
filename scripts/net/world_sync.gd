@@ -28,7 +28,7 @@ var _inventory_dirty := false
 var _repair_sent := {}      # piece index -> last sent state (as text)
 var _part_sent := {}        # part index -> last sent state (as text)
 var _gone: Array[String] = []   # host: pickups and keys taken (paths relative to Main)
-var _dynamic: Array[Node] = []  # host: named zombies, eagles, fallen panels, anchors
+var _dynamic: Array = []        # host: named zombies, eagles, fallen panels, anchors (may hold freed ones)
 var _counter := 0
 var _hooks: Array[Node] = []
 # client
@@ -133,10 +133,12 @@ func snapshot() -> Dictionary:
 		for id: String in SabotageManager.ABILITIES:
 			cds.append(Game.sabotage.cooldowns.get(id, 0.0))
 	var dyn := {}
-	for n in _dynamic.duplicate():
-		if not is_instance_valid(n) or not n.is_inside_tree() or n.is_queued_for_deletion():
-			_dynamic.erase(n)
-			continue
+	var alive := []
+	for n: Variant in _dynamic:
+		if is_instance_valid(n) and (n as Node).is_inside_tree() and not (n as Node).is_queued_for_deletion():
+			alive.append(n)
+	_dynamic = alive
+	for n: Node in alive:
 		var n3 := n as Node3D
 		if n is Zombie:
 			dyn[n.name] = [DYN_ZOMBIE, n3.global_position, n3.global_basis.get_rotation_quaternion()]
@@ -156,7 +158,7 @@ func snapshot() -> Dictionary:
 	}
 
 
-func _poll_repairs(force: bool, peer := 0) -> Array:
+func _poll_repairs(force: bool) -> Array:
 	var all := []
 	for r in track.get_children():
 		if r is RailRepair and not r.is_queued_for_deletion():

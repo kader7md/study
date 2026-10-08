@@ -36,6 +36,11 @@ func describe_invite(_port: int) -> Dictionary:
 	return {"code": "", "lines": PackedStringArray()}
 
 
+## Called for each new connection (on the host: every client; on a client: the host, id 1).
+func on_peer_connected(_id: int) -> void:
+	pass
+
+
 ## True if this backend can try to open the port on the router (UPnP).
 func supports_upnp() -> bool:
 	return false
