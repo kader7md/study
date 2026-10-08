@@ -177,7 +177,9 @@ func _run() -> void:
 	sab.use("meteor", train.cars[0].global_position)
 	await _wait(Meteor.FALL_TIME + 0.5)
 	check(train.health < hp, "meteor on the train damages it (%.0f → %.0f)" % [hp, train.health])
-	check(train._cracks.size() == train.crack_count() and train.crack_count() > 0, "damage shows as %d cracks" % train.crack_count())
+	check(train.attached_count() < train.parts.size(), "damage knocks panels off (%d/%d left)" % [train.attached_count(), train.parts.size()])
+	await _frames(2)
+	check(get_tree().get_nodes_in_group("enemy").size() >= 0 and main.find_children("*", "FallenPart", true, false).size() > 0, "broken panels fly off as pieces you can pick up")
 	check(not sab.can_use("meteor"), "meteor goes on cooldown")
 	var top := train.max_speed_now()
 	sab.use("freezing_wind")
@@ -196,20 +198,68 @@ func _run() -> void:
 	for e in get_tree().get_nodes_in_group("enemy"):
 		e.queue_free()
 
-	print("Welding cracks")
-	train.health = 35.0
-	train._sync_cracks()
-	var crack: Crack = train._cracks[0]
-	player.global_position = crack.global_position + Vector3.UP
-	player.select_tool("welder")
+	print("Train cover: panels and doors")
+	check(train.parts.size() >= 20, "train is covered by %d breakable pieces" % train.parts.size())
+	var door: BodyPart = null
+	for p in train.parts:
+		if p.is_door and p.attached:
+			door = p
+	if door:
+		door.toggle_door()
+		check(door.door_open, "doors open with E")
+		door.toggle_door()
+	# Refit a wooden panel: pick up a fallen one, place it, nail it
+	train.weld_full()
+	train.take_damage(train.parts[0].value() * 3.0)
+	var wpanel: BodyPart = null
+	var metal: BodyPart = null
+	for p in train.parts:
+		if not p.attached and p.material == "wood" and p.slot() != null and wpanel == null:
+			wpanel = p
+		if not p.attached and p.material == "metal" and p.slot() != null and metal == null:
+			metal = p
+	while wpanel == null or metal == null:
+		wpanel = null
+		metal = null
+		train.weld_full()
+		train.take_damage(train.parts[0].value() * 6.0)
+		for p in train.parts:
+			if not p.attached and p.material == "wood" and p.slot() != null and wpanel == null:
+				wpanel = p
+			if not p.attached and p.material == "metal" and p.slot() != null and metal == null:
+				metal = p
+	var hp_before := train.health
+	var fallen: Array = main.find_children("*", "FallenPart", true, false)
+	check(fallen.size() > 0, "fallen pieces lie around")
+	fallen[0]._pick_up(player)
+	check(player.carried_item == "panel", "pick up a fallen panel (free)")
+	wpanel.slot().interact(player)
+	await _frames(2)
+	check(wpanel.is_pending(), "panel placed, needs nails")
+	var nails := train.find_children("*", "NailSpot", true, false).filter(func(n): return n.get_meta("part", null) == wpanel)
+	check(nails.size() == 2, "a wooden panel takes 2 nails")
+	for n in nails:
+		for k in NailSpot.HAMMER_HITS:
+			n.on_tool_hit("hammer", player)
+	check(wpanel.attached and train.health > hp_before, "nailed on → panel fixed, health %.0f → %.0f" % [hp_before, train.health])
+	# Refit a metal panel: new one from the cargo car (2 scrap), weld it
+	Game.add("scrap", 20)
+	var scrap2 := Game.count("scrap")
+	train.take_item(player, "panel")
+	check(Game.count("scrap") == scrap2 - 2, "a new panel from the cargo car costs 2 scrap")
+	metal.slot().interact(player)
+	await _frames(2)
+	var seams2 := train.find_children("*", "WeldSeam", true, false).filter(func(n): return n.get_meta("part", null) == metal)
+	check(seams2.size() == 2, "a metal panel takes 2 welds")
 	player.welder_source = train.welder
-	player.weld_tick(crack, Crack.WELD_TIME + 0.1)
-	check(train.health == 45.0, "welding a crack with the train's welder adds 10%")
-	train.health = 58.0
-	train._sync_cracks()
-	player.weld_tick(train._cracks[0], Crack.WELD_TIME + 0.1)
-	check(train.health == Train.PATCH_LIMIT, "the train's welder stops at %d%%" % int(Train.PATCH_LIMIT))
-	check(not player.weld_tick(train._cracks[0], 0.5), "…and refuses above it")
+	var health_now := train.health
+	train.health = Train.PATCH_LIMIT + 5.0
+	check(not player.weld_tick(seams2[0], 0.5), "the train's welder can't weld metal above %d%%" % int(Train.PATCH_LIMIT))
+	train.health = minf(health_now, Train.PATCH_LIMIT - 10.0)
+	for seam in seams2:
+		player.weld_tick(seam, WeldSeam.WELD_TIME + 0.1)
+	check(metal.attached, "welded on → metal panel fixed")
+	player.select_tool("hammer")
 
 	print("Station checkpoint + station welder")
 	_clear_gaps(track.station_distances[1] - 200.0, track.station_distances[1] + 40.0)
@@ -218,10 +268,26 @@ func _run() -> void:
 	var arrived := await _wait_until(func(): return Game.next_station == 2, 10.0)
 	check(arrived and Game.checkpoint.get("station", -1) == 1, "stopping in station 1 saves a checkpoint")
 	var station_welder: WelderSource = main.get_node("Station1").find_children("*", "WelderSource", true, false)[0]
+	train.health = Train.PATCH_LIMIT + 5.0
+	train._sync_parts(false)
+	var high: BodyPart = null
+	for p in train.parts:
+		if not p.attached and p.material == "metal" and p.slot() != null and high == null:
+			high = p
+	if high == null:
+		train.take_damage(30.0)
+		for p in train.parts:
+			if not p.attached and p.material == "metal" and p.slot() != null and high == null:
+				high = p
+	var hp_station := train.health
+	Game.add("scrap", 10)
+	train.take_item(player, "panel")
+	high.slot().interact(player)
+	await _frames(2)
 	player.welder_source = station_welder
-	while train._cracks.size() > 0:
-		player.weld_tick(train._cracks[0], Crack.WELD_TIME + 0.1)
-	check(train.health == 100.0, "the station welder welds the body to 100%")
+	for seam in train.find_children("*", "WeldSeam", true, false).filter(func(n): return n.get_meta("part", null) == high):
+		player.weld_tick(seam, WeldSeam.WELD_TIME + 0.1)
+	check(high.attached and train.health > hp_station, "the station welder welds metal panels above %d%%" % int(Train.PATCH_LIMIT))
 	var gold := Game.count("gold")
 	Game.buy("nails")
 	check(Game.count("gold") == gold - Game.SHOP.nails.price, "shop takes gold")
@@ -243,8 +309,7 @@ func _run() -> void:
 	_clear_gaps(train.distance, train.distance + 200.0)
 	track.break_piece(track.piece_at(train.distance + 120.0))
 	train.fuel = 100.0
-	train.health = 100.0
-	train._sync_cracks()
+	train.weld_full()
 	train.lever = 1
 	await _wait_until(func(): return train.speed > 9.0, 20.0)
 	await _wait_until(func(): return train.is_stopped(), 20.0)
@@ -264,6 +329,11 @@ func _run() -> void:
 	train.lever = 1
 	await _wait(6.0)
 	var local_after := car.to_local(player.global_position)
+	if local_before.distance_to(local_after) >= 1.5:
+		for i in player.get_slide_collision_count():
+			var c := player.get_slide_collision(i).get_collider()
+			print("    debug collider: ", c.get_path() if c else null)
+		print("    debug: ", local_before, " -> ", local_after, " floor=", player.is_on_floor(), " wheels=", train.wheels)
 	check(train.speed > 5.0, "train is moving fast (%.1f m/s)" % train.speed)
 	check(local_before.distance_to(local_after) < 1.5, "player stays in place on the moving car (drift %.2f m)" % local_before.distance_to(local_after))
 

@@ -8,6 +8,10 @@ const WELD_TIME := 1.6
 
 var progress := 0.0
 var finished := false
+## Optional check (source) -> bool, e.g. the train's welder is too weak for the body above 60 %.
+var allow_fn: Callable
+var refuse_text := ""
+var _refuse_cd := 0.0
 var _bead: MeshInstance3D
 var _mat := StandardMaterial3D.new()
 
@@ -28,8 +32,13 @@ func get_prompt(_player: Node) -> String:
 	return "Weld the joint: welder [hold LMB] %d%%" % int(progress * 100.0)
 
 
-func on_weld(delta: float, _player: Node, _source: Node) -> bool:
+func on_weld(delta: float, _player: Node, source: Node) -> bool:
 	if finished:
+		return false
+	if allow_fn.is_valid() and not allow_fn.call(source):
+		if Time.get_ticks_msec() > _refuse_cd:
+			Game.say(refuse_text)
+			_refuse_cd = Time.get_ticks_msec() + 3000
 		return false
 	progress = minf(progress + delta / WELD_TIME, 1.0)
 	_mat.emission_energy_multiplier = 3.0 * progress

@@ -7,6 +7,7 @@ const LAYER_PLAYER := 2
 const LAYER_TRAIN := 4
 const LAYER_INTERACT := 8
 const LAYER_ENEMY := 16
+const LAYER_DEBRIS := 32  # broken-off train pieces: lie on the ground, players walk through them
 
 static var _materials := {}
 

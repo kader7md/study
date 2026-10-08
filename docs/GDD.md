@@ -106,9 +106,12 @@ Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations 
 **Wheels:** a fallen wheel is gone. Buy a new one at a station, carry it from the cargo car, **lift it into place** (animated),
 then **bolt it on with 3 hammer hits**.
 
-**Train body:** damage shows as **glowing cracks** (each one = 10 %). Weld them with the welder.
-The train's own welder machine can only get the body back to **60 %**. The big **station welder** gets it to **100 %**,
-so a badly damaged train has to **limp to the next station**.
+**Train body (cover):** at full health every car is fully covered: walls, roofs, doors and the locomotive's boiler plates
+(30 breakable pieces in total). Damage makes pieces **break off and fly away**, leaving the bare frame (and gaps you
+can fall out of). To fix one: **pick up the fallen piece** (free) or take a **new panel** from the cargo car (2 scrap),
+carry it to the ghost, place it, then **nail it** (wood: 2 nails) or **weld it** (metal: 2 welds).
+The train's own welder can only weld metal panels while the body is under **60 %**. Above that you need the big
+**station welder**, so a badly damaged train has to **limp to the next station**. Doors open and close with E.
 
 Special items found only at stations: **engine oil, repair hammer, nail gun, wheels**.
 

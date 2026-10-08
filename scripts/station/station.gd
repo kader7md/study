@@ -50,7 +50,7 @@ func _build() -> void:
 	WelderSource.create(self, "station", 25.0, Vector3(3.2, 1.2, 0))
 	Build.label(self, "STATION WELDER", Vector3(3.2, 3.2, 0), 40)
 	ActionSpot.create(self, Vector3(1.6, 1.4, 1.2), Vector3(3.2, 1.9, 0),
-		func(_p): return "Station welder (cable 25 m): pick the welder [2] near it, weld the train's cracks to 100%",
+		func(_p): return "Station welder (cable 25 m): pick the welder [2] near it, weld metal panels back on up to 100%",
 		func(_p): pass)
 
 	# Grave (revive dead players here, M5)

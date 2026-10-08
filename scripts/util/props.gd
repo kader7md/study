@@ -18,6 +18,13 @@ static var _cache := {}
 
 
 static func instance(id: String) -> Node3D:
+	if id == "panel":
+		# generic spare panel carried by the player (fits any missing piece)
+		var n := Node3D.new()
+		Build.box(n, Vector3(1.6, 1.0, 0.1), Vector3.ZERO, Color(0.55, 0.33, 0.16))
+		Build.box(n, Vector3(1.64, 0.12, 0.12), Vector3(0, 0.3, 0), Color(0.36, 0.2, 0.1))
+		Build.box(n, Vector3(1.64, 0.12, 0.12), Vector3(0, -0.3, 0), Color(0.36, 0.2, 0.1))
+		return n
 	if not _cache.has(id):
 		_cache[id] = load(PATHS[id])
 	return _cache[id].instantiate()

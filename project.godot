@@ -26,6 +26,7 @@ window/size/viewport_height=900
 3d_physics/layer_3="train"
 3d_physics/layer_4="interact"
 3d_physics/layer_5="enemy"
+3d_physics/layer_6="debris"
 3d_render/layer_2="own_body"
 
 [physics]

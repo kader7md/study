@@ -194,52 +194,80 @@ def side_boards(length, parts, height=0.7, door=1.0, color="wood"):
 
 # --- Train cars -------------------------------------------------------------------
 
+def panel(kind, mat_kind, n, parts, origin=None):
+    """Joins parts into one detachable body piece: Panel_<wood|metal>_<n> or Door_<wood|metal>_<n>.
+    Origin = centre of the panel (doors: the hinge edge)."""
+    obj = join(f"{kind}_{mat_kind}_{n}", parts, origin=origin)
+    if origin is None:
+        bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
+    return obj
+
+
 def build_locomotive():
     clear_scene()
     L = 10.0
     body = []
     underframe(L, body)
-    # cab deck (rear half)
+    # cab deck (rear half) and the iron boiler core (visible when the red jacket plates are knocked off)
     body.append(box("cab_deck", (2.8, 4.8, 0.3), (0, -2.6, FLOOR - 0.15), mat("wood_dark"), 0.03))
-    # boiler (front half), smokebox, bands
-    body.append(cyl("boiler", 1.0, 4.6, (0, 2.0, FLOOR + 1.0), mat("red", 0.45), axis="Y", verts=48, bevel=0.06))
+    body.append(cyl("boiler_core", 0.93, 4.6, (0, 2.0, FLOOR + 1.0), mat("iron", 0.5, 0.6), axis="Y", verts=48, bevel=0.03))
     body.append(cyl("smokebox", 1.04, 0.8, (0, 4.45, FLOOR + 1.0), mat("black", 0.6), axis="Y", verts=48, bevel=0.08))
     body.append(cyl("smokedoor", 0.8, 0.12, (0, 4.9, FLOOR + 1.0), mat("iron", 0.4, 0.6), axis="Y", verts=48, bevel=0.04))
     body.append(sphere("doorknob", 0.1, (0, 4.98, FLOOR + 1.0), mat("gold", 0.3, 0.8)))
-    for i, y in enumerate((0.3, 1.6, 2.9)):
-        body.append(cyl(f"band{i}", 1.03, 0.12, (0, y, FLOOR + 1.0), mat("gold", 0.35, 0.7), axis="Y", verts=48))
-    # chimney (flared), domes, whistle, headlight
     body.append(cyl("chimney", 0.28, 1.0, (0, 4.0, FLOOR + 2.4), mat("black"), bevel=0.03))
     body.append(cyl("chimney_top", 0.3, 0.45, (0, 4.0, FLOOR + 3.05), mat("black"), radius2=0.5, bevel=0.03))
-    body.append(sphere("steam_dome", 0.42, (0, 2.3, FLOOR + 1.95), mat("gold", 0.3, 0.8), scale=(1, 1, 0.9)))
-    body.append(sphere("sand_dome", 0.34, (0, 0.9, FLOOR + 1.9), mat("red", 0.45), scale=(1, 1, 0.85)))
+    body.append(sphere("steam_dome", 0.42, (0, 2.3, FLOOR + 1.9), mat("gold", 0.3, 0.8), scale=(1, 1, 0.9)))
+    body.append(sphere("sand_dome", 0.34, (0, 0.9, FLOOR + 1.85), mat("red", 0.45), scale=(1, 1, 0.85)))
     body.append(cyl("whistle", 0.07, 0.4, (0.3, 0.2, FLOOR + 2.2), mat("gold", 0.3, 0.8)))
     body.append(cyl("lamp_body", 0.26, 0.4, (0, 4.7, FLOOR + 2.15), mat("black"), axis="Y"))
     body.append(cyl("lamp_glass", 0.2, 0.06, (0, 4.92, FLOOR + 2.15), mat("lamp", 0.2, 0.0, 4.0), axis="Y"))
-    # cowcatcher
     for i in range(5):
         x = -0.8 + i * 0.4
         body.append(box(f"cowbar{i}", (0.1, 0.9, 0.08), (x, 5.35, 0.55), mat("red"), 0.02, rot=(math.radians(35), 0, 0)))
     body.append(box("cow_top", (2.0, 0.15, 0.12), (0, 5.05, 0.85), mat("red"), 0.03))
-    # running boards along the boiler
     for s in (-1, 1):
         body.append(box(f"runboard{s}", (0.35, 4.6, 0.08), (1.22 * s, 2.2, FLOOR - 0.05), mat("black"), 0.02))
-    # cab: front wall with round windows, low side walls with doors, posts, roof
+        body.append(box(f"rod{s}", (0.06, 7.4, 0.12), (1.0 * s, 0.0, 0.5), mat("steel", 0.3, 0.9), 0.02))
+    # cab frame: front wall with portholes, corner posts, roof beams (the frame stays when panels fall off)
     body.append(box("cab_front", (2.8, 0.15, 2.5), (0, -0.25, FLOOR + 1.25), mat("green", 0.6), 0.04))
     for s in (-1, 1):
         body.append(cyl(f"porthole{s}", 0.25, 0.18, (0.75 * s, -0.25, FLOOR + 1.85), mat("glass", 0.1), axis="Y"))
         body.append(torus(f"portring{s}", 0.26, 0.04, (0.75 * s, -0.33, FLOOR + 1.85), mat("gold", 0.3, 0.8), axis="Y"))
-        body.append(box(f"cab_side{s}", (0.12, 3.6, 0.9), (1.4 * s, -2.1, FLOOR + 0.45), mat("green", 0.6), 0.03))
-        body.append(box(f"cab_trim{s}", (0.16, 3.6, 0.1), (1.42 * s, -2.1, FLOOR + 0.92), mat("gold", 0.35, 0.7), 0.02))
-        for py in (-0.35, -4.7):
-            body.append(box(f"cab_post{s}{py}", (0.14, 0.14, 2.6), (1.36 * s, py, FLOOR + 1.3), mat("green", 0.6), 0.03))
-        body.append(box(f"cab_step{s}", (0.5, 0.7, 0.08), (1.45 * s, -4.5, 0.75), mat("iron", 0.5, 0.5), 0.02))
-    body.append(box("roof", (3.1, 4.6, 0.16), (0, -2.55, FLOOR + 2.65), mat("dark_red", 0.6), 0.06))
-    body.append(box("roof_lip", (3.2, 4.7, 0.06), (0, -2.55, FLOOR + 2.55), mat("black"), 0.02))
-    # connecting rods
-    for s in (-1, 1):
-        body.append(box(f"rod{s}", (0.06, 7.4, 0.12), (1.0 * s, 0.0, 0.5), mat("steel", 0.3, 0.9), 0.02))
+        for py in (-0.35, -3.9, -4.95):
+            body.append(box(f"cab_post{s}{py}", (0.12, 0.12, 2.6), (1.38 * s, py, FLOOR + 1.3), mat("iron", 0.5, 0.6), 0.02))
+        body.append(box(f"roof_beam{s}", (0.12, 4.7, 0.12), (1.38 * s, -2.6, FLOOR + 2.55), mat("iron", 0.5, 0.6), 0.02))
+        body.append(box(f"cab_step{s}", (0.5, 0.7, 0.08), (1.45 * s, -4.45, 0.75), mat("iron", 0.5, 0.6), 0.02))
     join("Locomotive", body, origin=(0, 0, 0))
+
+    # --- detachable body pieces ---
+    n = 0
+    # red boiler jacket plates (metal), each with its gold band
+    for i, (y0, y1) in enumerate(((-0.3, 1.25), (1.25, 2.75), (2.75, 4.05))):
+        yc = (y0 + y1) / 2
+        panel("Panel", "metal", n, [
+            cyl(f"jacket{i}", 1.0, y1 - y0 - 0.04, (0, yc, FLOOR + 1.0), mat("red", 0.45), axis="Y", verts=48, bevel=0.03),
+            cyl(f"band{i}", 1.03, 0.12, (0, y0 + 0.08, FLOOR + 1.0), mat("gold", 0.35, 0.7), axis="Y", verts=48)])
+        n += 1
+    # cab side walls (metal, green, with a window opening made from 4 pieces)
+    for s in (-1, 1):
+        x = 1.42 * s
+        panel("Panel", "metal", n, [
+            box(f"cab_low{s}", (0.1, 3.45, 0.95), (x, -2.12, FLOOR + 0.48), mat("green", 0.6), 0.03),
+            box(f"cab_top{s}", (0.1, 3.45, 0.4), (x, -2.12, FLOOR + 2.3), mat("green", 0.6), 0.03),
+            box(f"cab_mid_a{s}", (0.1, 0.6, 0.9), (x, -0.7, FLOOR + 1.4), mat("green", 0.6), 0.03),
+            box(f"cab_mid_b{s}", (0.1, 0.6, 0.9), (x, -3.55, FLOOR + 1.4), mat("green", 0.6), 0.03),
+            box(f"cab_trim{s}", (0.14, 3.45, 0.08), (x, -2.12, FLOOR + 0.97), mat("gold", 0.35, 0.7), 0.02)])
+        n += 1
+    panel("Panel", "metal", n, [box("roof", (3.1, 4.7, 0.14), (0, -2.6, FLOOR + 2.67), mat("dark_red", 0.6), 0.05),
+                                box("roof_lip", (3.2, 4.8, 0.05), (0, -2.6, FLOOR + 2.58), mat("black"), 0.02)])
+    n += 1
+    # cab doors at the rear corners (hinge at the front edge)
+    for k, s in enumerate((-1, 1)):
+        x = 1.42 * s
+        panel("Door", "metal", k, [box(f"cab_door{s}", (0.08, 0.95, 1.9), (x, -4.43, FLOOR + 0.95), mat("green", 0.6), 0.03),
+                                   box(f"door_win{s}", (0.1, 0.5, 0.45), (x, -4.43, FLOOR + 1.45), mat("glass", 0.1), 0.02),
+                                   sphere(f"door_knob{s}", 0.05, (x + 0.06 * s, -4.75, FLOOR + 0.95), mat("gold", 0.3, 0.8))],
+              origin=(x, -3.95, FLOOR + 0.95))
     # tracked wheels: Wheel_0..5, same order as train.gd (front pair first, left then right)
     idx = 0
     for y in (3.5, 0.0, -3.5):
@@ -255,35 +283,82 @@ def build_wagon(kind):
     body = []
     underframe(L, body)
     plank_deck(L, body)
-    if kind in ("cargo", "utility"):
-        side_boards(L, body, color="wood" if kind == "cargo" else "green")
+    n = 0
+    panels_later = []
     if kind == "cargo":
+        # Covered goods wagon: iron frame + wooden wall panels, a door in the middle of each side, roof panels.
+        for s in (-1, 1):
+            for py in (-3.0, -1.0, 1.0, 3.0):
+                body.append(box(f"post{s}{py}", (0.14, 0.14, 2.4), (1.43 * s, py, FLOOR + 1.2), mat("iron", 0.5, 0.6), 0.02))
+            body.append(box(f"top_beam{s}", (0.14, 6.2, 0.14), (1.43 * s, 0, FLOOR + 2.37), mat("iron", 0.5, 0.6), 0.02))
+            for e in (-1, 1):
+                body.append(box(f"step{s}{e}", (0.5, 0.7, 0.08), (1.45 * s, e * 3.5, 0.75), mat("iron", 0.5, 0.6), 0.02))
+        for i in range(4):
+            body.append(box(f"rib{i}", (2.9, 0.12, 0.12), (0, -3.0 + i * 2.0, FLOOR + 2.45), mat("iron", 0.5, 0.6), 0.02))
         for i, (x, y) in enumerate([(-0.6, -2.0), (0.6, -1.0), (-0.5, 1.2), (0.55, 2.2)]):
             body.append(box(f"crate{i}", (0.9, 0.9, 0.8), (x, y, FLOOR + 0.4), mat("wood"), 0.05))
             body.append(box(f"crate_band{i}", (0.94, 0.94, 0.12), (x, y, FLOOR + 0.4), mat("wood_dark"), 0.02))
         body.append(sphere("coal_pile", 0.7, (0.4, -0.2, FLOOR + 0.1), mat("black", 0.9), scale=(1.2, 1.4, 0.6)))
-    elif kind == "utility":
-        body.append(box("canopy", (3.0, 3.4, 0.12), (0, 1.8, FLOOR + 2.6), mat("cream", 0.7), 0.05))
+
+        def wall(name, s, y):
+            parts = []
+            for k in range(5):
+                shade = "wood" if k % 2 == 0 else "wood_dark"
+                parts.append(box(f"{name}_{k}", (0.08, 1.86, 0.44), (1.42 * s, y, FLOOR + 0.25 + k * 0.46), mat(shade), 0.02))
+            return parts
         for s in (-1, 1):
-            for py in (0.2, 3.4):
-                body.append(box(f"canopy_post{s}{py}", (0.1, 0.1, 2.6), (1.35 * s, py, FLOOR + 1.3), mat("iron", 0.5, 0.5), 0.02))
+            for y in (-2.0, 2.0):
+                panels_later.append(("Panel", "wood", wall(f"wall{s}{y}", s, y), None))
+            door = wall(f"door{s}", s, 0.0)
+            door.append(box(f"door_x{s}", (0.1, 1.9, 0.12), (1.47 * s, 0.0, FLOOR + 1.15), mat("wood_dark"), 0.02, rot=(0.9, 0, 0)))
+            door.append(sphere(f"door_handle{s}", 0.06, (1.5 * s, 0.75, FLOOR + 1.1), mat("iron", 0.4, 0.7)))
+            panels_later.append(("Door", "wood", door, (1.42 * s, -0.95, FLOOR + 1.15)))
+        for y in (-1.6, 1.6):
+            panels_later.append(("Panel", "metal", [box(f"roof{y}", (3.1, 3.2, 0.12), (0, y, FLOOR + 2.58), mat("dark_red", 0.6), 0.04)], None))
+    elif kind == "utility":
+        # Open workshop wagon: frame posts + canopy roof panels + low wooden side boards
+        for s in (-1, 1):
+            for py in (-3.0, 0.0, 3.0):
+                body.append(box(f"post{s}{py}", (0.12, 0.12, 2.6), (1.38 * s, py, FLOOR + 1.3), mat("iron", 0.5, 0.6), 0.02))
+            body.append(box(f"top_beam{s}", (0.12, 6.1, 0.12), (1.38 * s, 0, FLOOR + 2.55), mat("iron", 0.5, 0.6), 0.02))
+            for e in (-1, 1):
+                body.append(box(f"step{s}{e}", (0.5, 0.7, 0.08), (1.45 * s, e * 3.5, 0.75), mat("iron", 0.5, 0.6), 0.02))
+            for y in (-1.5, 1.5):
+                parts = [box(f"board{s}{y}{k}", (0.1, 2.9, 0.22), (1.4 * s, y, FLOOR + 0.13 + k * 0.25), mat("green"), 0.02) for k in range(3)]
+                panels_later.append(("Panel", "wood", parts, None))
+        for y in (-1.6, 1.6):
+            panels_later.append(("Panel", "metal", [box(f"canopy{y}", (3.0, 3.2, 0.1), (0, y, FLOOR + 2.65), mat("cream", 0.7), 0.04)], None))
     elif kind == "container":
-        body.append(box("container", (2.5, 6.4, 2.3), (0, 0, FLOOR + 1.15), mat("rust", 0.75), 0.06))
-        for i in range(13):
-            y = -3.0 + i * 0.5
-            for s in (-1, 1):
-                body.append(box(f"rib{i}{s}", (0.06, 0.18, 2.1), (1.26 * s, y, FLOOR + 1.15), mat("rust", 0.75), 0.01))
-        body.append(box("doors", (2.3, 0.08, 2.1), (0, -3.23, FLOOR + 1.15), mat("dark_red", 0.7), 0.02))
-        for s in (-0.3, 0.3):
-            body.append(cyl(f"lockbar{s}", 0.04, 2.0, (s, -3.3, FLOOR + 1.15), mat("steel", 0.3, 0.9)))
-        body.append(box("padlock", (0.25, 0.12, 0.3), (0, -3.36, FLOOR + 1.1), mat("gold", 0.3, 0.8), 0.03))
-        body.append(torus("shackle", 0.09, 0.025, (0, -3.36, FLOOR + 1.3), mat("steel", 0.3, 0.9), axis="Y"))
+        # Container: dark inner box + corrugated metal panels outside, locked doors at the back, roof
+        body.append(box("inner", (2.3, 6.2, 2.15), (0, 0, FLOOR + 1.1), mat("wood_dark", 0.9), 0.03))
+        for s in (-1, 1):
+            for py in (-3.2, -1.07, 1.07, 3.2):
+                body.append(box(f"cpost{s}{py}", (0.14, 0.14, 2.35), (1.27 * s, py, FLOOR + 1.17), mat("rust", 0.6), 0.02))
+        for s in (-1, 1):
+            for j, yc in enumerate((-2.13, 0.0, 2.13)):
+                parts = [box(f"cpan{s}{j}", (0.06, 2.0, 2.15), (1.27 * s, yc, FLOOR + 1.12), mat("rust", 0.75), 0.02)]
+                for r in range(4):
+                    parts.append(box(f"crib{s}{j}{r}", (0.05, 0.16, 2.05), (1.3 * s, yc - 0.75 + r * 0.5, FLOOR + 1.12), mat("rust", 0.75), 0.01))
+                panels_later.append(("Panel", "metal", parts, None))
+        panels_later.append(("Panel", "metal", [box("croof", (2.6, 6.5, 0.1), (0, 0, FLOOR + 2.32), mat("rust", 0.75), 0.03)], None))
+        doors = [box("doors", (2.3, 0.08, 2.1), (0, -3.25, FLOOR + 1.12), mat("dark_red", 0.7), 0.02),
+                 box("padlock", (0.25, 0.12, 0.3), (0, -3.36, FLOOR + 1.1), mat("gold", 0.3, 0.8), 0.03),
+                 torus("shackle", 0.09, 0.025, (0, -3.36, FLOOR + 1.3), mat("steel", 0.3, 0.9), axis="Y")]
+        for sx in (-0.3, 0.3):
+            doors.append(cyl(f"lockbar{sx}", 0.04, 2.0, (sx, -3.32, FLOOR + 1.12), mat("steel", 0.3, 0.9)))
+        panels_later.append(("Panel", "metal", doors, None))
     join(kind.capitalize(), body, origin=(0, 0, 0))
-    n = 0
+    counters = {}
+    for kind_name, mat_kind, parts, origin in panels_later:
+        key = kind_name
+        counters[key] = counters.get(key, 0)
+        panel(kind_name, mat_kind, counters[key], parts, origin)
+        counters[key] += 1
+    m = 0
     for y in (2.8, -2.8):
         for s in (-1, 1):
-            wagon_wheel(f"WagonWheel_{n}", (0.85 * s, y, 0.4))
-            n += 1
+            wagon_wheel(f"WagonWheel_{m}", (0.85 * s, y, 0.4))
+            m += 1
     export(os.path.join(OUT_TRAIN, f"{kind}_wagon.glb"))
 
 

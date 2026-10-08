@@ -4,6 +4,7 @@ A co-op train chase (then a sea chase) with a secret impostor. Made with **Godot
 
 - Game Design Doc: [`docs/GDD.md`](docs/GDD.md)
 - Workflow and phases: [`docs/WORKFLOW_PLAN.md`](docs/WORKFLOW_PLAN.md) · the video's method: [`docs/VIDEO_METHOD.md`](docs/VIDEO_METHOD.md)
+- Asset image prompts for Higgsfield: [`docs/ASSET_PROMPTS.md`](docs/ASSET_PROMPTS.md)
 - ⚠️ **Open TODOs for when the repo moves to your PC: [`docs/TODO_LOCAL.md`](docs/TODO_LOCAL.md)** (full video analysis, MCP setup)
 
 ## Current prototype: Chapter 1 train core (grey boxes)
@@ -18,7 +19,8 @@ What's in it:
 - **Hands-on track repair**: take planks → place → nail (hammer 3 hits / nail gun) → take rails → place → weld both ends
 - **Welder** with a **cable** to a welder machine (train: 35 m, rails + body up to 60 %; station: body up to 100 %)
 - **Wheels** fall off in crashes: carry a new one, lift it into place, bolt it with the hammer
-- **Body damage** shows as glowing cracks you weld shut
+- **Breakable train cover**: walls, roofs, doors and boiler plates fly off when damaged. Pick them up (or take a new panel),
+  place them, then nail (wood) or weld (metal). Doors open with E
 - **Shop** at every station, **checkpoints**, back to the last checkpoint if everyone dies
 - **Sabotage**: meteor (aimed), zombies, eagles (steal cargo), freezing wind
 - First-person player with cartoony hands, a tool hotbar, and carrying items; can ride the moving train

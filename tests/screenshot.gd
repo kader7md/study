@@ -19,10 +19,12 @@ func _ready() -> void:
 	var train := Game.train
 	var player: Player = main.player
 
-	var only_repair := OS.get_cmdline_user_args().has("repair")
-	if not only_repair:
+	var args := OS.get_cmdline_user_args()
+	if not args.has("repair") and not args.has("train"):
 		await _landscape_shots(track, train, player)
-	await _repair_shots(track, train, player)
+	if not args.has("train"):
+		await _repair_shots(track, train, player)
+	await _train_shots(track, train, player)
 	get_tree().quit()
 
 
@@ -88,6 +90,22 @@ func _repair_shots(track: Track, train: Train, player: Player) -> void:
 	player.carry("rail")
 	await get_tree().create_timer(0.2).timeout
 	await _shot("7_carry_rail")
+
+
+func _train_shots(track: Track, train: Train, player: Player) -> void:
+	if free_cam == null:
+		free_cam = Camera3D.new()
+		free_cam.far = 3000.0
+		main.add_child(free_cam)
+	free_cam.make_current()
+	main.hud.visible = false
+	var tt := track.transform_at(train.center_distance())
+	free_cam.global_position = tt.origin - tt.basis.x * 13.0 + Vector3.UP * 5.0 - tt.basis.z * 6.0
+	free_cam.look_at(train.cars[1].global_position + Vector3.UP * 1.8, Vector3.UP)
+	await _shot("8_train_covered")
+	train.take_damage(55.0)
+	await get_tree().create_timer(1.2).timeout
+	await _shot("9_train_damaged")
 
 
 func _view_player(player: Player, pos: Vector3, look: Vector3) -> void:

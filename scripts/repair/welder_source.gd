@@ -1,7 +1,7 @@
 class_name WelderSource
 extends Node3D
 ## A welder machine the welding torch plugs into. The cable has a fixed length.
-## kind "train" = small machine on the utility car (rails, and body cracks up to Train.PATCH_LIMIT)
+## kind "train" = small machine on the utility car (rails; metal body panels only while the body is under Train.PATCH_LIMIT)
 ## kind "station" = big station machine (anything, body up to 100 %)
 
 var kind := "train"

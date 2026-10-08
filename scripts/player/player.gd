@@ -47,6 +47,10 @@ var _sparks: CPUParticles3D
 var _weld_light: OmniLight3D
 var _cable: WelderCable
 var _right_rest := Vector3(0.36, -0.36, -0.62)
+## Riding the train: the car we stand on and its transform last frame (we move with it exactly).
+var _ride_car: Node3D
+var _ride_prev: Transform3D
+var _ride_grace := 0.0
 
 
 func _ready() -> void:
@@ -54,6 +58,8 @@ func _ready() -> void:
 	collision_layer = Build.LAYER_PLAYER
 	collision_mask = Build.LAYER_WORLD | Build.LAYER_TRAIN | Build.LAYER_ENEMY
 	floor_max_angle = deg_to_rad(50)
+	# Train cars are carried by our own ride logic (exact, also on hills); other platforms the normal way
+	platform_floor_layers = Build.LAYER_WORLD
 	var shape := CapsuleShape3D.new()
 	shape.radius = 0.35
 	shape.height = 1.8
@@ -195,6 +201,9 @@ func carry(item: String) -> void:
 			_carry_model.position = Vector3(0.05, -0.4, -1.1)
 			_carry_model.rotation = Vector3(0, 0.15, 0)
 			_carry_model.scale = Vector3.ONE * 0.45
+		"panel":
+			_carry_model.position = Vector3(0, -0.3, -0.85)
+			_carry_model.scale = Vector3.ONE * 0.6
 		"wheel":
 			_carry_model.position = Vector3(0, -0.35, -0.8)
 			_carry_model.rotation = Vector3(0, PI * 0.5, 0)
@@ -344,6 +353,8 @@ func _physics_process(delta: float) -> void:
 	elif global_position.y < -80.0:
 		respawn_on_train()
 
+	_ride_train(delta)
+
 	var input := Vector2.ZERO
 	if not Game.ui_open and not downed:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
@@ -361,10 +372,38 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= _gravity * delta
 	move_and_slide()
+	_update_ride_car()
 
 	_update_focus(delta)
 	_update_welder(delta)
 	_update_aim()
+
+
+## Moves the player along with the train car they stand on (position and turning), before walking.
+func _ride_train(delta: float) -> void:
+	if not is_instance_valid(_ride_car):
+		return
+	var now := _ride_car.global_transform
+	var moved := now * _ride_prev.affine_inverse()
+	global_position = moved * global_position
+	rotate_y(moved.basis.get_euler().y)
+	_ride_prev = now
+	_ride_grace -= delta
+	if _ride_grace <= 0.0:
+		_ride_car = null
+
+
+## After moving: which train car are we standing on? (a short grace keeps us attached over small bumps)
+func _update_ride_car() -> void:
+	for i in get_slide_collision_count():
+		var col := get_slide_collision(i)
+		var body := col.get_collider()
+		if col.get_normal().y > 0.6 and body is AnimatableBody3D and body.get_parent() is Train:
+			if body != _ride_car:
+				_ride_car = body
+				_ride_prev = body.global_transform
+			_ride_grace = 0.25
+			return
 
 
 func _update_focus(delta: float) -> void:
@@ -497,5 +536,6 @@ func take_damage(amount: float) -> void:
 
 func respawn_on_train() -> void:
 	velocity = Vector3.ZERO
+	_ride_car = null
 	if Game.train:
 		global_position = Game.train.cars[0].global_position + Game.train.cars[0].global_basis.z * 3.0 + Vector3.UP * 2.0
