@@ -25,6 +25,8 @@ static func attach(player: Player, peer: int) -> void:
 	# The host's own input sync is shown per peer (like StateSync); a client's is public (it can't know who is ready,
 	# and packets for players a peer hasn't spawned yet are dropped by Godot).
 	input.public_visibility = peer != 1
+	if peer != 1:
+		input.add_visibility_filter(Net.in_world)  # only to peers that loaded the world (no "node not found")
 	player.add_child(input)
 	input.set_multiplayer_authority(peer)
 

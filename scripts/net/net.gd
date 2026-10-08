@@ -397,8 +397,33 @@ func start_solo() -> void:
 
 ## Host: reloads the world on every peer (back to the checkpoint, or a new game). Called by Game when online.
 func reload_world() -> void:
-	if is_host() and is_online() and run_active:
+	if not (is_host() and is_online() and run_active):
+		return
+	# Take the players out first, so no despawn reaches a client after it already left the old world.
+	_clear_players()
+	await get_tree().create_timer(0.25).timeout
+	if is_online() and run_active:
 		_rpc_reload.rpc(Game.checkpoint, Game.inventory, Game.next_station)
+
+
+func _clear_players() -> void:
+	if not is_instance_valid(_players_root):
+		return
+	_forget_local_player()
+	for p in _players_root.get_children():
+		if p is Player:
+			p.queue_free()
+
+
+## True once `peer` has loaded the world (the host marks it in `players`); clients only send their movement to those.
+func in_world(peer: int) -> bool:
+	return peer == 1 or (players.has(peer) and bool(players[peer].get("world", false)))
+
+
+func _mark_world(id: int, on: bool) -> void:
+	if players.has(id) and bool(players[id].get("world", false)) != on:
+		players[id].world = on
+		_broadcast_players()
 
 
 func _main_seed() -> int:
@@ -441,6 +466,7 @@ func spawn_players(main: Node, spawn_xform: Transform3D) -> Player:
 	_spawner.spawn_path = _spawner.get_path_to(_players_root)
 	_spawner.spawn_function = _spawn_player
 	_spawner.spawned.connect(_on_spawned)
+	_spawner.despawned.connect(_on_despawned)
 	if not is_online():
 		var solo: Player = _spawn_player(_spawn_data(local_id(), 0, my_name()))
 		_players_root.add_child(solo)
@@ -451,6 +477,7 @@ func spawn_players(main: Node, spawn_xform: Transform3D) -> Player:
 	_world_sync.setup(main)
 	if is_host():
 		_host_world_ready = true
+		_mark_world(1, true)
 		var ids: Array = players.keys()
 		ids.sort()
 		for i in ids.size():
@@ -492,6 +519,21 @@ func _on_spawned(node: Node) -> void:
 		_set_local_player(node)
 
 
+func _on_despawned(node: Node) -> void:
+	if node is Player and (node as Player).peer_id == local_id():
+		_forget_local_player()
+
+
+## Main and the HUD let go of our player (it is about to be freed).
+func _forget_local_player() -> void:
+	if not is_instance_valid(_main):
+		return
+	_main.set("player", null)
+	var hud: Node = _main.get("hud")
+	if hud:
+		hud.set("player", null)
+
+
 func _set_local_player(p: Player) -> void:
 	if not is_instance_valid(p) or not is_instance_valid(_main):
 		return
@@ -531,6 +573,7 @@ func _show_role_banner(role: String) -> void:
 func _on_peer_world_ready(id: int) -> void:
 	if not is_instance_valid(_players_root):
 		return
+	_mark_world(id, true)
 	for p: Node in _players_root.get_children():
 		if p is Player:
 			PlayerSync.show_to(p, id)
@@ -796,7 +839,7 @@ func _broadcast_players() -> void:
 func _reject(id: int, reason: String) -> void:
 	_rpc_rejected.rpc_id(id, reason)
 	get_tree().create_timer(0.4).timeout.connect(func():
-		if multiplayer.multiplayer_peer and multiplayer.is_server():
+		if multiplayer.multiplayer_peer and multiplayer.is_server() and id in multiplayer.get_peers():
 			multiplayer.multiplayer_peer.disconnect_peer(id))
 
 
@@ -841,6 +884,10 @@ func _rpc_players(list: Dictionary) -> void:
 		_joining = false
 		print("[net] joined the lobby (%d players)" % players.size())
 		joined.emit()
+	# who has loaded the world may have changed: our movement goes only to them
+	var me := local_player()
+	if me and me.has_node("InputSync"):
+		(me.get_node("InputSync") as MultiplayerSynchronizer).update_visibility()
 	players_changed.emit()
 
 
@@ -859,6 +906,7 @@ func _rpc_start_run(new_seed: int) -> void:
 	_host_world_ready = false
 	if is_host():
 		_ready_peers.clear()
+		_reset_world_marks()
 	_pending_role = ""
 	Game.new_game(false)
 	Game.role = "crew"
@@ -888,8 +936,15 @@ func _rpc_reload(checkpoint: Dictionary, inventory: Dictionary, next_station: in
 	_host_world_ready = false
 	if is_host():
 		_ready_peers.clear()
+		_reset_world_marks()
 	_overlay.show_wait("Back to the last checkpoint…")
 	get_tree().change_scene_to_file(MAIN_SCENE)
+
+
+func _reset_world_marks() -> void:
+	for id: int in players:
+		players[id].world = false
+	_broadcast_players()
 
 
 @rpc("any_peer", "call_remote", "reliable")

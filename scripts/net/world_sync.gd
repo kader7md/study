@@ -3,8 +3,9 @@ extends Node
 ## Host -> clients replication of one running world (a child of Main, online only; Net adds it).
 ## Every peer builds the same world from Main.SEED, so only CHANGES travel:
 ##   snapshot, 20 Hz, unreliable: train (distance, speed, lever, fuel, body / engine / chassis, wheel wear + state,
-##     tipped + tip angle, current station, come-along hook / anchor), wind, next station, sabotage cooldowns and the
-##     moving extras (zombies, eagles, fallen panels, anchor points), which clients show as puppets.
+##     tipped + tip angle, current station, come-along hook / anchor), wind, next station, sabotage cooldowns.
+##   extras, 20 Hz, unreliable, in packets of a few: the moving zombies, eagles, fallen panels and anchor points, which
+##     clients show as puppets (only what moved, plus everything once a second); reliable "gone" when one disappears.
 ##   events, reliable: rail pieces broken / repaired (index, cratered, roll), each RailRepair's build state, train cover
 ##     pieces (off / placed / nails and welds / doors), pickups taken, inventory, station reached, meteors, gates,
 ##     objective and the end-of-run stats.
@@ -17,6 +18,7 @@ const DYN_ZOMBIE := 0
 const DYN_EAGLE := 1
 const DYN_FALLEN := 2
 const DYN_ANCHOR := 3
+const DYN_PER_PACKET := 8     # keeps every packet under the MTU
 
 var main: Node
 var track: Track
@@ -31,6 +33,8 @@ var _gone: Array[String] = []   # host: pickups and keys taken (paths relative t
 var _dynamic: Array = []        # host: named zombies, eagles, fallen panels, anchors (may hold freed ones)
 var _counter := 0
 var _hooks: Array[Node] = []
+var _dyn_sent := {}         # host: extra name -> last sent position
+var _dyn_key_clock := 0.0
 # client
 var _snap_distance := 0.0
 var _snap_speed := 0.0
@@ -111,8 +115,11 @@ func _host_tick(delta: float) -> void:
 	if _snap_clock >= 1.0 / SNAPSHOT_RATE:
 		_snap_clock = 0.0
 		var snap := snapshot()
+		var extras := _extras_packets(delta)
 		for id in Net.ready_peers():
 			_rpc_snapshot.rpc_id(id, snap)
+			for packet in extras:
+				_rpc_extras.rpc_id(id, packet)
 	_state_clock += delta
 	if _state_clock >= 1.0 / STATE_RATE:
 		_state_clock = 0.0
@@ -132,30 +139,62 @@ func snapshot() -> Dictionary:
 	if Game.sabotage:
 		for id: String in SabotageManager.ABILITIES:
 			cds.append(Game.sabotage.cooldowns.get(id, 0.0))
-	var dyn := {}
-	var alive := []
-	for n: Variant in _dynamic:
-		if is_instance_valid(n) and (n as Node).is_inside_tree() and not (n as Node).is_queued_for_deletion():
-			alive.append(n)
-	_dynamic = alive
-	for n: Node in alive:
-		var n3 := n as Node3D
-		if n is Zombie:
-			dyn[n.name] = [DYN_ZOMBIE, n3.global_position, n3.global_basis.get_rotation_quaternion()]
-		elif n is Eagle:
-			dyn[n.name] = [DYN_EAGLE, n3.global_position, n3.global_basis.get_rotation_quaternion()]
-		elif n is FallenPart:
-			dyn[n.name] = [DYN_FALLEN, n3.global_position, n3.global_basis.get_rotation_quaternion(), n.get_meta("net_part", -1)]
-		elif n is AnchorSpot:
-			dyn[n.name] = [DYN_ANCHOR, n3.global_position, Quaternion.IDENTITY]
 	return {
 		"t": [train.distance, train.speed, train.lever, train.fuel, train.body_health, train.engine_damage,
 			train.chassis_damage, train.tipped, train.tip_target, train.current_station, hook_index, anchor_name],
 		"w": states, "ww": wear,
 		"g": [Game.next_station, Game.wind_active],
 		"cd": cds,
-		"dyn": dyn,
 	}
+
+
+## The moving extras in small packets: what moved since last time, everything once a second (`force` = all).
+## Extras that disappeared are announced reliably.
+func _extras_packets(delta: float, force := false) -> Array:
+	_dyn_key_clock += delta
+	var keyframe := force or _dyn_key_clock >= 1.0
+	if keyframe and not force:
+		_dyn_key_clock = 0.0
+	var alive := []
+	for n: Variant in _dynamic:
+		if is_instance_valid(n) and (n as Node).is_inside_tree() and not (n as Node).is_queued_for_deletion():
+			alive.append(n)
+	_dynamic = alive
+	var names := {}
+	var packets := []
+	var packet := {}
+	for n: Node in alive:
+		var n3 := n as Node3D
+		names[String(n.name)] = true
+		var pos := n3.global_position
+		var last: Variant = _dyn_sent.get(String(n.name))
+		if not keyframe and last is Vector3 and (last as Vector3).distance_squared_to(pos) < 0.0004:
+			continue
+		if not force:
+			_dyn_sent[String(n.name)] = pos
+		var rot := n3.global_basis.get_rotation_quaternion()
+		if n is Zombie:
+			packet[n.name] = [DYN_ZOMBIE, pos, rot]
+		elif n is Eagle:
+			packet[n.name] = [DYN_EAGLE, pos, rot]
+		elif n is FallenPart:
+			packet[n.name] = [DYN_FALLEN, pos, rot, n.get_meta("net_part", -1)]
+		elif n is AnchorSpot:
+			packet[n.name] = [DYN_ANCHOR, pos, Quaternion.IDENTITY]
+		if packet.size() >= DYN_PER_PACKET:
+			packets.append(packet)
+			packet = {}
+	if not packet.is_empty():
+		packets.append(packet)
+	if not force:
+		var gone := PackedStringArray()
+		for n: String in _dyn_sent.keys():
+			if not names.has(n):
+				gone.append(n)
+				_dyn_sent.erase(n)
+		if not gone.is_empty():
+			_send(&"_rpc_extras_gone", [gone])
+	return packets
 
 
 func _poll_repairs(force: bool) -> Array:
@@ -245,6 +284,8 @@ func send_full_state(peer: int) -> void:
 	}
 	_rpc_full_state.rpc_id(peer, state)
 	_rpc_snapshot.rpc_id(peer, snapshot())
+	for packet in _extras_packets(0.0, true):
+		_rpc_extras.rpc_id(peer, packet)
 
 
 ## After the host ran an action (its own or a client's): things taken away vanish everywhere, gold rocks count down.
@@ -407,16 +448,10 @@ func _rpc_snapshot(s: Dictionary) -> void:
 			if k < cds.size():
 				Game.sabotage.cooldowns[id] = cds[k]
 			k += 1
-	_apply_dynamic(s.dyn)
 
 
-func _apply_dynamic(dyn: Dictionary) -> void:
-	for n: String in _puppets.keys():
-		if not dyn.has(n):
-			var node: Node = _puppets[n].node
-			if is_instance_valid(node):
-				node.queue_free()
-			_puppets.erase(n)
+@rpc("authority", "call_remote", "unreliable_ordered", 1)
+func _rpc_extras(dyn: Dictionary) -> void:
 	for n: String in dyn:
 		var e: Array = dyn[n]
 		if not _puppets.has(n) or not is_instance_valid(_puppets[n].node):
@@ -427,6 +462,16 @@ func _apply_dynamic(dyn: Dictionary) -> void:
 		else:
 			_puppets[n].pos = e[1]
 			_puppets[n].rot = e[2]
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_extras_gone(names: PackedStringArray) -> void:
+	for n in names:
+		if _puppets.has(n):
+			var node: Node = _puppets[n].node
+			if is_instance_valid(node):
+				node.queue_free()
+			_puppets.erase(n)
 
 
 func _make_puppet(n: String, e: Array) -> Node3D:

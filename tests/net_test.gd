@@ -25,7 +25,9 @@ var _finished := false
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	mode = "host" if args.has("host") else ("client" if args.has("client") else ("shots" if args.has("shots") else ""))
+	for m in ["host", "client", "late", "shots"]:
+		if args.has(m):
+			mode = m
 	var i := args.find("--port")
 	if i >= 0 and i + 1 < args.size():
 		port = args[i + 1].to_int()
@@ -54,6 +56,8 @@ func _ready() -> void:
 	print("[%s] net test on port %d" % [mode, port])
 	if mode == "host":
 		await _host()
+	elif mode == "late":
+		await _late()
 	else:
 		await _client()
 	_finish()
@@ -259,6 +263,18 @@ func _host() -> void:
 	_tell.rpc_id(cid, "wind_checked", Game.wind_active)
 	await _wait_until(func(): return _flags.has("client_checked"), 30.0)
 
+	print("Everyone back to the start (the crew-wiped / F6 path)")
+	var old_main := main.get_instance_id()
+	Game.new_game(true)  # online: the host reloads the world on every peer
+	var reloaded := await _wait_until(func(): return _main() != null and _main().get_instance_id() != old_main and Game.train != null and Net.is_peer_ready(cid), 60.0)
+	check(reloaded, "both reloaded the world, the client reported ready again")
+	if reloaded:
+		await _wait(1.0)
+		check(_main().get_node_or_null("Players/Player_%d" % cid) != null, "the client's player is back")
+		check(Game.train.distance < Game.track.station_distances[0] + 40.0, "the train is back at the departure station")
+	_tell.rpc_id(cid, "reloaded", true)
+	await _wait_until(func(): return _flags.has("client_reloaded"), 30.0)
+
 	print("Host leaves")
 	await _wait(0.5)
 	Net.leave_to_menu()
@@ -450,11 +466,33 @@ func _client() -> void:
 	check(await _wait_until(func(): return Game.wind_active == wind, 5.0), "the wind state matches the host's (%s)" % wind)
 	_tell.rpc_id(1, "client_checked", true)
 
+	print("Back to the start")
+	var old_main := main.get_instance_id()
+	var back := await _wait_until(func(): return _main() != null and _main().get_instance_id() != old_main and _main().player != null, 60.0)
+	check(back, "the world reloaded and we got a new player")
+	if back:
+		check(Game.train.distance < Game.track.station_distances[0] + 40.0, "the train is back at the departure station")
+		check(Game.count("gold") == Game.START_INVENTORY.gold, "the inventory is back to the start")
+	_tell.rpc_id(1, "client_reloaded", true)
+
 	print("The host leaves")
 	var dropped := await _wait_until(func(): return _disconnect_reason != "", 30.0)
 	check(dropped and _disconnect_reason == "Host left the game", "told: '%s'" % _disconnect_reason)
 	await _wait(1.0)
 	check(_main() == null and not Net.is_online(), "back at the menu, offline")
+
+
+# --- Latecomer (a third process) ------------------------------------------------------------
+
+## Tries to join after the run started: the host must turn it away with a reason.
+func _late() -> void:
+	Net.local_name = "Latecomer"
+	Net.connection_failed.connect(func(r: String): _flags["refused"] = r)
+	check(Net.join_game("127.0.0.1:%d" % port) == OK, "a latecomer knocks while the run is on")
+	var told := await _wait_until(func(): return _flags.has("refused"), 30.0)
+	var reason: String = _flags.get("refused", "")
+	check(told and reason.contains("already started"), "turned away: '%s'" % reason)
+	check(not Net.is_online() and not Net.players.has(Net.local_id()), "and not in the game")
 
 
 func _teleport(p: Player, pos: Vector3) -> void:
