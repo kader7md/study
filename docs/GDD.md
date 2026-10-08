@@ -329,7 +329,8 @@ your name).
   and every peer builds the same world from the seed. Clients move themselves and ask the host for everything else
   (use, tool hits, carry, weld, buy, sabotage). The host streams the train 20 times a second plus every repair, pickup,
   inventory change and sabotage. Exactly one secret impostor with 3 to 5 players, told only to that player.
-  Proximity push-to-talk voice chat. No joining mid-run yet; if the host leaves, the run ends for everyone.
+  Proximity voice chat (push-to-talk or open mic with a noise gate). A player who drops out can rejoin the running run with
+  the same name; brand-new players cannot join mid-run yet. If the host leaves, the run ends for everyone.
 - **The train is a path follower:** it moves along a track curve (`Path3D` + `PathFollow3D`) with real speed, not full physics.
   It's stable online and easy to derail on purpose at broken track.
 - **Players on a moving train or raft:** they stand in the vehicle's local space so they don't slide off. This is a known hard problem, and we solve it early.
@@ -337,7 +338,7 @@ your name).
 - **The raft (Chapter 2)** is a grid-based buildable platform (like Raft) with simple buoyancy and wave motion.
 - **Sabotage map:** the impostor opens a top-down map view to place meteors and the rest.
 - **Carry system:** pick up and carry bodies, goats and resources. One shared system.
-- **Saves:** a checkpoint save at each station (host saves).
+- **Saves:** a checkpoint save at each station (host saves). *Built:* `checkpoint_solo.json` / `checkpoint_host.json` with inventory, train, stats and opened gates.
 
 ### Assets to make (Tripo3D → Blender → Godot, RV There Yet style)
 Characters: host, girlfriend, friends (customisable colours and hats), kidnappers, zombies, eagle, goat, shark, piranha, villain.
@@ -348,19 +349,19 @@ Sea: raft pieces, boat engine, ocean, islands.
 Animations: Mixamo / Quaternius (walk, run, shovel, carry, climb, crouch, hit, knocked out, swim, zombie set).
 
 ## 12. Build order (milestones)
-| # | Milestone | Done when |
-|---|-----------|-----------|
-| M0 | PC + MCP setup | See `TODO_LOCAL.md` |
-| M1 | **Multiplayer base** | 2+ players join a Steam/ENet lobby, walk around in first person and see each other (ENet done, Steam backend stubbed) |
-| M2 | **Train core** | Train drives on a track, furnace + coal, forward/back/stop, players ride it without sliding |
-| M3 | **Gather + repair + carry** | Collect coal/wood/scrap, missing rail repaired, carry items/bodies |
-| M4 | **Impostor + voting** | Secret role, sabotage menu + meteor with cooldown, vote that silently locks sabotage |
-| M5 | **Vertical slice** ⭐ | Board the train → reach station 1 (shop, station-only repairs, grave), death + medkit revive, cold. **Playtest with friends** |
-| M6 | Intro + kidnap | Café intro, 4 kidnap scenes, impostor chooses with a timer |
-| M7 | Chapter 1 content | 5 stations, zombies, eagles, freezing wind, wheels, gold rocks, goat altar, crafting + blueprints |
-| M8 | Quest maps | The Nest (horror labyrinth) + The Mountain (Peak-style). More maps added one by one later |
-| M9 | **Chapter 2** | Container reveal, raft building, sea sabotages, yacht chase + finale |
-| M10 | Polish + Steam | Menus, sound, balance, Steam page and export |
+| # | Milestone | Done when | Status (polish v1, `743ce70`) |
+|---|-----------|-----------|--------|
+| M0 | PC + MCP setup | See `TODO_LOCAL.md` | open (needs the local PC) |
+| M1 | **Multiplayer base** | 2+ players join a Steam/ENet lobby, walk around in first person and see each other | ENet done (lobby, invite codes, rejoin, net test); Steam backend stubbed |
+| M2 | **Train core** | Train drives on a track, furnace + coal, forward/back/stop, players ride it without sliding | done |
+| M3 | **Gather + repair + carry** | Collect coal/wood/scrap, missing rail repaired, carry items/bodies | done except carrying bodies |
+| M4 | **Impostor + voting** | Secret role, sabotage menu + meteor with cooldown, vote that silently locks sabotage | role and sabotage done; voting open |
+| M5 | **Vertical slice** ⭐ | Board the train → reach station 1 (shop, station-only repairs, grave), death + medkit revive, cold. **Playtest with friends** | built (down + medkit revive); grave and the friends playtest open |
+| M6 | Intro + kidnap | Café intro, 4 kidnap scenes, impostor chooses with a timer | open |
+| M7 | Chapter 1 content | 5 stations, zombies, eagles, freezing wind, wheels, gold rocks, goat altar, crafting + blueprints | 5 stations, locked gates + keys, sabotage, wheels, ending card done; gold rocks, altar, crafting open |
+| M8 | Quest maps | The Nest (horror labyrinth) + The Mountain (Peak-style). More maps added one by one later | open (keys lie beside the gates until then) |
+| M9 | **Chapter 2** | Container reveal, raft building, sea sabotages, yacht chase + finale | open |
+| M10 | Polish + Steam | Menus, sound, balance, Steam page and export | menus, settings, theme, HUD, balance v1 done (see `POLISH_REPORT.md`); sound, Steam, export open |
 
 The intro comes *after* the train gameplay on purpose. If the train isn't fun with friends, nothing else matters.
 

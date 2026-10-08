@@ -5,9 +5,10 @@ A co-op train chase (then a sea chase) with a secret impostor. Made with **Godot
 - Game Design Doc: [`docs/GDD.md`](docs/GDD.md)
 - Workflow and phases: [`docs/WORKFLOW_PLAN.md`](docs/WORKFLOW_PLAN.md) · the video's method: [`docs/VIDEO_METHOD.md`](docs/VIDEO_METHOD.md)
 - Asset image prompts for Higgsfield: [`docs/ASSET_PROMPTS.md`](docs/ASSET_PROMPTS.md)
-- ⚠️ **Open TODOs for when the repo moves to your PC: [`docs/TODO_LOCAL.md`](docs/TODO_LOCAL.md)** (full video analysis, MCP setup)
+- Polish session report (what works, known issues, next steps): [`docs/POLISH_REPORT.md`](docs/POLISH_REPORT.md)
+- ⚠️ **Open TODOs for when the repo moves to your PC: [`docs/TODO_LOCAL.md`](docs/TODO_LOCAL.md)** (full video analysis, MCP setup, Steam/GodotSteam, mic test, playtest with friends)
 
-## Current prototype: Chapter 1 train core (grey boxes)
+## Current prototype: Chapter 1, menu to the last station
 
 Open the folder in **Godot 4.7** (standard build, 4.7.2), then press **F5** (Run Project).
 
@@ -124,6 +125,14 @@ xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 re
 xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/ScreenshotLobby.tscn -- <out_dir>   # lobby cards
 tests/run_net_test.sh                                   # multiplayer: headless host + client (+ latecomer, + 3 players with a rejoin); GODOT=/path/to/godot
 ```
+
+Note: the tests play the route offline and write the real `user://checkpoint_solo.json`, `checkpoint_host.json` and
+`settings.cfg` (known issue T3-02 in the polish report). Back up your own saves before you run them.
+
+### Known issues (see `docs/POLISH_REPORT.md`)
+- With a solo save present, the main menu's Quit button can run off the bottom of a 16:9 window (T3-01).
+- The host's *Back to main menu* on the Chapter 1 card ends the run for clients with no confirmation (T3-07).
+- Stations 1 to 5 still look grey-box.
 
 ### Not built yet (see GDD milestones)
 Steam lobbies (the backend is stubbed, ENet works) · joining mid-run as a new player (rejoining works) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **quest maps (next; the keys lie beside the gates until then)** · Chapter 2 sea
