@@ -71,6 +71,7 @@ func _wait(seconds: float) -> void:
 func _run() -> void:
 	_check_layout()
 	_check_budget()
+	await _check_viewmodel()
 	Engine.time_scale = TIME_SCALE
 	for seg in Game.STATION_COUNT:
 		var ok := await _drive_segment(seg)
@@ -159,6 +160,52 @@ func _check_budget() -> void:
 		check(ok, "segment %d: %d gap pieces covered, spare after it: %s" % [s + 1, pieces, ", ".join(line)])
 		check(int(near[s].gold) >= Game.SHOP.wheel.price + Game.SHOP.engine_oil.price, "segment %d: %d gold near the track (a wheel + oil = %d)" % [s + 1, int(near[s].gold), Game.SHOP.wheel.price + Game.SHOP.engine_oil.price])
 	set_meta("near", near)
+
+
+## Each tool's first-person animation and each carry pose moves the hands differently.
+func _check_viewmodel() -> void:
+	print("First-person tools and carry poses")
+	var vm := player.viewmodel
+	Game.add("nail_gun")
+	var poses := {}
+	for tool in ["hammer", "wrench", "nail_gun", "come_along"]:
+		player.select_tool(tool)
+		await _wait(0.5)
+		var rest := vm.right.transform
+		vm.play(tool)
+		await _wait(0.12 if tool == "nail_gun" else 0.2)
+		var mid := vm.right.transform
+		var model := vm.right.get_child(vm.right.get_child_count() - 1)
+		for c in vm.right.get_children():
+			if c is Node3D and c.visible and c.get_child_count() > 0:
+				model = c
+		poses[tool] = [mid.origin, mid.basis.get_euler(), (model as Node3D).rotation]
+		check(not mid.is_equal_approx(rest), "%s: the arm moves (%.2f m)" % [tool, mid.origin.distance_to(rest.origin)])
+		await _wait(0.6)
+	var distinct := true
+	var tools := poses.keys()
+	for i in tools.size():
+		for j in range(i + 1, tools.size()):
+			var a: Array = poses[tools[i]]
+			var b: Array = poses[tools[j]]
+			if (a[0] as Vector3).distance_to(b[0]) < 0.02 and (a[1] as Vector3).distance_to(b[1]) < 0.1 and (a[2] as Vector3).distance_to(b[2]) < 0.1:
+				distinct = false
+	check(distinct, "the hammer, wrench, nail gun and come-along animations all differ")
+	player.select_tool("hammer")
+	var holds := {}
+	for item in ["plank", "rail", "wheel", "panel"]:
+		player.carry(item)
+		await _wait(0.2)
+		holds[item] = [vm.right.position, vm.left.position]
+		player.consume_carried()
+		await _wait(0.5)
+	var carry_distinct := true
+	for a in holds:
+		for b in holds:
+			if a != b and (holds[a][0] as Vector3).distance_to(holds[b][0]) < 0.05 and (holds[a][1] as Vector3).distance_to(holds[b][1]) < 0.05:
+				carry_distinct = false
+	check(carry_distinct and vm.left.visible == false, "plank, rail, wheel and panel are held in four different poses")
+	Game.take("nail_gun")
 
 
 # --- Driving --------------------------------------------------------------------------------
@@ -320,3 +367,31 @@ func _check_restart_from_station_3() -> void:
 	check(int(Game.stats.gates) == 3 and is_equal_approx(float(Game.stats.distance), float(saved.distance)), "stats carried over (gates %d, %.0f m)" % [int(Game.stats.gates), float(Game.stats.distance)])
 	check(train.current_station == 3 and Game.next_station == 4 and not Game.run_complete, "the train waits in station 3, next stop station 4")
 	check(Game.count("key") == 0, "no orphan keys in the inventory")
+	await _check_softlock_guards()
+
+
+func _check_softlock_guards() -> void:
+	print("Softlock guards")
+	var director: RunDirector = main.director
+	var gap: Dictionary = track.initial_gaps.filter(func(gp: Dictionary): return int(gp.segment) == 3)[0]
+	train.distance = float(gap.first) * Track.PIECE_LENGTH - 2.0
+	train.speed = 0.0
+	train.lever = 0
+	for item in ["wood", "nails", "scrap", "gold"]:
+		Game.take(item, Game.count(item))
+	await _frames(2)
+	director.guard()
+	var crate := main.find_child("SupplyCrate_*", false, false) as Pickup
+	check(crate != null, "stuck at a gap with no wood, nails or gold: a supply crate turns up beside it")
+	if crate:
+		crate.interact(player)
+		check(Game.count("wood") >= 3 and Game.count("nails") >= 6, "the crate holds enough for a piece (%s)" % Game.cost_text({"wood": Game.count("wood"), "nails": Game.count("nails"), "scrap": Game.count("scrap")}))
+	# a broke crew with two wheels left at a station gets one emergency wheel
+	train.distance = track.station_distances[3] + 18.0
+	train.current_station = 3
+	Game.take("wheel", Game.count("wheel"))
+	while train.wheels > 2:
+		train.lose_wheel(false)
+	check(train.max_speed_now() >= Train.LIMP_SPEED, "on two wheels the train still limps along (%.1f m/s)" % train.max_speed_now())
+	director.guard()
+	check(Game.count("wheel") == 1, "the station master hands out an emergency wheel")

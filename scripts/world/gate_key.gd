@@ -67,7 +67,7 @@ func _ready() -> void:
 	bm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	bm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	bm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	bm.albedo_color = Color(1.0, 0.75, 0.3, 0.16)
+	bm.albedo_color = Color(1.0, 0.7, 0.25, 0.1)
 	beam.material_override = bm
 	beam.position.y = 4.5
 	add_child(beam)

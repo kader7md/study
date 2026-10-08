@@ -99,6 +99,8 @@ func guard() -> void:
 	var track := Game.track
 	if train == null or track == null or Game.run_complete or not train.is_stopped():
 		return
+	if not multiplayer.is_server():
+		return  # host-side state change (true offline)
 	# 1. Stopped at a gap without the wood / nails / scrap to rebuild it and without gold to buy them:
 	#    a supply crate (and over water without a nail gun: a loaned nail gun) turns up beside the gap.
 	var piece := first_broken_ahead(train.distance, 25.0) if train.lever >= 0 else -1

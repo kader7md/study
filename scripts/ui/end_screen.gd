@@ -6,7 +6,7 @@ extends CanvasLayer
 ## Styled with UiTheme (scripts/ui/menu/ui_theme.gd) when it exists, with the same palette as a fallback.
 
 const UI_THEME_PATH := "res://scripts/ui/menu/ui_theme.gd"
-const STORY := "The tracker's signal leads past the last pier of the port and out over the water.\nShe is out there somewhere. The train has done its part."
+const STORY := "The tracker's signal runs past the last pier and out to sea.\nShe is out there somewhere. The train has done its part."
 const NEXT := "Chapter 2: The Sea"
 
 ## Fallback palette (matches the planned UiTheme: cream and wood panels, ink outline, rust and teal accents).
@@ -90,15 +90,19 @@ func _build(ui_theme: Script) -> void:
 	rule.custom_minimum_size = Vector2(0, 3)
 	box.add_child(rule)
 
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 12)
-	box.add_child(grid)
-	for entry: Array in [["time", "Run time", ""], ["distance", "Distance", ""], ["repairs", "Track rebuilt", "rail"],
-			["panels", "Panels refitted", "panel"], ["wheels_lost", "Wheels lost", "wheel"], ["gates", "Gates opened", "key"],
-			["gold_found", "Gold found", "gold"]]:
-		_stat_card(grid, entry[0], entry[1], entry[2])
+	var rows := [[["time", "Run time", ""], ["distance", "Distance", ""], ["repairs", "Track rebuilt", "plank"],
+			["panels", "Panels refitted", "panel"]],
+		[["wheels_lost", "Wheels lost", "wheel"], ["gates", "Gates opened", "key"], ["gold_found", "Gold found", "gold"]]]
+	for cards: Array in rows:
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 12)
+		box.add_child(row)
+		for entry: Array in cards:
+			_stat_card(row, entry[0], entry[1], entry[2])
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 6)
+	box.add_child(gap)
 
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER

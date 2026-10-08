@@ -487,6 +487,9 @@ func open_gate(seg: int) -> void:
 	if not is_gate_locked(seg):
 		return
 	_gate_locked[seg] = false
+	var key := get_node_or_null("Key_%d" % seg)
+	if key:
+		key.queue_free()  # no orphan keys once the gate is open
 	Game.on_gate_opened(seg)
 	gate_opened.emit(seg)
 
