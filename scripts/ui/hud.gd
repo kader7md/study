@@ -29,6 +29,10 @@ var _messages: VBoxContainer
 var _banner: Label
 var _sabotage_label: Label
 var _hotbar: Label
+var _tool_slots := {}          # tool id -> PanelContainer
+var _inventory_box: VBoxContainer
+var _inventory_rows := {}      # item -> Label
+static var _icons := {}
 var _help: Label
 var _shop: PanelContainer
 var _shop_list: VBoxContainer
@@ -66,6 +70,10 @@ func _ready() -> void:
 	# Top left: inventory
 	_inventory_label = _label(root, "", 18)
 	_inventory_label.position = Vector2(16, 12)
+	_inventory_label.visible = false
+	_inventory_box = VBoxContainer.new()
+	_inventory_box.position = Vector2(14, 10)
+	root.add_child(_inventory_box)
 
 	# Top right: train status
 	_status_label = _label(root, "", 18)
@@ -105,9 +113,35 @@ func _ready() -> void:
 	_sabotage_label.add_theme_color_override("font_color", Color(1, 0.45, 0.45))
 
 	# Bottom centre: tool hotbar + carried item
-	_hotbar = _label(root, "", 20)
-	_place(_hotbar, 0.5, 1.0, Vector2(-450, -150), Vector2(900, 0))
+	_hotbar = _label(root, "", 18)
+	_place(_hotbar, 0.5, 1.0, Vector2(-450, -132), Vector2(900, 0))
 	_hotbar.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# icon hotbar: one slot per tool, key number in the corner
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 8)
+	bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	root.add_child(bar)
+	_place(bar, 0.5, 1.0, Vector2(-200, -205), Vector2(400, 64))
+	for i in Player.TOOLS.size():
+		var id: String = Player.TOOLS[i]
+		var slot := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0.45)
+		sb.set_corner_radius_all(8)
+		sb.set_border_width_all(2)
+		sb.border_color = Color(1, 1, 1, 0.15)
+		slot.add_theme_stylebox_override("panel", sb)
+		slot.custom_minimum_size = Vector2(64, 64)
+		var icon := TextureRect.new()
+		icon.texture = icon_for(id)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(56, 56)
+		slot.add_child(icon)
+		var key := _label(slot, str(i + 1), 14)
+		key.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+		bar.add_child(slot)
+		_tool_slots[id] = slot
 
 	# Bottom centre: help
 	_help = _label(root, HELP, 15)
@@ -160,11 +194,21 @@ func _process(_delta: float) -> void:
 		_status_label.text = "Speed %d km/h · Lever %s\nFuel %d%% · Wheels %d/%d%s%s" % [
 			int(absf(train.speed) * 3.6), train.lever_text(), int(train.fuel), train.wheels, Train.MAX_WHEELS, wind, oil]
 
-	var inv := PackedStringArray()
 	for item: String in Game.inventory:
-		if Game.inventory[item] > 0:
-			inv.append("%s: %d" % [item.replace("_", " ").capitalize(), Game.inventory[item]])
-	_inventory_label.text = "\n".join(inv)
+		var n: int = Game.inventory[item]
+		if not _inventory_rows.has(item):
+			var row := HBoxContainer.new()
+			var ic := TextureRect.new()
+			ic.texture = icon_for(item)
+			ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			ic.custom_minimum_size = Vector2(30, 30)
+			row.add_child(ic)
+			_inventory_rows[item] = _label(row, "", 17)
+			_inventory_box.add_child(row)
+		var lbl: Label = _inventory_rows[item]
+		lbl.text = "%s  %d" % [item.replace("_", " ").capitalize(), n]
+		lbl.get_parent().visible = n > 0
 
 	if player:
 		_health_bar.value = player.health
@@ -175,14 +219,15 @@ func _process(_delta: float) -> void:
 		_hold_bar.visible = player.hold_needed > 0.0 and player.hold_progress > 0.0
 		if _hold_bar.visible:
 			_hold_bar.value = player.hold_progress / player.hold_needed * 100.0
-		var slots := PackedStringArray()
 		var tools := player.available_tools()
-		for i in Player.TOOLS.size():
-			var id: String = Player.TOOLS[i]
-			if id in tools:
-				var name: String = Player.TOOL_NAMES[id]
-				slots.append(("[ %d %s ]" if id == player.current_tool and player.carried_item == "" else "%d %s") % [i + 1, name])
-		var line := "   ".join(slots)
+		for id: String in _tool_slots:
+			var slot: PanelContainer = _tool_slots[id]
+			slot.visible = id in tools
+			var active: bool = id == player.current_tool and player.carried_item == ""
+			var sb: StyleBoxFlat = slot.get_theme_stylebox("panel")
+			sb.border_color = Color(1.0, 0.85, 0.3) if active else Color(1, 1, 1, 0.15)
+			slot.modulate = Color.WHITE if active else Color(1, 1, 1, 0.7)
+		var line: String = Player.TOOL_NAMES.get(player.current_tool, "")
 		if player.carried_item != "":
 			line = "Carrying: %s   ([E] place · [G] put back)" % player.carried_item.to_upper()
 		elif player.current_tool == "welder":
@@ -230,6 +275,9 @@ func open_shop(station: Station) -> void:
 	for id: String in Game.SHOP:
 		var b := Button.new()
 		b.text = "%s: %d gold" % [Game.SHOP[id].label, Game.SHOP[id].price]
+		b.icon = icon_for(Game.SHOP[id].gives.keys()[0])
+		b.expand_icon = false
+		b.add_theme_constant_override("icon_max_width", 32)
 		b.pressed.connect(Game.buy.bind(id))
 		_shop_list.add_child(b)
 	_shop.visible = true
@@ -265,6 +313,13 @@ func _show_banner(text: String) -> void:
 
 
 # --- Helpers ----------------------------------------------------------------------
+
+## Item / tool icon rendered in Blender (assets/icons/<id>.png), or null.
+static func icon_for(id: String) -> Texture2D:
+	if not _icons.has(id):
+		var path := "res://assets/icons/%s.png" % id
+		_icons[id] = load(path) if ResourceLoader.exists(path) else null
+	return _icons[id]
 
 ## Pins a control to an anchor point of the screen (0..1), offset in pixels from it.
 func _place(c: Control, ax: float, ay: float, offset: Vector2, size: Vector2) -> void:

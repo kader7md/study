@@ -96,11 +96,24 @@ Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations 
 - **Sacrifice altar** on the train, for reviving (see 8).
 
 ### Hands-on repair (RV There Yet style: you do it with your hands, no "hold E")
-**Broken track**, step by step (anywhere on the line):
-1. Take **planks** from the cargo car (1 wood each), carry them in both hands, place them on the 2 glowing ghost sleepers.
-2. **Nail** each plank: 2 nails per plank, **3 hammer hits** per nail (or 1 shot with the **nail gun**).
-3. Take **rails** (2 scrap each) and place them on the 2 rail ghosts.
-4. **Bolt a fishplate** at both ends of each rail (hammer / nail gun).
+**Broken track: free building, together** (anywhere on the line)
+1. Carry **planks** from the cargo car and place them where you aim (they snap to the 4 sleeper positions of the gap).
+   A see-through preview shows the result: 🟩 rests on the ground, 🟨 needs joining (over water), 🟥 will fall.
+   - **On the ground** a plank rests on the ground, so **bumpy ground tilts it** (meteor craters are very bumpy).
+     Nail it down with the hammer (2 nails), then **tap it with the hammer to level it**.
+   - **Over a river** there is no ground. A plank needs a **supported neighbour** (another plank or the intact track)
+     and must be **joined to it with the NAIL GUN**, so the crew builds a platform out over the water.
+     A plank with nothing under it and no neighbour **falls into the water** (the wood is lost).
+2. Carry **rails** onto the planks (a rail needs at least 3 of the 4 planks under it).
+3. **Bolt the fishplates** at both ends of each rail (hammer / nail gun).
+
+**Build quality matters:** the rebuilt piece keeps the average tilt of its planks (plus sag for missing ones).
+- tilt **4-8°**: bumpy, the wheels shake loose (wheel wear)
+- tilt **over 8°**: the train **tips over sideways** (damage, can't move)
+
+**Tipped train → come-along (hand winch).** Hook the come-along to the locomotive's **lifting eye**, chain it to a
+**tree or rock on the high side** (anchor points appear), then **crank** it (LMB, one notch per click; several players can
+crank together) until the train is back on the rails.
 
 **Welding only exists at stations.** Every station has a welder machine. Take its **welding torch** [E]; the torch is on
 a **cable** (30 m): walk too far and it stops you, go much further and it pulls out.
