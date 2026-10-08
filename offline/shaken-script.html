@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<meta charset="utf-8">
+<title>Shaken Reception Script</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@600;700&display=swap">
+<style>
+/* Layout: one reading column, sticky tabs; script lines as cards with romaji first, Japanese and English below */
+:root {
+  --bg: #eef1f6; --surface: #ffffff; --ink: #1a2232; --muted: #5a6477; --line: #d6dce6;
+  --accent: #1c5aa6; --accent-soft: #e2ebf7; --mark: #f6dc8a;
+  --ok: #24744a; --ok-soft: #e1f2e8; --warn: #9a5b00; --warn-soft: #fbefd9;
+  --font-display: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-body: "Atkinson Hyperlegible", "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-jp: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #98a2b4; --line: #2b3441;
+    --accent: #8db4ee; --accent-soft: #1f3150; --mark: #6a5718;
+    --ok: #63c08b; --ok-soft: #173326; --warn: #e6b062; --warn-soft: #3a2c14;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #98a2b4; --line: #2b3441;
+  --accent: #8db4ee; --accent-soft: #1f3150; --mark: #6a5718;
+  --ok: #63c08b; --ok-soft: #173326; --warn: #e6b062; --warn-soft: #3a2c14;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6; }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 64px; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.25; margin: 0; }
+h1 { font-family: var(--font-display); font-size: clamp(1.7rem, 4.5vw, 2.4rem); }
+h2 { font-family: var(--font-display); font-size: 1.4rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0; }
+.jp { font-family: var(--font-jp); }
+.muted { color: var(--muted); }
+.eyebrow { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+header.top { display: grid; gap: 8px; padding-block: 8px 20px; }
+header.top p { max-width: 62ch; color: var(--muted); }
+
+.toolbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tab { font: inherit; font-weight: 700; font-size: .92rem; border: 1px solid transparent; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--surface); }
+.tab:hover:not([aria-selected="true"]) { border-color: var(--line); color: var(--ink); }
+.switches { display: flex; gap: 12px; flex-wrap: wrap; font-size: .88rem; }
+.switches label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+button:focus-visible, input:focus-visible, .tab:focus-visible, .line:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+section.panel { display: grid; gap: 28px; padding-top: 24px; }
+.block { display: grid; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+.note { background: var(--accent-soft); border-radius: var(--r); padding: 14px 16px; }
+.warn { background: var(--warn-soft); border-radius: var(--r); padding: 14px 16px; }
+.warn b:first-child { color: var(--warn); }
+
+ol.flow { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; counter-reset: step; }
+ol.flow li { counter-increment: step; display: grid; grid-template-columns: 2.2rem 1fr; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; }
+ol.flow li::before { content: counter(step); display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+ol.flow li div { display: grid; gap: 2px; min-width: 0; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+td.yen { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 700; }
+td .jp { font-size: 1.02rem; font-weight: 700; }
+td .ro { display: block; font-size: .82rem; color: var(--accent); }
+tr.sub td { background: var(--bg); font-weight: 700; }
+tr.total td { background: var(--accent-soft); font-weight: 700; font-size: 1.05rem; }
+tr.group th { background: var(--surface); color: var(--ink); font-size: .85rem; text-transform: none; letter-spacing: 0; }
+.pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.gov { background: var(--ok-soft); color: var(--ok); }
+.pill.shop { background: var(--accent-soft); color: var(--accent); }
+
+.script { display: grid; gap: 22px; }
+.scene { display: grid; gap: 10px; }
+.scene h3 { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.scene h3 small { font-weight: 400; color: var(--muted); font-size: .85rem; }
+.line { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: grid; gap: 4px; }
+.line .ro { font-size: 1.12rem; font-weight: 700; line-height: 1.45; }
+.line .ja { font-family: var(--font-jp); color: var(--ink); }
+.line .en { color: var(--muted); font-size: .92rem; }
+.line .tip { font-size: .85rem; color: var(--warn); }
+body.hide-ja .line .ja, body.hide-en .line .en { display: none; }
+body.quiz .line { cursor: pointer; }
+body.quiz .line:not(.open) .ro, body.quiz .line:not(.open) .ja { filter: blur(7px); user-select: none; }
+body.quiz .line:not(.open)::after { content: "Say it, then tap to check"; font-size: .78rem; color: var(--accent); font-weight: 700; }
+
+dl.faq { margin: 0; display: grid; gap: 12px; }
+dl.faq > div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 6px; }
+dl.faq dt { font-weight: 700; }
+dl.faq dd { margin: 0; display: grid; gap: 4px; }
+.ro-inline { font-weight: 700; }
+
+ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+@media (max-width: 520px) { .line .ro { font-size: 1.04rem; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Osaka BMW · Service advisor</span>
+    <h1><span class="jp">車検</span> Reception Script</h1>
+    <p>How the shaken (vehicle inspection) works, what every fee on the estimate means, and the Japanese you say to the customer, written in romaji. Based on the consent form and the estimate email from your team.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="process">Process</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="fees">Fees</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="form">Consent form</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="script">Script</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="faq">Customer questions</button>
+    </div>
+    <div class="switches">
+      <label><input type="checkbox" id="opt-ja" checked> Japanese</label>
+      <label><input type="checkbox" id="opt-en" checked> English</label>
+      <label><input type="checkbox" id="opt-quiz"> Practice mode</label>
+    </div>
+  </div>
+
+  <!-- PROCESS -->
+  <section class="panel" id="panel-process">
+    <div class="block">
+      <h2>What shaken is</h2>
+      <p><b>Shaken (車検, shaken)</b> is Japan's required vehicle inspection. Every car on the road must pass it. For a private passenger car it is every 2 years (after the first 3 years for a new car). Without a valid shaken the car cannot legally be driven, and the compulsory insurance (自賠責) must be renewed at the same time.</p>
+      <p>Officially it is called <b>継続検査 (keizoku kensa)</b>, "continuing inspection". The government office is the <b>陸運局 (rikuunkyoku)</b>, the Land Transport Bureau.</p>
+    </div>
+
+    <div class="block">
+      <h2>The process, step by step</h2>
+      <ol class="flow">
+        <li><div><b>Reception (受付, uketsuke)</b><span class="muted">Customer brings the car. You collect the documents, explain the estimate, and get the consent form signed. If they need a loaner car (代車, daisha), they sign the loan form (貸出書, kashidashi-sho).</span></div></li>
+        <li><div><b>Documents (必要書類, hitsuyou shorui)</b><span class="muted">車検証 (shakenshou, vehicle registration certificate) + 自賠責保険証書 (jibaiseki hoken shousho, compulsory insurance certificate) + the signed parking-fine consent form.</span></div></li>
+        <li><div><b>Check for unpaid parking fines</b><span class="muted">The shop asks the police (through the 自動車整備振興会, the car maintenance association) whether the car has an unpaid parking fine. If it does, the shaken cannot be finished until the customer pays it.</span></div></li>
+        <li><div><b>2-year legal inspection + maintenance (法定2年点検)</b><span class="muted">Technicians inspect the car, steam-clean the engine room and underbody, check the safety items (headlight aim, exhaust gas), and reset the BMW service indicators (CBS).</span></div></li>
+        <li><div><b>Extra repairs: call the customer first</b><span class="muted">If parts need changing (brake pads, tires, wipers, oil leaks…), you call the customer, explain the cost, and get approval before any work. These costs are NOT in the base estimate.</span></div></li>
+        <li><div><b>Paperwork at the Transport Bureau</b><span class="muted">The shop submits the inspection result and pays the government fees (weight tax, stamp fee, compulsory insurance). Much of this is now sent electronically, which is why the customer signs the electronic-application consent.</span></div></li>
+        <li><div><b>Hand-over (お引き渡し, o-hikiwatashi)</b><span class="muted">Customer pays and gets the car back with the new 車検証, the new inspection sticker (検査標章, kensa hyoushou) for the windshield, and the new 自賠責 certificate. Tell them the next shaken is in 2 years.</span></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- FEES -->
+  <section class="panel" id="panel-fees" hidden>
+    <div class="block">
+      <h2>The estimate, line by line</h2>
+      <p>The estimate has two parts. <span class="pill gov">Government</span> fees are fixed by law and cost the same at any shop. <span class="pill shop">Dealer</span> fees are BMW's work.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Item</th><th>What it means</th><th>Yen</th></tr></thead>
+          <tbody>
+            <tr class="group"><th colspan="3">Part 1 · 車検諸費用 (shaken shohiyou), shaken costs · car 1.5–2.0 t, 13+ years old</th></tr>
+            <tr><td><span class="jp">自動車重量税</span><span class="ro">jidousha juuryouzei</span> <span class="pill gov">Government</span></td><td>Weight tax. Depends on the car's weight. Higher because the car is more than 13 years old.</td><td class="yen">32,800</td></tr>
+            <tr><td><span class="jp">自賠責保険料（24ヶ月）</span><span class="ro">jibaiseki hokenryou</span> <span class="pill gov">Government</span></td><td>Compulsory insurance for 24 months. Required by law. Pays only for injuring or killing other people, not for car damage.</td><td class="yen">17,650</td></tr>
+            <tr><td><span class="jp">車体検査印紙代</span><span class="ro">shatai kensa inshi-dai</span> <span class="pill gov">Government</span></td><td>Inspection stamp fee, paid to the Transport Bureau.</td><td class="yen">1,850</td></tr>
+            <tr><td><span class="jp">検査（車検）手続費用</span><span class="ro">kensa tetsuzuki hiyou</span> <span class="pill shop">Dealer</span></td><td>Agency fee: the dealer does the shaken procedures at the Transport Bureau for the customer.</td><td class="yen">22,000</td></tr>
+            <tr class="sub"><td colspan="2">小計 (shoukei) subtotal</td><td class="yen">74,300</td></tr>
+            <tr class="group"><th colspan="3">Part 2 · BMW 2年法定点検 (houtei tenken), BMW 2-year legal inspection</th></tr>
+            <tr><td><span class="jp">法定2年点検</span><span class="ro">houtei ni-nen tenken</span> <span class="pill shop">Dealer</span></td><td>The 2-year inspection required by law. Base fee for shaken maintenance. (23 work units × 1,650)</td><td class="yen">37,950</td></tr>
+            <tr><td><span class="jp">CBS車両点検 / SIA検査</span><span class="ro">shii-bii-esu sharyou tenken</span> <span class="pill shop">Dealer</span></td><td>BMW Condition Based Service: check when oil change and other services are due, and reset the indicators. (2 × 1,650)</td><td class="yen">3,300</td></tr>
+            <tr><td><span class="jp">エンジンルーム／下回り スチーム洗浄</span><span class="ro">enjin ruumu / shitamawari suchiimu senjou</span> <span class="pill shop">Dealer</span></td><td>Steam-cleaning the engine room, underbody and wheel housings so the inspector can see everything. (10 × 1,650)</td><td class="yen">16,500</td></tr>
+            <tr><td><span class="jp">保安確認検査料</span><span class="ro">hoan kakunin kensa-ryou</span> <span class="pill shop">Dealer</span></td><td>Safety standards check. More items than the normal 12-month check: headlight direction, exhaust gas too dark or too thin, etc.</td><td class="yen">19,000</td></tr>
+            <tr><td><span class="jp">ブレーキクリーナー（500cc）</span><span class="ro">bureeki kuriinaa</span> <span class="pill shop">Dealer</span></td><td>Cleaning chemical used during the steam cleaning.</td><td class="yen">2,200</td></tr>
+            <tr class="sub"><td colspan="2">小計 (shoukei) subtotal</td><td class="yen">78,950</td></tr>
+            <tr class="total"><td colspan="2">合計 (goukei) total, before any extra repairs</td><td class="yen">153,250</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="warn"><b>Note:</b> The estimate says 「継続検査等に係る書類作成料は含まれておりません」 (keizoku kensa tou ni kakaru shorui sakusei-ryou wa fukumarete orimasen): the document preparation fee for the shaken is <b>not included</b>. Check with your team whether it is charged and how much, so you can tell the customer.</div>
+      <div class="note"><b>サービスコンプリート (saabisu konpuriito)</b> is BMW Service Inclusive. The estimate has "あり／なし" (yes / no) next to it. If the customer has it, some of the inspection and maintenance items may be covered. Check the customer's contract before you explain the price.</div>
+      <p class="muted">"Work units" are labor charged at 1,650 yen each. Ask your team how much time one unit is.</p>
+    </div>
+  </section>
+
+  <!-- FORM -->
+  <section class="panel" id="panel-form" hidden>
+    <div class="block">
+      <h2>The consent form, explained</h2>
+      <p class="jp"><b>車検を受けられるお客様へ</b> (shaken wo ukerareru okyakusama e): "To customers getting a shaken"</p>
+      <div class="card block">
+        <h3>1. 放置違反金滞納情報照会 (houchi ihankin tainou jouhou shoukai): checking unpaid parking fines</h3>
+        <ul class="plain">
+          <li>Since June 2006 (平成18年), if the police ordered the car's user to pay a parking fine (放置違反金, houchi ihankin) and it is still unpaid, <b>the car cannot finish its next shaken</b>.</li>
+          <li>So the shop asks the police (through the car maintenance association) whether there is an unpaid fine. The customer must sign to agree to this.</li>
+          <li>If the customer has an unpaid fine, they must pay it and bring the receipt. If they lost the payment slip, they contact the traffic department of the prefectural police to get a new one.</li>
+        </ul>
+      </div>
+      <div class="card block">
+        <h3>2. 電磁的方法による申請 (denjiteki houhou ni yoru shinsei): electronic application</h3>
+        <ul class="plain">
+          <li>Since April 2017 (平成29年), the shaken documents can be made and submitted electronically. The law requires the customer's consent first.</li>
+          <li>The checked boxes mean the customer agrees that:
+            <ul class="plain">
+              <li>the dealer applies for the shaken on the customer's behalf (申請の委任),</li>
+              <li>the safety-standards certificate (保安基準適合証) information is sent electronically,</li>
+              <li>the compulsory insurance (自賠責) certificate information is sent electronically.</li>
+            </ul>
+          </li>
+          <li>The data is used only for the shaken.</li>
+        </ul>
+      </div>
+      <div class="card block">
+        <h3>What the customer fills in</h3>
+        <ul class="plain">
+          <li><b>ご記入日 (go-kinyuu-bi)</b>: today's date (年 year, 月 month, 日 day).</li>
+          <li><b>使用者の氏名（社名）(shiyousha no shimei)</b>: name of the car's user, or company name.</li>
+          <li><b>㊞</b>: hanko stamp, or a handwritten signature (記名・押印または自署).</li>
+          <li><span class="muted">登録番号 (license plate number) and 車台番号 (chassis number): usually the dealer fills these in from the 車検証.</span></li>
+          <li><span class="muted">The bottom part (照会書, 自動車整備事業者用) is for the dealer. The customer does not fill it.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCRIPT -->
+  <section class="panel" id="panel-script" hidden>
+    <div class="block">
+      <h2>What to say to the customer</h2>
+      <p class="muted">Read the bold romaji out loud. To memorize, turn on <b>Practice mode</b>: the Japanese is hidden, you see the English, say the line, then tap to check.</p>
+      <div class="script" id="script"></div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="panel" id="panel-faq" hidden>
+    <div class="block">
+      <h2>Questions customers often ask</h2>
+      <dl class="faq" id="faq"></dl>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+
+  // [romaji, Japanese, English, optional tip]
+  var SCRIPT = [
+    ['1. Greeting', 'when the customer arrives', [
+      ['Irasshaimase. Honjitsu wa shaken no go-irai, makoto ni arigatou gozaimasu.', 'いらっしゃいませ。本日は車検のご依頼、誠にありがとうございます。', 'Welcome. Thank you very much for bringing your car for shaken today.'],
+      ['Tantou no Hamudi to moushimasu. Yoroshiku onegai itashimasu.', '担当のハムディと申します。よろしくお願いいたします。', 'My name is Hamdi, I will be taking care of you.'],
+      ['Mazu, shaken no nagare to hiyou ni tsuite, go-setsumei sasete itadakimasu.', 'まず、車検の流れと費用について、ご説明させていただきます。', 'First, let me explain the shaken process and the costs.']
+    ]],
+    ['2. Documents', 'collect them', [
+      ['Shakenshou to, jibaiseki hoken no shousho wo o-mochi deshou ka?', '車検証と、自賠責保険の証書をお持ちでしょうか。', 'Do you have your vehicle certificate and your compulsory insurance certificate?'],
+      ['Arigatou gozaimasu. O-azukari itashimasu.', 'ありがとうございます。お預かりいたします。', 'Thank you. I will keep them for now.']
+    ]],
+    ['3. Consent form', 'show the paper', [
+      ['Kochira wa, houchi ihankin no kakunin ni kansuru doui-sho de gozaimasu.', 'こちらは、放置違反金の確認に関する同意書でございます。', 'This is a consent form about checking parking fines.'],
+      ['Chuusha ihan no houchi ihankin ga mi-nou no baai, shaken wo kanryou suru koto ga dekinai kimari ni natte orimasu.', '駐車違反の放置違反金が未納の場合、車検を完了することができない決まりになっております。', 'If there is an unpaid parking fine, the rules say the shaken cannot be completed.'],
+      ['Sono tame, tousha kara keisatsu ni kakunin sasete itadakimasu.', 'そのため、当社から警察に確認させていただきます。', 'So we will check with the police.'],
+      ['Mata, shaken no tetsuzuki wo denshi de okonau koto ni tsuite mo, go-shoudaku wo onegai itashimasu.', 'また、車検の手続きを電子で行うことについても、ご承諾をお願いいたします。', 'We also ask you to agree that we do the shaken paperwork electronically.'],
+      ['Kochira ni, hizuke to o-namae wo go-kinyuu no ue, inkan ka sain wo onegai itashimasu.', 'こちらに、日付とお名前をご記入の上、印鑑かサインをお願いいたします。', 'Please write the date and your name here, and stamp or sign.', 'Point at ご記入日, 使用者の氏名 and ㊞.']
+    ]],
+    ['4. Fees: part 1', 'government fees', [
+      ['Hiyou wa, ookiku futatsu ni wakarete orimasu.', '費用は、大きく二つに分かれております。', 'The cost is divided into two main parts.'],
+      ['Hitotsu-me wa, shaken shohiyou desu. Kuni ni osameru zeikin ya hoken nado de, doko de shaken wo ukete mo onaji kingaku desu.', '一つ目は、車検諸費用です。国に納める税金や保険などで、どこで車検を受けても同じ金額です。', 'The first part is the shaken costs. These are taxes and insurance paid to the government, the same amount at any shop.', 'Except the 22,000 yen procedure fee, which is the dealer\'s fee.'],
+      ['Juuryouzei wa, kuruma no omosa ni yotte kakaru zeikin desu.', '重量税は、車の重さによってかかる税金です。', 'Weight tax is a tax based on the car\'s weight.'],
+      ['O-kuruma wa ichi-ten-go ton kara ni ton de, shinki touroku kara juusan-nen ijou tatte iru tame, sanman nisen happyaku en ni narimasu.', 'お車は1.5トンから2トンで、新規登録から13年以上経っているため、32,800円になります。', 'Your car is 1.5 to 2 tons and more than 13 years since first registration, so it is 32,800 yen.'],
+      ['Jibaiseki hoken wa, houritsu de kanyuu ga gimu no hoken de, aite no kata ni kega wo sasete shimatta toki no hoshou desu.', '自賠責保険は、法律で加入が義務の保険で、相手の方にけがをさせてしまった時の補償です。', 'Compulsory insurance is required by law. It covers you if you injure another person.'],
+      ['Nijuuyon-kagetsu bun de, ichiman nanasen roppyaku gojuu en desu.', '24か月分で、17,650円です。', 'For 24 months it is 17,650 yen.'],
+      ['Inshi-dai wa, rikuunkyoku ni harau tesuuryou de, sen happyaku gojuu en desu.', '印紙代は、陸運局に払う手数料で、1,850円です。', 'The stamp fee is paid to the Transport Bureau: 1,850 yen.'],
+      ['Tetsuzuki hiyou wa, o-kyakusama no kawari ni, rikuunkyoku de shaken no tetsuzuki wo suru daikou tesuuryou de, niman nisen en desu.', '手続費用は、お客様の代わりに、陸運局で車検の手続きをする代行手数料で、22,000円です。', 'The procedure fee is our fee for doing the paperwork at the Transport Bureau for you: 22,000 yen.'],
+      ['Koko made no goukei ga, nanaman yonsen sanbyaku en desu.', 'ここまでの合計が、74,300円です。', 'The total so far is 74,300 yen.']
+    ]],
+    ['5. Fees: part 2', 'BMW inspection', [
+      ['Futatsu-me wa, BMW no ni-nen houtei tenken no hiyou desu.', '二つ目は、BMWの2年法定点検の費用です。', 'The second part is the BMW 2-year legal inspection.'],
+      ['Houtei ni-nen tenken wa, houritsu de kimerareta tenken de, shaken seibi no beesu ryoukin desu. Sanman nanasen kyuuhyaku gojuu en desu.', '法定2年点検は、法律で決められた点検で、車検整備のベース料金です。37,950円です。', 'The 2-year inspection is required by law. It is the base fee for shaken maintenance: 37,950 yen.'],
+      ['CBS sharyou tenken wa, oiru koukan nado no tenken jiki no kakunin to risetto desu. Sanzen sanbyaku en desu.', 'CBS車両点検は、オイル交換などの点検時期の確認とリセットです。3,300円です。', 'The CBS check confirms and resets when the oil change and other services are due: 3,300 yen.'],
+      ['Enjin ruumu to shitamawari wa, suchiimu de senjou shimasu. Ichiman rokusen gohyaku en desu.', 'エンジンルームと下回りは、スチームで洗浄します。16,500円です。', 'We steam-clean the engine room and the underbody: 16,500 yen.'],
+      ['Hoan kakunin kensa-ryou wa, tsuujou no juuni-kagetsu tenken yori, chekku suru koumoku ga fuemasu.', '保安確認検査料は、通常の12か月点検より、チェックする項目が増えます。', 'For the safety check, there are more items to check than in the normal 12-month inspection.'],
+      ['Tatoeba, heddoraito no muki ya, haiki gasu no koi usui nado desu. Ichiman kyuusen en desu.', '例えば、ヘッドライトの向きや、排気ガスの濃い薄いなどです。19,000円です。', 'For example, the headlight direction and whether the exhaust gas is too dark or too thin: 19,000 yen.'],
+      ['Bureeki kuriinaa wa, senjou de tsukau yakuhin de, nisen nihyaku en desu.', 'ブレーキクリーナーは、洗浄で使う薬品で、2,200円です。', 'Brake cleaner is the chemical used for cleaning: 2,200 yen.'],
+      ['Tenken no goukei ga, nanaman hassen kyuuhyaku gojuu en desu.', '点検の合計が、78,950円です。', 'The inspection total is 78,950 yen.']
+    ]],
+    ['6. Total and extra repairs', '', [
+      ['Zenbu de, juugoman sanzen nihyaku gojuu en ni narimasu.', '全部で、153,250円になります。', 'The total is 153,250 yen.'],
+      ['Tadashi, buhin no koukan ya shuuri ga hitsuyou na baai wa, betsu de hiyou ga kakarimasu.', 'ただし、部品の交換や修理が必要な場合は、別で費用がかかります。', 'But if parts need replacing or repairing, that costs extra.'],
+      ['Sono baai wa, kanarazu jizen ni o-denwa de go-renraku shite, go-shoudaku wo itadaite kara sagyou itashimasu.', 'その場合は、必ず事前にお電話でご連絡して、ご承諾をいただいてから作業いたします。', 'In that case, we will always call you first and only start the work after you agree.'],
+      ['Renraku-saki wa, kochira no o-denwa bangou de yoroshii deshou ka?', '連絡先は、こちらのお電話番号でよろしいでしょうか。', 'Is this phone number the best way to contact you?']
+    ]],
+    ['7. Loaner car', 'only if they need one', [
+      ['Daisha wa go-riyou ni narimasu ka?', '代車はご利用になりますか。', 'Will you be using a loaner car?'],
+      ['Go-riyou no baai wa, kochira no kashidashi-sho ni sain wo onegai itashimasu.', 'ご利用の場合は、こちらの貸出書にサインをお願いいたします。', 'If so, please sign this loan form.']
+    ]],
+    ['8. Timing and closing', '', [
+      ['O-kuruma no o-watashi wa, ◯-gatsu ◯-nichi wo yotei shite orimasu.', 'お車のお渡しは、〇月〇日を予定しております。', 'We plan to return your car on [month] [day].', 'Say the real date: e.g. shichi-gatsu juugo-nichi = July 15.'],
+      ['Nani ka go-fumei na ten wa gozaimasu ka?', '何かご不明な点はございますか。', 'Do you have any questions?'],
+      ['Sore dewa, taisetsu na o-kuruma wo o-azukari itashimasu. Yoroshiku onegai itashimasu.', 'それでは、大切なお車をお預かりいたします。よろしくお願いいたします。', 'Then we will take good care of your car. Thank you.']
+    ]],
+    ['9. At hand-over', 'when the customer picks up the car', [
+      ['O-matase itashimashita. Shaken ga buji ni kanryou itashimashita.', 'お待たせいたしました。車検が無事に完了いたしました。', 'Thank you for waiting. The shaken is complete.'],
+      ['Kochira ga atarashii shakenshou to, jibaiseki hoken no shousho de gozaimasu.', 'こちらが新しい車検証と、自賠責保険の証書でございます。', 'Here are your new vehicle certificate and compulsory insurance certificate.'],
+      ['Kensa hyoushou wa, furonto garasu ni hatte orimasu.', '検査標章は、フロントガラスに貼っております。', 'The inspection sticker is on the windshield.'],
+      ['Tsugi no shaken wa ni-nen go ni narimasu. Mata yoroshiku onegai itashimasu.', '次の車検は2年後になります。またよろしくお願いいたします。', 'The next shaken is in 2 years. We look forward to seeing you again.']
+    ]]
+  ];
+
+  $('script').innerHTML = SCRIPT.map(function (s) {
+    return '<div class="scene"><h3>' + s[0] + (s[1] ? ' <small>' + s[1] + '</small>' : '') + '</h3>' +
+      s[2].map(function (l) {
+        return '<div class="line" tabindex="0"><p class="ro">' + l[0] + '</p><p class="ja">' + l[1] + '</p><p class="en">' + l[2] + '</p>' + (l[3] ? '<p class="tip">Tip: ' + l[3] + '</p>' : '') + '</div>';
+      }).join('') + '</div>';
+  }).join('');
+
+  var FAQ = [
+    ['"Why is the weight tax so high?"', 'Because the car is over 13 years old. Japan raises the weight tax after 13 years (and again after 18).',
+      'Shinki touroku kara juusan-nen wo sugita kuruma wa, juuryouzei ga takaku naru kimari ni natte orimasu.', '新規登録から13年を過ぎた車は、重量税が高くなる決まりになっております。'],
+    ['"Is it cheaper somewhere else?"', 'The government fees are the same everywhere. The difference is the inspection and maintenance quality.',
+      'Juuryouzei, jibaiseki hoken, inshi-dai wa kuni ga kimeta kingaku na node, doko de mo onaji desu. Tousha de wa, BMW no kijun de tenken itashimasu.', '重量税、自賠責保険、印紙代は国が決めた金額なので、どこでも同じです。当社では、BMWの基準で点検いたします。'],
+    ['"I have an unpaid parking fine."', 'They must pay it first, or the shaken cannot be completed. If they lost the payment slip, the prefectural police traffic department can reissue it.',
+      'Mi-nou no houchi ihankin ga aru baai wa, saki ni o-shiharai itadakanai to, shaken ga kanryou dekimasen. Noufusho ga nai baai wa, todoufuken keisatsu no koutsuubu ni o-toiawase kudasai.', '未納の放置違反金がある場合は、先にお支払いいただかないと、車検が完了できません。納付書がない場合は、都道府県警察の交通部にお問い合わせください。'],
+    ['"What does 自賠責 cover?"', 'Only injury or death of other people. Not damage to cars or property, and not the driver. That is why voluntary insurance (任意保険) is also important.',
+      'Jibaiseki hoken wa, aite no kata no kega ya shibou no hoshou dake desu. Kuruma no songai wa taishou ni narimasen.', '自賠責保険は、相手の方のけがや死亡の補償だけです。車の損害は対象になりません。'],
+    ['"How long does it take?"', 'Say the planned date. If parts are needed, it can take longer.',
+      'Tsuujou wa ◯-nichi hodo desu ga, buhin no toriyose ga hitsuyou na baai wa, sukoshi o-jikan wo itadaku koto ga gozaimasu.', '通常は〇日ほどですが、部品の取り寄せが必要な場合は、少しお時間をいただくことがございます。'],
+    ['When you don\'t know the answer', 'It is fine to check. Say:',
+      'Kakunin shite, sugu ni go-renraku itashimasu. Shoushou o-machi kudasai.', '確認して、すぐにご連絡いたします。少々お待ちください。']
+  ];
+  $('faq').innerHTML = FAQ.map(function (f) {
+    return '<div><dt>' + f[0] + '</dt><dd><p class="muted">' + f[1] + '</p><div class="line" tabindex="0"><p class="ro">' + f[2] + '</p><p class="ja">' + f[3] + '</p></div></dd></div>';
+  }).join('');
+
+  document.addEventListener('click', function (e) {
+    var l = e.target.closest('.line'); if (l && document.body.classList.contains('quiz')) l.classList.toggle('open');
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('line') && document.body.classList.contains('quiz')) { e.preventDefault(); e.target.classList.toggle('open'); }
+  });
+
+  function show(tab) {
+    document.querySelectorAll('.tab').forEach(function (t) { t.setAttribute('aria-selected', t.dataset.tab === tab); });
+    document.querySelectorAll('section.panel').forEach(function (p) { p.hidden = p.id !== 'panel-' + tab; });
+    store('shaken-tab', tab);
+  }
+  document.querySelectorAll('.tab').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); window.scrollTo(0, 0); }); });
+  var start = (location.hash || '').slice(1) || store('shaken-tab');
+  if (['process', 'fees', 'form', 'script', 'faq'].indexOf(start) !== -1) show(start);
+
+  function apply() {
+    document.body.classList.toggle('hide-ja', !$('opt-ja').checked);
+    document.body.classList.toggle('hide-en', !$('opt-en').checked);
+    document.body.classList.toggle('quiz', $('opt-quiz').checked);
+    if ($('opt-quiz').checked) document.querySelectorAll('.line.open').forEach(function (l) { l.classList.remove('open'); });
+  }
+  ['opt-ja', 'opt-en', 'opt-quiz'].forEach(function (id) { $(id).addEventListener('change', apply); });
+  apply();
+})();
+</script>
+
+</body>
+</html>
