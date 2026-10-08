@@ -18,7 +18,32 @@ Generate these in **Higgsfield** in **landscape 16:9 at the highest resolution**
 Do the **master sheet** first. If the assets come out too small, use the 5 themed sheets (fewer items each, more detail).
 Save them as `assets/concept/sheet_<name>.png`.
 
-### Master sheet (all key assets)
+### 🔥 Everything in ONE prompt (all assets + characters)
+```
+Huge game concept art asset sheet for the cosy cartoon co-op adventure game "TRUST ISSUES", ultra high resolution, landscape
+16:9 poster, dark wooden board background with gold frame lines, clean organised grid, every asset isolated with a small label
+underneath, grouped in titled sections. Top-left corner: small key art of a chunky red steam train with gold bands crossing a
+wooden trestle bridge over a turquoise river, pine hills and snowy mountains, golden light, the title "TRUST ISSUES".
+TRAIN: steam locomotive, same locomotive damaged with missing plates showing the frame, covered goods wagon, open workshop wagon
+with canopy, rusty locked container wagon with padlock, train wheel, wooden wall panel, red boiler plate, cab door, roof panel.
+TOOLS: claw hammer, orange nail gun, welding torch, orange welding machine with cable reel, coal shovel, big wrench, crowbar.
+REPAIR & RESOURCES: wooden sleeper plank, steel rail, box of nails, coal pile, log stack, scrap metal pile, gold ore rock,
+wooden crate, medkit, oil can, grappling hook, scrap spear, lantern.
+NATURE: pine tree, snowy pine, oak tree, birch tree, spooky dead tree, tree stump, fallen log, bush, grass clump, flowers,
+mossy boulder, small rocks, layered cliff rock, river stones, snowy low-poly mountain, waterfall.
+RAILWAY & STATION: station building, platform with roof, market stall shop, water tower, signal post, buffer stop, wooden
+trestle bridge section, track piece, bench, lamp post, blank sign, grave stone, fence, harbour dock, white villain yacht.
+FURNITURE & PROPS: café table and chairs, café counter with coffee machine, crafting workbench, round meeting table with a
+bell, small stone altar with candles, barrel, toolbox, sacks.
+CHARACTERS (T-pose, front view): young man in a date outfit, his girlfriend in a nice date outfit, friend in hoodie and beanie,
+friend in overalls and cap, henchman in black suit and sunglasses, funny green cartoon zombie, angry cartoon eagle, silly goat,
+black villain helicopter.
+Style: stylized 3D game assets, chunky rounded shapes, soft bevelled edges, bright warm colours, clean hand-painted textures,
+slightly exaggerated proportions, cosy funny look like RV There Yet and Peak, same soft lighting on every asset, 3/4 view,
+readable silhouettes, high detail, professional game art presentation
+```
+
+### Master sheet (all key assets, without characters)
 ```
 Game concept art asset sheet for a cosy cartoon co-op adventure game called "TRUST ISSUES", landscape 16:9 poster layout.
 Left third: key art of a chunky red steam train with gold bands crossing a wooden trestle bridge over a turquoise river,
