@@ -3,18 +3,16 @@ extends CanvasLayer
 ## "CHAPTER 1 COMPLETE": shown a moment after the train stops at station 5 (the port). A warm cream card with
 ## a short story line and the run stats (read from Game.stats; in multiplayer the host's stats are synced),
 ## then "Back to main menu" (Game.return_to_menu) or "Keep exploring" (closes the card).
-## Styled with UiTheme (scripts/ui/menu/ui_theme.gd) when it exists, with the same palette as a fallback.
+## Styled with UiTheme (scripts/ui/menu/ui_theme.gd); the root theme (set by Settings) does the rest.
 
-const UI_THEME_PATH := "res://scripts/ui/menu/ui_theme.gd"
 const STORY := "The tracker's signal runs past the last pier and out to sea.\nShe is out there somewhere. The train has done its part."
 const NEXT := "Chapter 2: The Sea"
 
-## Fallback palette (matches the planned UiTheme: cream and wood panels, ink outline, rust and teal accents).
-var cream := Color(0.98, 0.93, 0.82)
-var wood := Color(0.55, 0.34, 0.18)
-var ink := Color(0.17, 0.12, 0.09)
-var rust := Color(0.78, 0.33, 0.16)
-var teal := Color(0.16, 0.5, 0.5)
+var cream := UiTheme.CREAM
+var wood := UiTheme.WOOD
+var ink := UiTheme.INK
+var rust := UiTheme.RUST
+var teal := UiTheme.TEAL
 
 var _backdrop: ColorRect
 var _card: PanelContainer
@@ -30,22 +28,12 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	name = "EndScreen"
 	visible = false
-	var ui_theme: Script = load(UI_THEME_PATH) if ResourceLoader.exists(UI_THEME_PATH) else null
-	if ui_theme:
-		var consts := ui_theme.get_script_constant_map()
-		cream = consts.get("CREAM", cream)
-		wood = consts.get("WOOD", wood)
-		ink = consts.get("INK", ink)
-		rust = consts.get("RUST", rust)
-		teal = consts.get("TEAL", teal)
-	_build(ui_theme)
+	_build()
 
 
-func _build(ui_theme: Script) -> void:
+func _build() -> void:
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	if ui_theme and ui_theme.has_method("build"):
-		root.theme = ui_theme.call("build")
 	add_child(root)
 
 	_backdrop = ColorRect.new()
@@ -194,7 +182,7 @@ func open(stats: Dictionary) -> void:
 	_count_t = 0.0
 	_set_values(0.0)
 	visible = true
-	Game.ui_open = true
+	Game.open_ui(&"end")
 	_backdrop.modulate.a = 0.0
 	_card.pivot_offset = _card.size * 0.5
 	_card.scale = Vector2(0.85, 0.85)
@@ -212,7 +200,7 @@ func is_open() -> bool:
 
 func close() -> void:
 	visible = false
-	Game.ui_open = false
+	Game.close_ui(&"end")
 
 
 func _on_menu() -> void:

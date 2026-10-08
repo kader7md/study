@@ -14,14 +14,17 @@ Open the folder in **Godot 4.7** (standard build, 4.7.2), then press **F5** (Run
 ### Menu, hosting and joining
 - The game starts on the **title screen** (`scenes/menu/MainMenu.tscn`): **Continue** (only when there is a save),
   **Play solo**, **Host game**, **Join game**, **Settings**, **Quit**. Type your name in the card at the bottom right.
-- **Play solo** starts an offline run (no network port, no firewall prompt).
+- **Play solo** starts an offline run (no network port, no firewall prompt). With a solo save on disk it asks first.
 - **Continue (station N)** carries on from the last station you reached: every station saves the run to
-  `user://checkpoint.json` (inventory, train, run stats, opened gates). A finished run is not offered.
+  `user://checkpoint_solo.json` (inventory, train, run stats, opened gates). A finished run is not offered.
+  Online runs save on the host in `user://checkpoint_host.json`, so they never overwrite the solo run.
 - **Host game** opens the crew lobby. If port 24565 is busy it uses the next free one (the invite code carries it).
   With a save on disk the host can also press **Continue from station N** in the lobby (everyone starts there).
-- **Join game** asks for the host's **invite code** (or `IP:port`) and your name. The dialog stays open while
+- **Join game** asks for the host's **invite code** (or `IP:port`); you join with the name in the name card. The dialog stays open while
   connecting and shows why a join failed; once the host lets you in, the lobby opens.
-- **Esc** in game opens the **pause menu**: Resume, Settings, Back to menu, Quit. Solo play pauses; online it keeps running.
+- **Esc** in game opens the **pause menu**: Resume, Restart from the last station (solo, or the host for everyone),
+  Settings, Back to menu, Quit. Solo play pauses; online it keeps running. The host's Back to menu / Quit asks first
+  (it ends the run for the whole crew).
 - **Settings** (also in the pause menu), saved in `user://settings.cfg`:
   Controls (rebind every key or mouse button, reset to defaults, mouse sensitivity, invert Y) ·
   Graphics (window mode, V-Sync, resolution scale, shadows, anti-aliasing, FOV, max FPS) ·
@@ -96,14 +99,15 @@ All keys can be changed in Settings > Controls.
 
 ### Playing together (1 to 5 players)
 - **Host:** *Host game* in the main menu opens the **crew lobby** (run `res://scenes/net/Lobby.tscn` on its own and it
-  offers solo / host / join too). Share the **invite code** (Copy code), e.g. `60N00-H8QZN`: it is your IP and port.
-  Friends on your Wi-Fi join right away. Over the internet, forward **UDP port 24565** on your router or press
-  **Open the port (UPnP)**. Press **Start the run** when everyone is ready (alone it says *Start solo*: plain offline play).
+  offers solo / host / join too). It shows two **invite codes** (each with Copy code), e.g. `60N00-H8QZN` (an IP and
+  port): **Same Wi-Fi** for friends on your network, and **Internet** (your public address, found automatically or
+  typed in the Public IP field) for friends elsewhere: that one works once **UDP port 24565** is forwarded to your PC,
+  by hand on the router or with **Open the port (UPnP)**. With no network the lobby says so and offers no code. Press **Start the run** when everyone is ready (alone it says *Start solo*: plain offline play).
 - **Join:** *Join game*, paste the code (or type `192.168.1.20` / `192.168.1.20:24565`), then **I'm ready**.
 - The host's PC runs the game; everyone sees the same train, track, repairs and inventory. With 3 to 5 players one of
   you is secretly the **impostor** (a private banner tells only them). If the host leaves, everyone goes back to the menu
-  ("The host ended the run" when the host chose Back to menu). A player who drops out cannot rejoin a run in
-  progress yet.
+  ("The host ended the run" when the host chose Back to menu). A player who drops out can rejoin the running run:
+  join again with the same code and the same name, and you appear on the train.
 - Details, the Steam plug-in steps and the invite-code format: [`docs/NETWORK.md`](docs/NETWORK.md).
 
 ### Tests
@@ -113,10 +117,13 @@ godot --headless --path . res://tests/TestTrain.tscn   # automated playthrough o
 godot --headless --path . res://tests/TestMenu.tscn    # settings save/load/rebind, main menu, pause menu, scene flow
 godot --headless --path . res://tests/TestRoute.tscn   # the whole Chapter 1 route: gaps, 5 gates and keys, every
                                                        # checkpoint, the end screen and a station 3 restart (~1-2 min)
-# Screenshots need a display (or xvfb-run); modes: repair, train, menu, hud, gate, end, tools
+# Screenshots need a display (or xvfb-run); modes: repair, train, menu, hud, gate, end, tools, station.
+# Run them one after another (several minutes each on software rendering; parallel runs starve each other).
+# Each run deletes its own old PNGs first and prints "DONE n shots" at the end.
 xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/Screenshot.tscn -- <out_dir> menu
-tests/run_net_test.sh                                   # multiplayer: headless host + client (+ latecomer, + 3 players); GODOT=/path/to/godot
+xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/ScreenshotLobby.tscn -- <out_dir>   # lobby cards
+tests/run_net_test.sh                                   # multiplayer: headless host + client (+ latecomer, + 3 players with a rejoin); GODOT=/path/to/godot
 ```
 
 ### Not built yet (see GDD milestones)
-Steam lobbies (the backend is stubbed, ENet works) · joining mid-run · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **quest maps (next; the keys lie beside the gates until then)** · Chapter 2 sea
+Steam lobbies (the backend is stubbed, ENet works) · joining mid-run as a new player (rejoining works) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **quest maps (next; the keys lie beside the gates until then)** · Chapter 2 sea

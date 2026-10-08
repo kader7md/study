@@ -57,25 +57,29 @@ func contents() -> Dictionary:
 	return {item: amount * hits_left}
 
 
+## Blender model per pickup kind (blender/scripts/build_assets.py build_pickups, baked wear).
+const MODELS := {"gold": "gold_ore", "coal": "coal_pile", "scrap": "scrap_pile", "wood": "wood_bundle",
+	"nails": "nails_box", "supply": "supply_crate"}
+
+
 func _ready() -> void:
+	var model_id: String = MODELS.get(item, "")
+	if model_id != "":
+		var model := Props.instance(model_id)
+		model.name = "Model"
+		# a little random turn so piles along the track do not all look the same
+		model.rotation.y = deg_to_rad(float(hash(Vector3i(position.round())) % 360)) if item != "supply" else 0.0
+		add_child(model)
+	else:
+		Build.box(self, Vector3(0.6, 0.35, 0.6), Vector3(0, 0.175, 0), COLORS.get(item, Color.WHITE))
 	if item == "gold":
-		Build.sphere(self, 0.9, Vector3(0, 0.5, 0), Color(0.45, 0.42, 0.4))
-		for i in 4:
-			var a := TAU * i / 4.0
-			Build.sphere(self, 0.22, Vector3(cos(a) * 0.75, 0.7, sin(a) * 0.75), COLORS.gold)
 		Build.collider(self, Vector3(2, 1.6, 2), Vector3(0, 0.6, 0))
 	elif item == "supply" or item == "nails":
 		var big := item == "supply"
-		var size := Vector3(1.0, 0.7, 0.8) if big else Vector3(0.6, 0.35, 0.45)
-		Build.box(self, size, Vector3(0, size.y * 0.5, 0), Color(0.5, 0.33, 0.17))
-		for y in [0.15, size.y - 0.15]:
-			Build.box(self, Vector3(size.x + 0.02, 0.05, size.z + 0.02), Vector3(0, y, 0), Color(0.3, 0.3, 0.32))
-		var l := Build.label(self, "SUPPLIES" if big else "NAILS", Vector3(0, size.y + 0.35, 0), 40 if big else 28)
+		var l := Build.label(self, "SUPPLIES" if big else "NAILS", Vector3(0, (0.7 if big else 0.35) + 0.35, 0), 40 if big else 28)
 		l.modulate = Color(1.0, 0.9, 0.6)
 		Build.collider(self, Vector3(1.4, 1.0, 1.4), Vector3(0, 0.4, 0))
 	else:
-		var size := Vector3(0.6, 0.35, 0.6) if item != "wood" else Vector3(1.2, 0.3, 0.3)
-		Build.box(self, size, Vector3(0, size.y * 0.5, 0), COLORS.get(item, Color.WHITE))
 		Build.collider(self, Vector3(1.4, 1.0, 1.4), Vector3(0, 0.4, 0))
 
 

@@ -421,6 +421,18 @@ func _run() -> void:
 	check(Game.count("gold") == gold - Game.SHOP.nails.price, "shop takes gold")
 	player.select_tool("hammer")
 
+	print("Overshooting a station")
+	var last_st := track.station_distances.size() - 1
+	check(track.station_at(train.end_of_line() - train.total_length * 0.5) == last_st, "the buffer stop keeps the train's middle on the last platform")
+	var keep_d := train.distance
+	var keep_next := Game.next_station
+	Game.next_station = 2
+	train.distance = track.station_distances[2] + Track.STATION_LENGTH + train.total_length * 0.5
+	var director := main.get_node("RunDirector") as RunDirector
+	check(director.compute_objective().begins_with("You passed station 2"), "rolling past a station says so (%s)" % director.compute_objective())
+	train.distance = keep_d
+	Game.next_station = keep_next
+
 	print("Hills")
 	var climb := track.station_distances[2] + 0.25 * Track.SEGMENT_LENGTH
 	train.distance = climb

@@ -6,8 +6,10 @@ extends RigidBody3D
 const LIFETIME := 120.0
 
 
-static func spawn(parent: Node, from: MeshInstance3D, car: Node3D) -> FallenPart:
+## `part_index`: the train.parts index of the piece (kept as "net_part" metadata for WorldSync).
+static func spawn(parent: Node, from: MeshInstance3D, car: Node3D, part_index := -1) -> FallenPart:
 	var p := FallenPart.new()
+	p.set_meta("net_part", part_index)
 	parent.add_child(p)
 	p.global_transform = from.global_transform
 	var mi := MeshInstance3D.new()

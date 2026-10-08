@@ -34,7 +34,15 @@ var _cards: VBoxContainer
 var _card_nodes := {}        # peer id -> PanelContainer
 var _count_label: Label
 var _code_label: Label
+var _code_caption: Label
+var _copy_button: Button
+var _net_code_label: Label
+var _net_caption: Label
+var _net_copy: Button
+var _net_box: Control
+var _public_edit: LineEdit
 var _lan_label: Label
+var _play_status: Label
 var _upnp_label: Label
 var _upnp_button: Button
 var _start_button: Button
@@ -59,6 +67,7 @@ func _ready() -> void:
 	Net.joined.connect(_refresh_mode)
 	Net.connection_failed.connect(_on_failed)
 	Net.upnp_finished.connect(func(_ok: bool, _text: String): _refresh())
+	Net.public_ip_changed.connect(_refresh)
 	_refresh_mode()
 	if Net.last_error != "" and _mode == Mode.PLAY:
 		_set_status(Net.last_error, true)
@@ -123,6 +132,13 @@ func _build_frame() -> void:
 
 
 func _set_status(text: String, error := false) -> void:
+	# on the Play card an error shows right under the join field (dark red on cream), like the main menu's dialog
+	if _mode == Mode.PLAY and is_instance_valid(_play_status):
+		_play_status.text = text
+		_play_status.visible = text != ""
+		_play_status.add_theme_color_override("font_color", UiTheme.DANGER.darkened(0.25) if error else UiTheme.INK_SOFT)
+		_status.text = ""
+		return
 	_status.text = text
 	_status.add_theme_color_override("font_color", Color("ffb08a") if error else CREAM)
 
@@ -174,7 +190,7 @@ func _build_play() -> void:
 	_name_edit.text_changed.connect(_on_name_changed)
 	col.add_child(_name_edit)
 	col.add_child(HSeparator.new())
-	var solo := _button("Play solo", &"AccentButton", func(): Net.start_solo())
+	var solo := _button("Play solo", &"AccentButton", func(): _confirm_new_run("solo", func(): Net.start_solo()))
 	col.add_child(solo)
 	col.add_child(HSeparator.new())
 	col.add_child(_header("Host a game"))
@@ -198,6 +214,12 @@ func _build_play() -> void:
 	_join_edit.text_submitted.connect(func(_t: String): _on_join())
 	join_row.add_child(_join_edit)
 	join_row.add_child(_button("Join", &"", _on_join))
+	_play_status = Label.new()
+	_play_status.theme_type_variation = &"MutedLabel"
+	_play_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_play_status.custom_minimum_size = Vector2(560, 0)
+	_play_status.visible = false
+	col.add_child(_play_status)
 	if ResourceLoader.exists(Net.MENU_SCENE):
 		col.add_child(_button("Back to the main menu", &"", func(): Net.go_to_menu()))
 	else:
@@ -218,8 +240,8 @@ func _on_join() -> void:
 
 
 func _on_failed(reason: String) -> void:
-	_set_status(reason, true)
 	_refresh_mode()
+	_set_status(reason, true)
 
 
 func _on_name_changed(text: String) -> void:
@@ -297,29 +319,19 @@ func _build_room() -> void:
 	var ih := _header("Invite friends")
 	ih.add_theme_color_override("font_color", HONEY)
 	inv_col.add_child(ih)
-	var code_box := _panel(&"PaperPanel", Vector2.ZERO)
-	inv_col.add_child(code_box)
-	var code_col := VBoxContainer.new()
-	code_col.add_theme_constant_override("separation", 6)
-	code_box.add_child(code_col)
-	var cl := Label.new()
-	cl.text = "Invite code"
-	cl.theme_type_variation = &"MutedLabel"
-	cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	code_col.add_child(cl)
-	_code_label = Label.new()
-	_code_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_code_label.add_theme_font_size_override("font_size", 52)
-	_code_label.add_theme_color_override("font_color", RUST_DARK)
-	_code_label.add_theme_constant_override("outline_size", 0)
-	var mono := SystemFont.new()
-	mono.font_names = PackedStringArray(["DejaVu Sans Mono", "Consolas", "Menlo", "monospace"])
-	mono.font_weight = 800
-	_code_label.add_theme_font_override("font", mono)
-	code_col.add_child(_code_label)
-	var copy := _button("Copy code", &"AccentButton", _copy_code)
-	copy.icon = null
-	code_col.add_child(copy)
+	# Two codes: same Wi-Fi (the LAN address) and internet (the public address, needs the port forwarded)
+	var lan_box := _code_box("Same Wi-Fi / LAN", _copy_code.bind(false))
+	inv_col.add_child(lan_box[0])
+	_code_caption = lan_box[1]
+	_code_label = lan_box[2]
+	_copy_button = lan_box[3]
+	if Net.is_host():
+		var net_box := _code_box("Internet (needs UDP port %d open)" % Net.port, _copy_code.bind(true))
+		_net_box = net_box[0]
+		inv_col.add_child(_net_box)
+		_net_caption = net_box[1]
+		_net_code_label = net_box[2]
+		_net_copy = net_box[3]
 	_lan_label = Label.new()
 	_lan_label.theme_type_variation = &"HudSmall"
 	_lan_label.add_theme_font_size_override("font_size", 18)
@@ -339,6 +351,17 @@ func _build_room() -> void:
 		_upnp_label.custom_minimum_size.x = 200
 		_upnp_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		up_row.add_child(_upnp_label)
+		var ip_row := HBoxContainer.new()
+		inv_col.add_child(ip_row)
+		var ipl := Label.new()
+		ipl.text = "Public IP"
+		ipl.theme_type_variation = &"HudSmall"
+		ipl.add_theme_font_size_override("font_size", 17)
+		ip_row.add_child(ipl)
+		_public_edit = _line(Net.manual_public_ip, "found automatically, or type it")
+		_public_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_public_edit.text_changed.connect(_on_public_ip_typed)
+		ip_row.add_child(_public_edit)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inv_col.add_child(spacer)
@@ -376,11 +399,12 @@ func _build_room() -> void:
 	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(_hint)
 	if Net.is_host():
-		var saved := Game.saved_station()
-		if saved >= 0:
-			_continue_button = _button("Continue from station %d" % saved, &"BigButton", func(): Net.start_run(true))
-			bar.add_child(_continue_button)
-		_start_button = _button("Start the run", &"AccentButton", func(): Net.start_run())
+		# alone it continues the solo save, with friends the hosted save (see _refresh_room)
+		_continue_button = _button("Continue", &"BigButton", func(): Net.start_run(true))
+		bar.add_child(_continue_button)
+		_start_button = _button("Start the run", &"AccentButton", func():
+			# alone, "Start solo" is a plain solo run (solo save); with friends it is a hosted run (host save)
+			_confirm_new_run("solo" if Net.players.size() <= 1 else "host", func(): Net.start_run()))
 		_start_button.custom_minimum_size.x = 300
 		bar.add_child(_start_button)
 	else:
@@ -389,14 +413,64 @@ func _build_room() -> void:
 		bar.add_child(_ready_button)
 
 
+## Starting a new run replaces the save in `slot` once it reaches station 1: ask first when there is one.
+func _confirm_new_run(slot: String, start: Callable) -> void:
+	var saved := Game.saved_station(slot)
+	if saved <= 0:
+		start.call()
+		return
+	ConfirmCard.ask(self, "Start a new run?", "The %s save at station %d is replaced once the new run reaches station 1. Continue keeps it." % [
+		"solo" if slot == "solo" else "hosted", saved], "New run", start, false)
+
+
 func _my_ready() -> bool:
 	return Net.players.has(Net.local_id()) and bool(Net.players[Net.local_id()].ready)
 
 
-func _copy_code() -> void:
+## A paper box with a caption, a big code and a Copy button. Returns [box, caption, code label, copy button].
+func _code_box(caption: String, on_copy: Callable) -> Array:
+	var box := _panel(&"PaperPanel", Vector2.ZERO)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 4)
+	box.add_child(col)
+	var cl := Label.new()
+	cl.text = caption
+	cl.theme_type_variation = &"MutedLabel"
+	cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(cl)
+	var code := Label.new()
+	code.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	code.add_theme_font_size_override("font_size", 34)
+	code.add_theme_color_override("font_color", RUST_DARK)
+	code.add_theme_constant_override("outline_size", 0)
+	var mono := SystemFont.new()
+	mono.font_names = PackedStringArray(["DejaVu Sans Mono", "Consolas", "Menlo", "monospace"])
+	mono.font_weight = 800
+	code.add_theme_font_override("font", mono)
+	col.add_child(code)
+	var copy := _button("Copy code", &"", on_copy)
+	copy.icon = null
+	col.add_child(copy)
+	return [box, cl, code, copy]
+
+
+func _copy_code(internet := false) -> void:
+	var code := Net.internet_code() if internet and Net.is_host() else (Net.lan_code() if Net.is_host() else Net.invite_code())
+	if code == "":
+		return
 	if DisplayServer.get_name() != "headless":
-		DisplayServer.clipboard_set(Net.invite_code())
-	_set_status("Invite code copied: %s" % Net.invite_code())
+		DisplayServer.clipboard_set(code)
+	if internet:
+		_set_status("Internet code copied: %s. It works once UDP port %d is forwarded to this PC." % [code, Net.port])
+	else:
+		_set_status("Invite code copied: %s (friends on the same Wi-Fi)" % code)
+
+
+func _on_public_ip_typed(text: String) -> void:
+	if Net.set_manual_public_ip(text):
+		_public_edit.remove_theme_color_override("font_color")
+	else:
+		_public_edit.add_theme_color_override("font_color", UiTheme.DANGER)
 
 
 # --- Refresh -------------------------------------------------------------------------------------
@@ -441,16 +515,24 @@ func _refresh_room() -> void:
 	for k in Net.MAX_PLAYERS - ids.size():
 		_cards.add_child(_empty_card())
 	_count_label.text = "%d / %d" % [ids.size(), Net.MAX_PLAYERS]
-	_code_label.text = Net.invite_code()
 	if Net.is_host():
 		var lan := Net.lan_addresses()
+		var lan_code := Net.lan_code()
+		_code_label.text = lan_code if lan_code != "" else "No network"
+		_code_label.add_theme_color_override("font_color", RUST_DARK if lan_code != "" else INK_SOFT)
+		_copy_button.disabled = lan_code == ""
+		_code_caption.text = "Same Wi-Fi / LAN" if lan_code != "" else "Same Wi-Fi / LAN: no network found, friends can't join"
+		var net_code := Net.internet_code()
+		_net_code_label.text = net_code if net_code != "" else ("Looking up…" if Net.public_ip_status.ends_with("…") else "Unknown")
+		_net_code_label.add_theme_color_override("font_color", RUST_DARK if net_code != "" else INK_SOFT)
+		_net_copy.disabled = net_code == ""
 		var lines := PackedStringArray()
-		lines.append("Same Wi-Fi / LAN: %s" % (", ".join(Array(lan).map(func(a: String): return "%s:%d" % [a, Net.port])) if not lan.is_empty() else "no network found"))
-		if Net.external_ip != "":
-			lines.append("Internet: %s:%d (the code above uses it)" % [Net.external_ip, Net.port])
+		if not lan.is_empty():
+			lines.append("LAN: %s" % ", ".join(Array(lan).map(func(a: String): return "%s:%d" % [a, Net.port])))
+		if net_code == "" and Net.public_ip_status != "":
+			lines.append(Net.public_ip_status)
 		else:
-			lines.append("Over the internet: forward UDP port %d to this PC, or try UPnP below." % Net.port)
-		lines.append("This PC: 127.0.0.1:%d" % Net.port)
+			lines.append("Internet: forward UDP port %d to this PC (by hand or UPnP). Steam invites come later." % Net.port)
 		_lan_label.text = "\n".join(lines)
 		_upnp_label.text = Net.upnp_status
 		_upnp_button.disabled = Net.external_ip != "" or Net.upnp_status.ends_with("…")
@@ -460,6 +542,9 @@ func _refresh_room() -> void:
 				waiting += 1
 		_start_button.disabled = not Net.can_start()
 		if _continue_button:
+			var saved := Game.saved_station("solo" if ids.size() <= 1 else "host")
+			_continue_button.visible = saved >= 0
+			_continue_button.text = "Continue from station %d" % saved
 			_continue_button.disabled = not Net.can_start()
 		_start_button.text = "Start solo" if ids.size() == 1 else "Start the run"
 		if ids.size() == 1:
@@ -469,6 +554,9 @@ func _refresh_room() -> void:
 		else:
 			_hint.text = "Everyone is ready!"
 	else:
+		_code_label.text = Net.invite_code()
+		_copy_button.disabled = _code_label.text == ""
+		_code_caption.text = "Invite code"
 		_lan_label.text = "Connected to %s\nShare the code: friends join the same host." % Net.joined_address
 		var ready := _my_ready()
 		_ready_button.text = "Ready!" if ready else "I'm ready"

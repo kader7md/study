@@ -22,6 +22,12 @@ const PATHS := {
 	"station_shelter": "res://assets/models/props/station_shelter.glb",
 	"shop_kiosk": "res://assets/models/props/shop_kiosk.glb",
 	"station_sign": "res://assets/models/props/station_sign.glb",
+	"gold_ore": "res://assets/models/props/gold_ore.glb",
+	"coal_pile": "res://assets/models/props/coal_pile.glb",
+	"scrap_pile": "res://assets/models/props/scrap_pile.glb",
+	"wood_bundle": "res://assets/models/props/wood_bundle.glb",
+	"nails_box": "res://assets/models/props/nails_box.glb",
+	"supply_crate": "res://assets/models/props/supply_crate.glb",
 }
 
 static var _cache := {}

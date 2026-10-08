@@ -25,6 +25,8 @@ signal role_assigned(role: String)
 signal peer_world_ready(id: int)
 signal local_player_spawned(player: Player)
 signal upnp_finished(ok: bool, text: String)
+## Host: the public (internet) address is known, changed or given up on (see public_ip / public_ip_status).
+signal public_ip_changed
 
 const DEFAULT_PORT := 24565
 ## host_game() with the default port tries this many ports in a row when one is busy.
@@ -36,6 +38,8 @@ const IMPOSTOR_MIN_PLAYERS := 3
 const JOIN_TIMEOUT := 10.0
 ## How far (m) a client's player may be from what it asks the host to use. Generous: latency and big colliders.
 const MAX_REACH := 9.0
+## How far (m) from a station's centre a client may buy from its shop (the platform is about 60 m long).
+const SHOP_REACH := 45.0
 const MAIN_SCENE := "res://scenes/main/Main.tscn"
 const LOBBY_SCENE := "res://scenes/net/Lobby.tscn"
 const MENU_SCENE := "res://scenes/menu/MainMenu.tscn"
@@ -65,9 +69,21 @@ var last_error := ""
 ## The address / code this client joined with (shown in its lobby).
 var joined_address := ""
 var upnp_status := ""
+## Host: the public IP from a successful UPnP mapping.
 var external_ip := ""
+## Host: this network's public IP as the internet sees it (UPnP query or an HTTPS lookup, or typed by the host).
+var public_ip := ""
+## "", "Looking up…", or why the lookup failed.
+var public_ip_status := ""
+## Typed by the host in the lobby (e.g. after forwarding the port by hand): wins over the looked-up address.
+var manual_public_ip := ""
+## Looks up the public IP when hosting (off in headless runs: tests and servers make no outside requests).
+var auto_public_ip := DisplayServer.get_name() != "headless"
+const PUBLIC_IP_URL := "https://api.ipify.org"
 
 var _ready_peers := {}          # host: peer id -> true once their Main is loaded
+var _run_roster := {}           # host: name -> {"color": Color, "impostor": bool} of everyone who started the run
+var _world_cp: Dictionary = {}  # the checkpoint the current world was built from (a rejoining player builds the same)
 var _host_world_ready := false
 var _impostor := 0              # host only. Never printed or sent to anyone but that peer.
 var _actor := 0                 # host: peer whose request is running (0 = the world)
@@ -83,6 +99,7 @@ var _overlay: NetOverlay
 var _voice: Node
 var _threads: Array[Thread] = []
 var _upnp_busy := false
+var _ip_request: HTTPRequest
 
 
 func _ready() -> void:
@@ -248,6 +265,8 @@ func host_game(p := DEFAULT_PORT) -> Error:
 	last_error = ""
 	print("[net] hosting on port %d" % p)
 	players_changed.emit()
+	if auto_public_ip:
+		lookup_public_ip()
 	return OK
 
 
@@ -290,12 +309,21 @@ func leave() -> void:
 	_ready_peers.clear()
 	_host_world_ready = false
 	_impostor = 0
+	_run_roster.clear()
+	_world_cp = {}
 	_actor = 0
 	_joining = false
 	_pending_role = ""
 	external_ip = ""
 	upnp_status = ""
+	public_ip = ""
+	public_ip_status = ""
+	if is_instance_valid(_ip_request):
+		_ip_request.queue_free()
+	_ip_request = null
 	Game.role = "crew"
+	Game.world_sabotage = true  # 1-2 player rule until a run with an impostor says otherwise (GDD 2)
+	Game.save_slot = "solo"
 	players_changed.emit()
 
 
@@ -345,16 +373,112 @@ func set_ready(on: bool) -> void:
 
 # --- Invite code, LAN addresses, UPnP --------------------------------------------------
 
+## The code to share: the internet code when the public IP is known, else the same-Wi-Fi code, else "" (no network:
+## a loopback code is never offered). A client shares the address it joined with.
 func invite_code() -> String:
 	if not is_online() and not is_host():
 		return ""
 	if not is_host():
 		var info := InviteCode.decode(joined_address, DEFAULT_PORT)
 		return InviteCode.encode(info.ip, info.port) if info.ok else ""
-	if external_ip.is_valid_ip_address():
-		return InviteCode.encode(external_ip, port)
+	var net_code := internet_code()
+	return net_code if net_code != "" else lan_code()
+
+
+## Host: the code for friends on the same Wi-Fi / LAN (the PC's LAN address), or "" when there is no network.
+func lan_code() -> String:
 	var lan := lan_addresses()
-	return InviteCode.encode(lan[0] if not lan.is_empty() else "127.0.0.1", port)
+	return InviteCode.encode(lan[0], port) if not lan.is_empty() else ""
+
+
+## Host: the code for friends over the internet (the public IP; it only works once UDP `port` is forwarded to this
+## PC, by UPnP or by hand), or "" while the public IP is unknown.
+func internet_code() -> String:
+	var ip := current_public_ip()
+	return InviteCode.encode(ip, port) if ip != "" else ""
+
+
+## The best known public IP: typed by the host, from UPnP, or looked up.
+func current_public_ip() -> String:
+	for ip in [manual_public_ip, external_ip, public_ip]:
+		if _usable_public(ip):
+			return ip
+	return ""
+
+
+static func _usable_public(ip: String) -> bool:
+	return ip.is_valid_ip_address() and not ip.contains(":") and not InviteCode.is_lan(ip) \
+		and not ip.begins_with("127.") and not ip.begins_with("0.")
+
+
+## Host: the address typed in the lobby ("" clears it). Returns false when it is not a public IPv4 address.
+func set_manual_public_ip(ip: String) -> bool:
+	var clean := ip.strip_edges()
+	if clean != "" and not _usable_public(clean):
+		return false
+	manual_public_ip = clean
+	public_ip_changed.emit()
+	players_changed.emit()
+	return true
+
+
+## Host: finds this network's public IP without opening any port: asks the router (UPnP query, on a thread), and
+## if that fails, an HTTPS lookup (api.ipify.org). Watch `public_ip_changed`.
+func lookup_public_ip() -> void:
+	if not is_host() or backend == null:
+		return
+	public_ip_status = "Looking up your internet address…"
+	public_ip_changed.emit()
+	var b := backend
+	if b is EnetBackend:
+		_run_thread(func():
+			var ip := EnetBackend.query_public_ip()
+			_on_upnp_ip.call_deferred(ip, b))
+	else:
+		_http_public_ip()
+
+
+func _on_upnp_ip(ip: String, b: NetBackend) -> void:
+	if backend != b:
+		return
+	if _usable_public(ip):
+		_set_public_ip(ip)
+	else:
+		_http_public_ip()
+
+
+func _http_public_ip() -> void:
+	if is_instance_valid(_ip_request):
+		return
+	_ip_request = HTTPRequest.new()
+	_ip_request.timeout = 6.0
+	add_child(_ip_request)
+	_ip_request.request_completed.connect(func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray):
+		var ip := body.get_string_from_utf8().strip_edges()
+		if is_instance_valid(_ip_request):
+			_ip_request.queue_free()
+		_ip_request = null
+		if result == HTTPRequest.RESULT_SUCCESS and code == 200 and _usable_public(ip):
+			_set_public_ip(ip)
+		else:
+			public_ip_status = "Could not find your internet address (offline?). Type it below if you know it."
+			public_ip_changed.emit()
+			players_changed.emit())
+	if _ip_request.request(PUBLIC_IP_URL) != OK:
+		_ip_request.queue_free()
+		_ip_request = null
+		public_ip_status = "Could not find your internet address. Type it below if you know it."
+		public_ip_changed.emit()
+
+
+func _set_public_ip(ip: String) -> void:
+	if not is_host() or backend == null:
+		return
+	public_ip = ip
+	public_ip_status = ""
+	print("[net] public address found")
+	public_ip_changed.emit()
+	players_changed.emit()
 
 
 func lan_addresses() -> PackedStringArray:
@@ -411,8 +535,12 @@ func start_run(from_save := false) -> void:
 		return
 	run_seed = _main_seed()
 	_assign_roles()
+	_run_roster.clear()
+	for id: int in players:
+		_run_roster[str(players[id].name)] = {"color": players[id].color, "impostor": id == _impostor}
 	Game.world_sabotage = _impostor == 0  # 1-2 players: the world sabotages (GDD 2)
-	var cp: Dictionary = Game.read_save() if from_save else {}
+	Game.save_slot = "host"
+	var cp: Dictionary = Game.read_save("host") if from_save else {}
 	_rpc_start_run.rpc(run_seed, cp)
 	_send_roles()
 
@@ -421,7 +549,9 @@ func start_run(from_save := false) -> void:
 func start_solo(from_save := false) -> void:
 	if backend:
 		leave()
-	if not (from_save and Game.continue_from_save()):
+	Game.save_slot = "solo"
+	Game.world_sabotage = true  # solo: the world sabotages (GDD 2), whatever the last online run said
+	if not (from_save and Game.continue_from_save("solo")):
 		Game.new_game(false)
 	Game.role = "crew"
 	run_started.emit()
@@ -604,12 +734,29 @@ func _on_peer_world_ready(id: int) -> void:
 	if not is_instance_valid(_players_root):
 		return
 	_mark_world(id, true)
+	if player_node(id) == null and run_active and players.has(id):
+		_spawn_rejoined(id)
 	for p: Node in _players_root.get_children():
 		if p is Player:
 			PlayerSync.show_to(p, id)
 	if is_instance_valid(_world_sync):
 		_world_sync.send_full_state(id)
 	peer_world_ready.emit(id)
+
+
+## Host: a player who rejoined mid-run appears on the train's middle car (every peer that is in the world sees them).
+func _spawn_rejoined(id: int) -> void:
+	var x: Transform3D = _players_root.get_meta("spawn_xform")
+	var train := Game.train
+	if train and train.cars.size() > 1:
+		var car := train.cars[1]
+		x = Transform3D(car.global_basis.orthonormalized(), car.global_position + Vector3.UP * (Train.FLOOR_HEIGHT + 0.3))
+	_spawner.spawn({"id": id, "name": player_name(id), "color": player_color(id), "xform": x})
+	var p := player_node(id)
+	if p:
+		for other: int in ready_peers():
+			if other != id:
+				PlayerSync.show_to(p, other)
 
 
 func _send_world_ready() -> void:
@@ -703,6 +850,8 @@ func _rpc_request(path: String, method: String, args: Array, aim: Vector3) -> vo
 		return
 	if not _in_reach(player, target, decoded):
 		return
+	if method == "buy" and not _near_shop(player):
+		return
 	if not target.has_method(method):
 		return
 	player.net_aim = aim
@@ -724,6 +873,15 @@ func _in_reach(player: Player, target: Node, args: Array) -> bool:
 	if subject is Node3D:
 		return player.global_position.distance_to((subject as Node3D).global_position) <= MAX_REACH
 	return true
+
+
+## Buying needs the train stopped at a station and the buyer on that station's platform (near its shop).
+func _near_shop(player: Player) -> bool:
+	var train := Game.train
+	if train == null or train.current_station < 0 or not is_instance_valid(_main):
+		return false
+	var station := _main.get_node_or_null("Station%d" % train.current_station) as Node3D
+	return station != null and player.global_position.distance_to(station.global_position) <= SHOP_REACH
 
 
 func _after_action(target: Object, args: Array) -> void:
@@ -805,6 +963,11 @@ func _on_peer_disconnected(id: int) -> void:
 			p.queue_free()
 		_actor = 0
 		Game.say("%s left the game" % who)
+		# without its impostor (or with too few players for one) the run falls back to world sabotage (GDD 2)
+		if _impostor == 0 or players.size() < IMPOSTOR_MIN_PLAYERS:
+			Game.world_sabotage = true
+		# the last player standing may have left while everyone else is down
+		Game.check_crew_wipe.call_deferred()
 
 
 func _on_connected_to_server() -> void:
@@ -891,14 +1054,41 @@ func _rpc_register(protocol: int, n: String) -> void:
 	var id := multiplayer.get_remote_sender_id()
 	if protocol != PROTOCOL:
 		_reject(id, "The host runs a different version of the game")
+	elif run_active and _can_rejoin(clean_name(n)):
+		_rejoin(id, clean_name(n))
 	elif run_active:
-		_reject(id, "The run has already started. Joining mid-run comes later")
+		_reject(id, "The run has already started. Only players who were in it can rejoin (with the same name)")
 	elif players.size() >= MAX_PLAYERS:
 		_reject(id, "The lobby is full (%d/%d)" % [MAX_PLAYERS, MAX_PLAYERS])
 	else:
 		players[id] = _entry(_unique_name(clean_name(n), id), _free_color(), false)
 		print("[net] %s joined" % players[id].name)
 		_broadcast_players()
+
+
+## Host: `n` started this run, is not in it now, and there is room.
+func _can_rejoin(n: String) -> bool:
+	if not _run_roster.has(n) or players.size() >= MAX_PLAYERS:
+		return false
+	for other: int in players:
+		if players[other].name == n:
+			return false
+	return true
+
+
+## Host: a player who dropped out comes back: they load the world the host built (same seed and checkpoint), get
+## the full world state when ready (WorldSync), and a new Player at the train (see _on_peer_world_ready).
+func _rejoin(id: int, n: String) -> void:
+	var info: Dictionary = _run_roster[n]
+	players[id] = {"name": n, "ready": true, "color": info.color, "host": false, "world": false}
+	if bool(info.impostor) and _impostor == 0:
+		_impostor = id
+		Game.world_sabotage = false
+	print("[net] %s rejoined the run" % n)
+	_broadcast_players()
+	Game.say("%s is back" % n)
+	_rpc_start_run.rpc_id(id, run_seed, _world_cp)
+	_rpc_role.rpc_id(id, "impostor" if id == _impostor else "crew", _impostor != 0)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -953,6 +1143,7 @@ func _rpc_start_run(new_seed: int, cp: Dictionary = {}) -> void:
 		_ready_peers.clear()
 		_reset_world_marks()
 	_pending_role = ""
+	_world_cp = cp.duplicate(true)
 	Game.use_checkpoint(cp)  # {} = a new game
 	Game.role = "crew"
 	get_tree().paused = false
@@ -972,6 +1163,7 @@ func _rpc_role(role: String, with_impostor: bool) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_reload(checkpoint: Dictionary, inventory: Dictionary, next_station: int, stats: Dictionary = {}) -> void:
+	_world_cp = checkpoint.duplicate(true)
 	if not is_host():
 		# mirror the host: the checkpoint's run state (opened gates, stats, run_complete) or a fresh game,
 		# so gates opened after the checkpoint are locked again here too, with their keys

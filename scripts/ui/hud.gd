@@ -51,6 +51,8 @@ var _toasts: VBoxContainer
 var _banner: PanelContainer
 var _banner_label: Label
 var _banner_tween: Tween
+var _banner_active := false   # a banner is showing (hidden while a modal window is open)
+var _intro_since := -1        # msec when the opening title appeared (-1: not showing)
 # bottom
 var _sabotage_panel: PanelContainer
 var _sabotage_label: Label
@@ -484,6 +486,8 @@ func _process(delta: float) -> void:
 	# modal windows (shop, pause, end screen) hide the help, toasts and prompts behind them
 	var modal := Game.ui_open
 	_toasts.visible = not modal
+	_banner.visible = _banner_active and not modal
+	_end_intro_on_move()
 	_help.visible = _help.visible and not modal
 	_help_hint.visible = not _help.visible and not modal
 	_downed.visible = player != null and player.downed and not modal
@@ -537,7 +541,13 @@ func _update_train(train: Train, track: Track) -> void:
 		if next - 1 < Track.THEMES.size():
 			theme_name = str(Track.THEMES[next - 1].get("name", ""))
 		var stop := "The Port" if next == Game.STATION_COUNT else "Station %d" % next
-		_journey_label.text = "Next: %s  ·  %s  ·  %d m" % [stop, theme_name, maxi(int(sd[next] - center), 0)]
+		var ahead := sd[next] - center
+		var dist := "%d m" % maxi(int(ahead), 0)
+		if ahead < -Track.STATION_LENGTH * 0.5:
+			dist = "%d m behind you: back up" % int(-ahead)
+		elif absf(ahead) <= Track.STATION_LENGTH * 0.5:
+			dist = "here: stop at the platform"
+		_journey_label.text = "Next: %s  ·  %s  ·  %s" % [stop, theme_name, dist]
 
 	_speed_label.text = "%d km/h" % int(absf(train.speed) * 3.6)
 	var lever := train.lever_text()
@@ -640,7 +650,7 @@ func _refresh_inventory() -> void:
 			var chip := PanelContainer.new()
 			chip.theme_type_variation = &"ChipPanel"
 			chip.custom_minimum_size = Vector2(140, 0)
-			chip.tooltip_text = item.replace("_", " ").capitalize()
+			chip.tooltip_text = _long_name(item)
 			var row := HBoxContainer.new()
 			row.add_theme_constant_override("separation", 4)
 			chip.add_child(row)
@@ -652,10 +662,9 @@ func _refresh_inventory() -> void:
 			row.add_child(ic)
 			var nm := Label.new()
 			nm.text = _short_name(item)
-			nm.add_theme_font_size_override("font_size", 15 if nm.text.length() <= 8 else 12)
+			nm.add_theme_font_size_override("font_size", 15)
 			nm.add_theme_color_override("font_color", UiTheme.INK_SOFT)
 			nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			nm.clip_text = true
 			row.add_child(nm)
 			var lbl := Label.new()
 			lbl.add_theme_font_size_override("font_size", 20)
@@ -671,11 +680,20 @@ func _refresh_inventory() -> void:
 			_pop(chip_node, int(old) < n)
 
 
+## Chip label: short enough to fit a 140 px chip at 15 px (the same names as the end screen).
 static func _short_name(item: String) -> String:
 	match item:
 		"engine_oil": return "Oil"
-		"come_along": return "Come-along"
+		"come_along": return "Winch"
 		"nail_gun": return "Nail gun"
+	return item.replace("_", " ").capitalize()
+
+
+## Tooltip: the full name.
+static func _long_name(item: String) -> String:
+	match item:
+		"come_along": return "Come-along (hand winch)"
+		"engine_oil": return "Engine oil"
 	return item.replace("_", " ").capitalize()
 
 
@@ -778,7 +796,7 @@ func open_shop(station: Station) -> void:
 	_shop.modulate.a = 0.0
 	_shop.create_tween().tween_property(_shop, "modulate:a", 1.0, 0.15)
 	_shop_opened_frame = Engine.get_process_frames()
-	Game.ui_open = true
+	Game.open_ui(&"shop")
 
 
 func _shop_card(id: String) -> Control:
@@ -849,7 +867,7 @@ func _refresh_shop() -> void:
 func close_shop() -> void:
 	_shop.visible = false
 	_shop_dim.visible = false
-	Game.ui_open = false
+	Game.close_ui(&"shop")
 
 
 # --- Messages -----------------------------------------------------------------------------------------
@@ -889,9 +907,38 @@ func _add_message(text: String) -> void:
 	tw.chain().tween_callback(holder.queue_free)
 
 
-func _show_banner(text: String) -> void:
+## The opening title: one title line and one small hint, higher up than other banners (clear of the crosshair and
+## the first prompts). It fades after a few seconds, or as soon as the player starts walking.
+func show_intro(title: String, hint: String) -> void:
+	_show_banner("%s\n%s" % [title, hint], 3.5)
+	_banner_label.add_theme_font_size_override("font_size", 22)
+	_banner.offset_top = 200.0
+	_banner.offset_bottom = 200.0
+	_intro_since = Time.get_ticks_msec()
+
+
+func _end_intro_on_move() -> void:
+	if _intro_since < 0 or not _banner_active:
+		return
+	if Time.get_ticks_msec() - _intro_since > 1200 and player and player.velocity.length() > 1.5:
+		_intro_since = -1
+		if _banner_tween and _banner_tween.is_valid():
+			_banner_tween.kill()
+		_banner_tween = _banner.create_tween()
+		_banner_tween.tween_property(_banner, "modulate:a", 0.0, 0.5)
+		_banner_tween.tween_callback(func() -> void:
+			_banner_active = false
+			_banner.hide())
+
+
+func _show_banner(text: String, hold := 4.0) -> void:
+	_intro_since = -1
+	_banner_label.add_theme_font_size_override("font_size", 28)
+	_banner.offset_top = 226.0
+	_banner.offset_bottom = 226.0
 	_banner_label.text = Settings.hint(text)
-	_banner.visible = true
+	_banner_active = true
+	_banner.visible = not Game.ui_open
 	if _banner_tween and _banner_tween.is_valid():
 		_banner_tween.kill()
 	_banner.modulate.a = 0.0
@@ -901,9 +948,11 @@ func _show_banner(text: String) -> void:
 	_banner_tween.set_parallel()
 	_banner_tween.tween_property(_banner, "modulate:a", 1.0, 0.25)
 	_banner_tween.tween_property(_banner, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_banner_tween.chain().tween_interval(4.0)
+	_banner_tween.chain().tween_interval(hold)
 	_banner_tween.chain().tween_property(_banner, "modulate:a", 0.0, 0.8)
-	_banner_tween.chain().tween_callback(_banner.hide)
+	_banner_tween.chain().tween_callback(func() -> void:
+		_banner_active = false
+		_banner.hide())
 
 
 # --- Helpers ----------------------------------------------------------------------------------------------

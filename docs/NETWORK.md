@@ -44,9 +44,13 @@ When the host presses Start with nobody else in the lobby, the server is closed 
   ENet's default (5 to 30 s) could drop it. Closing the game still disconnects at once (Net closes the peer on
   `NOTIFICATION_WM_CLOSE_REQUEST`); only a crash or a pulled cable takes up to a minute to notice.
 - **LAN:** friends on the same network use the LAN address (the lobby lists them, 192.168.x first).
-- **Internet:** the host forwards **UDP 24565** on the router, or presses **"Open the port (UPnP)"** in the lobby. That
-  runs `UPNP.discover()` + `add_port_mapping()` on a thread, shows a status line, and on success switches the invite
-  code to the external IP. The mapping is removed when the host leaves.
+- **Internet:** when hosting, `Net.lookup_public_ip()` finds the network's public IP without opening anything: it asks
+  the router (`UPNP.discover()` + `query_external_address()` on a thread) and falls back to an HTTPS lookup
+  (`api.ipify.org`); the host can also type it in the lobby's Public IP field. The lobby then shows a second,
+  **Internet** code (labelled "needs UDP port N open"). The host forwards **UDP 24565** on the router, or presses
+  **"Open the port (UPnP)"** (`add_port_mapping()` on a thread; the mapping is removed when the host leaves).
+  Headless runs (tests) skip the lookup (`Net.auto_public_ip`).
+- **No network:** the lobby says "no network found, friends can't join" and never offers a 127.0.0.1 code.
 
 ### SteamBackend (stub, for later)
 `scripts/net/steam_backend.gd` documents the mapping to [GodotSteam](https://godotsteam.com) and returns
@@ -84,8 +88,9 @@ in two groups of five (the top 2 of the 50 bits are zero).
 
 `InviteCode.decode()` (`scripts/net/invite_code.gd`) also accepts a plain `ip`, `ip:port`, `localhost` or a host name,
 ignores case, spaces and dashes, and reads O as 0 and I / L as 1. `Net.encode_invite()` / `decode_invite()` wrap it.
-The host's code uses its best LAN address (or the external IP after UPnP); a client's lobby shows the code it joined
-with so it can pass it on.
+The host has two codes: `Net.lan_code()` (best LAN address, "" without a network) and `Net.internet_code()` (the public
+IP: typed, from UPnP or looked up; "" while unknown). `Net.invite_code()` is the internet code when known, else the LAN
+code. A client's lobby shows the code it joined with so it can pass it on.
 
 ## Lobby
 
@@ -241,7 +246,13 @@ xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3
 
 ## Limits (v1)
 
-- No joining or rejoining mid-run; no host migration (the host leaving ends the run).
+- No joining mid-run as a new player; no host migration (the host leaving ends the run).
+- **Rejoining:** a player who was in the run (matched by name; `Net._run_roster`) may join again while it runs. The host
+  sends them `_rpc_start_run` with the checkpoint its own world was built from (`_world_cp`) and their role; when their
+  world is loaded they get the full state (WorldSync) and a new Player on the train's middle car.
+- When a player leaves mid-run the host re-checks the crew wipe (`Game.check_crew_wipe`), and without the impostor
+  (or under 3 players) the world sabotages again. Clients may only buy while their player is on the platform of the
+  station the train stands at (`Net._near_shop`).
 - ENet needs a reachable host (LAN, forwarded port or UPnP); Steam would remove that.
 - Fallen pieces and debris are simulated on the host only (clients see frozen puppets that follow it); planks that fall
   into a river and dropped wheels are cosmetic on each peer.

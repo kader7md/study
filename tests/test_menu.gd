@@ -107,13 +107,22 @@ func _settings_checks() -> void:
 	Settings.reset_section("audio")
 	check(is_equal_approx(get_tree().root.scaling_3d_scale, 1.0) and Engine.max_fps == 0, "graphics reset")
 
-	# Corrupt file falls back to defaults
-	print("  (an engine 'ConfigFile parse error' follows: expected, this case writes a corrupt file)")
+	# A file with wrong types and out-of-range values falls back to defaults / clamps (no engine parse error in
+	# the log; the unparsable-file case is opt-in: pass "corrupt" after "--")
 	var f := FileAccess.open(TEST_PATH, FileAccess.WRITE)
-	f.store_string("[controls\nthis is = = not a config }{")
+	f.store_string("[controls]\nmouse_sensitivity=\"fast\"\n[graphics]\nfov=9999.0\nwindow_mode=-3\n")
 	f.close()
 	Settings.load_settings()
-	check(is_equal_approx(Settings.mouse_sensitivity, 0.0025) and _has_key("jump", KEY_SPACE), "corrupt file -> defaults")
+	check(is_equal_approx(Settings.mouse_sensitivity, 0.0025) and _has_key("jump", KEY_SPACE), "bad values -> defaults")
+	check(is_equal_approx(Settings.fov, 110.0) and int(Settings.get_value("graphics", "window_mode")) == 0, "out of range values are clamped")
+	if OS.get_cmdline_user_args().has("corrupt"):
+		print("  (an engine 'ConfigFile parse error' follows: expected, this case writes a corrupt file)")
+		f = FileAccess.open(TEST_PATH, FileAccess.WRITE)
+		f.store_string("[controls\nthis is = = not a config }{")
+		f.close()
+		Settings.load_settings()
+		check(is_equal_approx(Settings.mouse_sensitivity, 0.0025) and _has_key("jump", KEY_SPACE), "corrupt file -> defaults")
+	Settings.reset_section("graphics")
 	Settings.cfg.set_value("graphics", "fov", "banana")
 	Settings._validate()
 	check(is_equal_approx(Settings.fov, 80.0), "wrong value types are dropped")
@@ -274,7 +283,13 @@ func _flow_checks() -> void:
 	await _frames(20)
 	check(get_tree().current_scene != null and get_tree().current_scene.name == "MainMenu", "main menu loads as a scene")
 	if true:
+		var had_save := Game.saved_station("solo") > 0
 		get_tree().current_scene.call("_on_solo")
+		await _frames(2)
+		var cards := get_tree().current_scene.find_children("*", "ConfirmCard", true, false)
+		check(cards.size() == (1 if had_save else 0), "Play solo over a save asks first (save: %s, cards: %d)" % [had_save, cards.size()])
+		for c in cards:
+			(c as ConfirmCard).confirm()
 		await get_tree().create_timer(1.2).timeout
 		await _frames(5)
 		var cur := get_tree().current_scene

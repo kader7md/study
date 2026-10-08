@@ -78,10 +78,10 @@ func _build() -> void:
 	WelderSource.create(self, "station", 30.0, Vector3(3.2, PLATFORM_TOP, 0))
 	Build.label(self, "STATION WELDER", Vector3(3.2, PLATFORM_TOP + 2.0, 0), 40)
 
-	# Grave (revive dead players here, M5)
+	# Grave (carrying a body here to revive it comes in M5; for now it only says how reviving works today)
 	Build.box(self, Vector3(0.8, 1.0, 0.25), Vector3(5.2, PLATFORM_TOP + 0.5, GRAVE_Z), Color(0.5, 0.5, 0.52))
 	ActionSpot.create(self, Vector3(1.2, 1.4, 1.0), Vector3(5.2, PLATFORM_TOP + 0.6, GRAVE_Z),
-		func(_p): return "Grave: bring a dead friend's body here to revive them (M5)", func(_p): pass)
+		func(_p): return "A quiet grave. Downed crewmates get back up when the train reaches a station (or with a medkit)", func(_p): pass)
 
 
 ## Painted text on a board facing the track (-X), `width` metres wide at most.

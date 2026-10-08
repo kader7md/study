@@ -89,6 +89,10 @@ Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations 
 ```
 
 ### Train systems
+- **Stopping at a station:** a station counts when the train stops with its middle on the platform. Roll past and the
+  objective says so ("You passed station N: pull the lever back"), and the journey strip shows the metres behind you.
+  A station further on also counts if the train stops there. The line ends in a buffer stop just after the last
+  platform, so the final stop always counts.
 - **Furnace:** players shovel coal in. Coal gives **speed and heat**. No coal means the train slows and stops.
 - **Controls:** forward, reverse, brake/stop (a lever in the cab that anyone can use).
 - **Damage:** the train body takes hits and **wheels can fall off**. A damaged train is slower, and a broken one stops.
@@ -286,13 +290,22 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
   - Bottom: health and frost (left), tool hotbar and help (centre), the impostor's sabotage panel (right)
   - Readable at 1280x720 and 1920x1080 (the UI scales with the window height)
 - **Menus:** the title screen shows **TRUST ISSUES** over a slow camera at the departure station (the real Chapter 1
-  world from the same seed, chimney smoke, a small generated music-box loop). Buttons: **Host game**, **Join game**
-  (invite code or IP:port, plus your name), **Settings**, **Quit**. **Esc** in game opens the pause menu (Resume,
-  Settings, Back to menu, Quit). Solo play pauses; online the game keeps running.
+  world from the same seed, chimney smoke, a small generated music-box loop). Buttons: **Continue (station N)** (only
+  with a solo save), **Play solo**, **Host game**, **Join game** (invite code or IP:port; you join with the name in the
+  name card at the bottom right), **Settings**, **Quit**. Play solo over an existing save asks first. **Esc** in game opens
+  the pause menu (Resume, Restart from the last station (solo / host), Settings, Back to menu, Quit). Solo play pauses;
+  online the game keeps running. Actions that end the run for the whole crew (the host's Back to menu or Quit) ask
+  first. Solo and hosted runs keep separate saves (`checkpoint_solo.json`, `checkpoint_host.json`).
+- **Invites:** the host's lobby shows two codes: **Same Wi-Fi** (the LAN address) and **Internet** (the public address,
+  found by asking the router or an HTTPS lookup, or typed by the host; it needs UDP port 24565 forwarded, by hand or
+  with UPnP). With no network it says so and shows no code. Steam invites (no port forwarding) come with the Steam
+  backend. A player who drops out can rejoin the running run with the same name.
 - **Settings** (saved in `user://settings.cfg`, applied at startup): **Controls** (rebind every action, keyboard or mouse,
-  conflict warnings, reset to defaults, mouse sensitivity, invert Y), **Graphics** (window mode, V-Sync, resolution scale,
+  conflict warnings, reset to defaults, mouse sensitivity, invert Y), **Graphics** (window mode: Windowed, Borderless
+fullscreen or Fullscreen; V-Sync, resolution scale,
   shadow quality, anti-aliasing, FOV, max FPS), **Audio** (Master, Music, SFX, Voice), **Microphone** (input device, live
-  level meter, "hear yourself" test, push-to-talk on/off and key, your name).
+  level meter, "hear yourself" test, push-to-talk on/off and key (with push-to-talk off, an open mic with a noise gate),
+your name).
 - **Objective list on paper/phone:** the player holds up a handwritten checklist (like RV There Yet's camping-trip note),
   e.g. "find the train station ✔, reach station 1, get engine oil…". The host can use the **phone with the tracker**.
 - Comedy: goofy physics, ragdolls, players carrying each other's bodies around.

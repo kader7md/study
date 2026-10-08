@@ -77,7 +77,7 @@ func detach(fly := true) -> void:
 	if _door_spot:
 		_door_spot.collision_layer = 0
 	if fly:
-		FallenPart.spawn(train.get_parent(), node, car)
+		FallenPart.spawn(train.get_parent(), node, car, train.parts.find(self))
 	_make_slot()
 	attached_changed.emit(self)
 
@@ -93,6 +93,11 @@ func _make_slot() -> void:
 		if c is CollisionShape3D:
 			c.position = aabb.get_center()
 	_slot.placed.connect(_on_placed)
+
+
+## NET: a client shows a piece the host's player placed (waiting for its nails / welds).
+func net_place_pending() -> void:
+	_on_placed(null)
 
 
 func _on_placed(_player: Node) -> void:

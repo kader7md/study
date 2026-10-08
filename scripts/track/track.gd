@@ -616,10 +616,8 @@ func reserved_spots() -> Array[Vector3]:
 # --- Visuals ------------------------------------------------------------------
 
 func _build_visuals() -> void:
-	var rail_mesh := BoxMesh.new()
-	rail_mesh.size = Vector3(0.12, 0.15, PIECE_LENGTH)
-	rail_mesh.material = Build.material(Color(0.5, 0.5, 0.52))
-	_rails = _make_multimesh(rail_mesh, piece_count * 2)
+	# the same Blender rail (worn steel head, rusty web and foot, fishplates) as the ones players lay in a gap
+	_rails = _make_multimesh(_rail_mesh(), piece_count * 2)
 
 	var sleeper_mesh := BoxMesh.new()
 	sleeper_mesh.size = Vector3(2.4, 0.12, 0.3)
@@ -629,6 +627,20 @@ func _build_visuals() -> void:
 	for i in piece_count:
 		_set_piece_visible(i, true)
 	_build_bridges()
+
+
+## The mesh of the Blender rail model (assets/models/props/rail.glb), or a plain bar if it is missing.
+static func _rail_mesh() -> Mesh:
+	var model := Props.instance("rail")
+	var found := model.find_children("*", "MeshInstance3D", true, false)
+	var mesh: Mesh = (found[0] as MeshInstance3D).mesh if not found.is_empty() else null
+	model.free()
+	if mesh == null:
+		var box := BoxMesh.new()
+		box.size = Vector3(0.12, 0.15, PIECE_LENGTH)
+		box.material = Build.material(Color(0.5, 0.5, 0.52))
+		mesh = box
+	return mesh
 
 
 func _make_multimesh(mesh: Mesh, count: int) -> MultiMesh:

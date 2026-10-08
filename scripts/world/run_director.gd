@@ -53,6 +53,9 @@ func compute_objective() -> String:
 		return "The train tipped over! Hook the come-along to its lifting eye, chain it to a tree and crank"
 	if train.wheels < Train.MIN_WHEELS_TO_MOVE:
 		return "Only %d wheels: fit a wheel (cargo car), or limp on to the station" % train.wheels
+	if next < track.station_distances.size() and train.center_distance() > track.station_distances[next] + Track.STATION_LENGTH * 0.5:
+		var where := "the port" if next == Game.STATION_COUNT else "station %d" % next
+		return "You passed %s: pull the lever back and stop at the platform" % where
 	var front := train.distance
 	var piece := first_broken_ahead(front, OBJECTIVE_RANGE)
 	var gate := track.locked_gate_ahead(front, OBJECTIVE_RANGE)
@@ -102,8 +105,6 @@ func guard() -> void:
 	var track := Game.track
 	if train == null or track == null or Game.run_complete or not train.is_stopped():
 		return
-	if not multiplayer.is_server():
-		return  # host-side state change (true offline)
 	# 1. Stopped at a gap without the wood / nails / scrap to rebuild it and without gold to buy them:
 	#    a supply crate (and over water without a nail gun: a loaned nail gun) turns up beside the gap.
 	var piece := first_broken_ahead(train.distance, 25.0) if train.lever >= 0 else -1

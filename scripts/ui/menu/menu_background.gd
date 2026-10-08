@@ -31,6 +31,10 @@ func _ready() -> void:
 	station = Station.new()
 	add_child(station)
 	station.setup(track, 0)
+	# the station name board and the floating name would sit right behind the title and buttons: hide them here
+	for c in station.get_children():
+		if c is Label3D or (c is Node3D and is_equal_approx((c as Node3D).position.z, Station.SIGN_Z)):
+			(c as Node3D).visible = false
 
 	terrain = Terrain.new()
 	terrain.name = "Terrain"

@@ -21,7 +21,6 @@ var _buttons: Array[Button] = []
 var _settings: SettingsMenu
 var _join: Control
 var _join_code: LineEdit
-var _join_name: LineEdit
 var _join_status: Label
 var _name_edit: LineEdit
 var _toast: Label
@@ -91,8 +90,7 @@ func _build_ui() -> void:
 	title_box.add_theme_constant_override("separation", -26)
 	_column.add_child(title_box)
 	for word in ["TRUST", "ISSUES"]:
-		var t := UiTheme.title_label(word, 112)
-		t.add_theme_font_override("font", UiTheme.logo_font())
+		var t := UiTheme.title_label(word, 112)  # the same rounded display face as every other title
 		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		title_box.add_child(t)
 	(title_box.get_child(1) as Label).add_theme_color_override("font_color", UiTheme.HONEY)
@@ -129,7 +127,7 @@ func _build_ui() -> void:
 
 	# Bottom left: build info. Bottom right: your name card.
 	var info := Label.new()
-	info.text = "Chapter 1: The Rails  ·  prototype build  ·  F11 fullscreen"
+	info.text = "Chapter 1: The Train Chase  ·  prototype build  ·  F11 fullscreen"
 	info.add_theme_font_size_override("font_size", 17)
 	info.theme_type_variation = &"HudSmall"
 	info.anchor_top = 1.0
@@ -279,13 +277,10 @@ func _build_join_dialog() -> void:
 	_join_code.text_submitted.connect(func(_t: String) -> void: _on_join())
 	col.add_child(_join_code)
 	var l2 := Label.new()
-	l2.text = "Your name"
+	l2.theme_type_variation = &"MutedLabel"
+	l2.add_theme_font_size_override("font_size", 16)
+	l2.text = "You join as the name in the card at the bottom right."
 	col.add_child(l2)
-	_join_name = LineEdit.new()
-	_join_name.max_length = Net.NAME_MAX
-	_join_name.placeholder_text = Net.DEFAULT_NAME
-	_join_name.text_submitted.connect(func(_t: String) -> void: _on_join())
-	col.add_child(_join_name)
 	_join_status = Label.new()
 	_join_status.theme_type_variation = &"MutedLabel"
 	_join_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -319,6 +314,11 @@ func _on_solo() -> void:
 	if _busy:
 		return
 	_save_name(_name_edit.text)
+	var saved := Game.saved_station("solo")
+	if saved > 0:
+		ConfirmCard.ask(_root, "Start a new run?", "Your solo save at station %d is replaced once the new run reaches station 1. Continue keeps it." % saved,
+			"New run", func() -> void: _go(MAIN_SCENE), false)
+		return
 	_go(MAIN_SCENE)
 
 
@@ -341,7 +341,6 @@ func _on_host() -> void:
 
 
 func _open_join() -> void:
-	_join_name.text = str(Settings.get_value("profile", "name", ""))
 	_join_status.text = ""
 	_join.show()
 	_join_code.grab_focus()
@@ -367,7 +366,7 @@ func _on_join() -> void:
 		_join_status.text = "Paste the invite code your host gave you (or their IP:port)."
 		_join_code.grab_focus()
 		return
-	_save_name(_join_name.text)
+	_save_name(_name_edit.text)
 	if Net.join_game(code) != OK:
 		_join_status.text = Net.last_error  # connection_failed is ignored while the dialog shows it
 		return
@@ -377,7 +376,7 @@ func _on_join() -> void:
 
 ## The host let us into its lobby.
 func _on_joined() -> void:
-	if _joining:
+	if _joining and not Net.run_active:
 		_joining = false
 		_go(LOBBY_SCENE)
 
@@ -423,6 +422,8 @@ func _go(scene: String, from_save := false) -> void:
 	if music:
 		t.parallel().tween_property(music, "volume_db", -40.0, 0.35)
 	await t.finished
+	if not is_inside_tree() or (scene == LOBBY_SCENE and Net.run_active):
+		return  # a rejoining player goes straight into the running world
 	if scene == MAIN_SCENE:
 		Net.start_solo(from_save)  # offline: no socket, no firewall prompt
 	else:

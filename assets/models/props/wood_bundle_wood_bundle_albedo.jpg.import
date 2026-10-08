@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvbticbo2jtct"
-path="res://.godot/imported/rail_rail_albedo.jpg-c03ac97e82b41a41076cd3c88d66d2e3.ctex"
+uid="uid://bmt4mm5mn643c"
+path="res://.godot/imported/wood_bundle_wood_bundle_albedo.jpg-f92acbb40ba1e313c2ffa33efc7cbb5d.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "ecc19ef702c7d10ef56eb23c96bb8a84"
+"md5": "914cbeb18f1703f601950cd0dbb978ce"
 }
 
 [deps]
 
-source_file="res://assets/models/props/rail_rail_albedo.jpg"
-dest_files=["res://.godot/imported/rail_rail_albedo.jpg-c03ac97e82b41a41076cd3c88d66d2e3.ctex"]
+source_file="res://assets/models/props/wood_bundle_wood_bundle_albedo.jpg"
+dest_files=["res://.godot/imported/wood_bundle_wood_bundle_albedo.jpg-f92acbb40ba1e313c2ffa33efc7cbb5d.ctex"]
 
 [params]
 

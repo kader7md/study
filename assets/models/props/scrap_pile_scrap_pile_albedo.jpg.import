@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvbticbo2jtct"
-path="res://.godot/imported/rail_rail_albedo.jpg-c03ac97e82b41a41076cd3c88d66d2e3.ctex"
+uid="uid://c45je412kp8a1"
+path="res://.godot/imported/scrap_pile_scrap_pile_albedo.jpg-052e8886f281b2639e456a5489fc07b0.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "ecc19ef702c7d10ef56eb23c96bb8a84"
+"md5": "d1a45580f85fba3f468d7a37dd5ac462"
 }
 
 [deps]
 
-source_file="res://assets/models/props/rail_rail_albedo.jpg"
-dest_files=["res://.godot/imported/rail_rail_albedo.jpg-c03ac97e82b41a41076cd3c88d66d2e3.ctex"]
+source_file="res://assets/models/props/scrap_pile_scrap_pile_albedo.jpg"
+dest_files=["res://.godot/imported/scrap_pile_scrap_pile_albedo.jpg-052e8886f281b2639e456a5489fc07b0.ctex"]
 
 [params]
 

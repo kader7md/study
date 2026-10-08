@@ -125,15 +125,15 @@ parts listed in the table), `tests/screenshot.gd` (`menu`/`hud` modes).
 9. Screenshot modes `menu` and `hud` in `tests/screenshot.gd`.
 
 **Acceptance (tester)**
-- [ ] F5 in the editor (and the plain `godot --path .`) opens MainMenu: title, 4 buttons, a moving train-station background, no errors in the log.
-- [ ] Headless import plus TestTrain still pass (`PASSED: 0 failure(s)`). Loading MainMenu headless for 120 frames gives no errors.
-- [ ] Esc in game opens the pause menu. Resume brings back mouse capture. Back to menu reaches MainMenu. Quit exits. Solo play pauses (the train does not move while paused).
-- [ ] Rebinding `jump` to J works at once, survives a restart (`user://settings.cfg` holds it), and "Reset to defaults" restores Space.
-- [ ] Changing fullscreen, V-Sync, resolution scale, shadows, FOV and max FPS has a visible effect and persists after a restart.
-- [ ] The Audio sliders change `AudioServer` bus volumes, and the values persist.
-- [ ] The Microphone tab lists devices, and the meter moves when you speak (on a machine with a mic). With no mic it shows "No input device" and does not crash.
-- [ ] Screenshots `menu` and `hud` (xvfb, opengl3): one cohesive theme, no overlapping text, bars use green, yellow, red, blue and the journey colour.
-- [ ] Critic: the look is our own (no RV There Yet assets or layout copies) and readable from 2 m away.
+- [x] F5 in the editor (and the plain `godot --path .`) opens MainMenu: title, 4 buttons, a moving train-station background, no errors in the log. *(verified: menu screenshots, TestMenu loads MainMenu with no errors)*
+- [x] Headless import plus TestTrain still pass (`PASSED: 0 failure(s)`). Loading MainMenu headless for 120 frames gives no errors. *(verified: TestTrain and TestMenu print PASSED)*
+- [x] Esc in game opens the pause menu. Resume brings back mouse capture. Back to menu reaches MainMenu. Quit exits. Solo play pauses (the train does not move while paused). *(verified: TestMenu (pause stops the train, Back to menu))*
+- [x] Rebinding `jump` to J works at once, survives a restart (`user://settings.cfg` holds it), and "Reset to defaults" restores Space. *(verified: TestMenu rebind and reset checks)*
+- [ ] Changing fullscreen, V-Sync, resolution scale, shadows, FOV and max FPS has a visible effect and persists after a restart. *(partly: TestMenu checks the values apply and persist; the visible effect needs a manual look)*
+- [x] The Audio sliders change `AudioServer` bus volumes, and the values persist. *(verified: TestMenu audio checks)*
+- [ ] The Microphone tab lists devices, and the meter moves when you speak (on a machine with a mic). With no mic it shows "No input device" and does not crash. *(partly: no microphone on the test machine; the no-device path does not crash)*
+- [x] Screenshots `menu` and `hud` (xvfb, opengl3): one cohesive theme, no overlapping text, bars use green, yellow, red, blue and the journey colour. *(verified: round 2 menu and hud screenshots)*
+- [ ] Critic: the look is our own (no RV There Yet assets or layout copies) and readable from 2 m away. *(critic round 2: own look; fonts unified (the pixel logo font was dropped))*
 
 ---
 
@@ -195,13 +195,13 @@ marked `# NET:`: `project.godot` (autoload), `game.gd`, `main.gd`, `player.gd`, 
    process prints `PASSED`/`FAILED` and the script exits non-zero on failure.
 
 **Acceptance (tester)**
-- [ ] `tests/run_net_test.sh` prints PASSED for host and client and exits 0 within 3 minutes.
-- [ ] TestTrain still passes unchanged (offline equals host with no clients). Solo from the Lobby plays exactly like before.
-- [ ] Two windowed instances on one PC: host, join by invite code, both appear in the lobby with names, ready works, host starts, both spawn at the departure station, see each other's body (no floating arms), and the train moves for both.
-- [ ] A client can collect a pickup, place a plank, nail it and bolt a rail, and the host sees it (and the other way round). A repaired gap lets the train pass on both.
-- [ ] With 3 test instances (or the debug override `Net.debug_force_impostor`), exactly one peer gets the impostor banner. The others never learn who it is (check the logs).
-- [ ] Closing the host sends clients back to the menu with a message. There are no script errors on disconnect.
-- [ ] `docs/NETWORK.md` explains the backends, the ports, the invite code format and the Steam plug-in steps.
+- [x] `tests/run_net_test.sh` prints PASSED for host and client and exits 0 within 3 minutes. *(verified: NET TEST PASSED (host, client, latecomer, 3 players, rejoin))*
+- [x] TestTrain still passes unchanged (offline equals host with no clients). Solo from the Lobby plays exactly like before. *(verified: TestTrain passes; solo opens no socket (TestMenu))*
+- [ ] Two windowed instances on one PC: host, join by invite code, both appear in the lobby with names, ready works, host starts, both spawn at the departure station, see each other's body (no floating arms), and the train moves for both. *(partly: covered headless by run_net_test.sh; two windowed instances not yet tried by hand)*
+- [x] A client can collect a pickup, place a plank, nail it and bolt a rail, and the host sees it (and the other way round). A repaired gap lets the train pass on both. *(verified: net_test (pickup, plank, nails, rail bolts, the train passes on both))*
+- [x] With 3 test instances (or the debug override `Net.debug_force_impostor`), exactly one peer gets the impostor banner. The others never learn who it is (check the logs). *(verified: net_test crew run (exactly one impostor, roles only to their own peer))*
+- [x] Closing the host sends clients back to the menu with a message. There are no script errors on disconnect. *(verified: net_test (the host ends the run: clients back at the menu, no script errors))*
+- [x] `docs/NETWORK.md` explains the backends, the ports, the invite code format and the Steam plug-in steps. *(done: docs/NETWORK.md)*
 
 ---
 
@@ -273,14 +273,14 @@ an automated test drives the whole route.
    high `Engine.time_scale` in under 5 minutes and prints `PASSED: 0 failure(s)`.
 
 **Acceptance (tester)**
-- [ ] `godot --headless --path . res://tests/TestRoute.tscn` prints `PASSED: 0 failure(s)` (under 5 min). TestTrain still passes.
-- [ ] Screenshot `gate`: the gate model with a padlock across the rails, and the glowing key clearly visible beside it from the cab.
-- [ ] Manual solo run: the train stops in front of each gate, the key is easy to find (under 30 s), the gate opens with an animation, and the train continues.
-- [ ] Reaching station 5 shows the Chapter 1 complete screen with real stats. "Back to main menu" reaches MainMenu (or reloads Main if the menu is missing).
-- [ ] Each of the 5 tools has a visibly different first-person animation, and the 4 carry poses differ (screenshots or a short capture).
-- [ ] Balance: a manual run with no shop visits except wheels and oil does not run out of wood, nails or coal. Average time per segment is about 6 to 10 minutes for one player.
-- [ ] Restart from a checkpoint at station 3: gates 1 to 3 are open, the stats carry over, and there are no orphan keys.
-- [ ] Critic: the gate and key models fit the stylized-realism look of the train. The tool motions read clearly.
+- [x] `godot --headless --path . res://tests/TestRoute.tscn` prints `PASSED: 0 failure(s)` (under 5 min). TestTrain still passes. *(verified: TestRoute PASSED)*
+- [x] Screenshot `gate`: the gate model with a padlock across the rails, and the glowing key clearly visible beside it from the cab. *(verified: round 2 gate screenshots)*
+- [ ] Manual solo run: the train stops in front of each gate, the key is easy to find (under 30 s), the gate opens with an animation, and the train continues. *(partly: TestRoute drives every gate; a manual timing run is still open)*
+- [x] Reaching station 5 shows the Chapter 1 complete screen with real stats. "Back to main menu" reaches MainMenu (or reloads Main if the menu is missing). *(verified: TestRoute (end screen, stats, Back to main menu))*
+- [x] Each of the 5 tools has a visibly different first-person animation, and the 4 carry poses differ (screenshots or a short capture). *(verified: tools screenshots)*
+- [ ] Balance: a manual run with no shop visits except wheels and oil does not run out of wood, nails or coal. Average time per segment is about 6 to 10 minutes for one player. *(open: needs a manual playthrough)*
+- [x] Restart from a checkpoint at station 3: gates 1 to 3 are open, the stats carry over, and there are no orphan keys. *(verified: TestRoute station 3 restart)*
+- [ ] Critic: the gate and key models fit the stylized-realism look of the train. The tool motions read clearly. *(critic round 2: gate and key fit; viewmodel arm made smaller, hammer and wrench poses turned)*
 
 ---
 

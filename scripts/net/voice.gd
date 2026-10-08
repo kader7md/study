@@ -12,6 +12,10 @@ const FRAME := 320            # samples per packet (20 ms)
 const SPEAKING_HOLD := 0.35   # seconds a speaker icon stays after the last packet
 const MIC_BUS := "Mic"
 const VOICE_BUS := "Voice"
+## Open microphone (push-to-talk off): frames quieter than this RMS (about -45 dBFS) are not sent...
+const GATE_RMS := 0.0056
+## ...unless someone spoke within this many seconds (so word endings and short pauses are not cut).
+const GATE_HANGOVER := 0.3
 
 var enabled := true
 var _mic: AudioStreamPlayer
@@ -19,6 +23,9 @@ var _capture: AudioEffectCapture
 var _talking := false
 var _phase := 0.0
 var _pending := PackedFloat32Array()
+var _acc := 0.0                # box filter: sum and count of source samples for the next 16 kHz sample
+var _acc_n := 0
+var _gate_open_until := 0.0    # open mic: send until this clock time
 var _last_heard := {}          # peer id -> seconds since start when we last heard them
 var _clock := 0.0
 var _available := false
@@ -35,7 +42,6 @@ func _process(delta: float) -> void:
 	if want != _talking:
 		_set_talking(want)
 	if _talking:
-		_last_heard[Net.local_id()] = _clock
 		_pump()
 	_update_bodies()
 
@@ -44,14 +50,13 @@ func is_speaking(id: int) -> bool:
 	return _last_heard.has(id) and _clock - float(_last_heard[id]) < SPEAKING_HOLD
 
 
+func _open_mic() -> bool:
+	return not bool(Settings.get_value("mic", "push_to_talk", true))
+
+
 func _wants_to_talk() -> bool:
-	if not InputMap.has_action("push_to_talk"):
-		var ev := InputEventKey.new()
-		ev.physical_keycode = KEY_V
-		InputMap.add_action("push_to_talk")
-		InputMap.action_add_event("push_to_talk", ev)
-	# Settings > Microphone: push-to-talk off = open microphone while in a run
-	if not bool(Settings.get_value("mic", "push_to_talk", true)):
+	# Settings > Microphone: push-to-talk off = open microphone while in a run (with a noise gate, see _pump)
+	if _open_mic():
 		return true
 	if Game.ui_open:
 		return false
@@ -73,6 +78,9 @@ func _set_talking(on: bool) -> void:
 		_ensure_mic()
 		_capture.clear_buffer()
 		_phase = 0.0
+		_acc = 0.0
+		_acc_n = 0
+		_gate_open_until = 0.0
 		_pending.clear()
 		_mic.play()
 	elif _mic:
@@ -85,6 +93,7 @@ func _ensure_mic() -> void:
 		return
 	var bus := AudioServer.get_bus_index(MIC_BUS)
 	if bus == -1:
+		push_warning("[voice] no Mic bus in default_bus_layout.tres: adding one")
 		AudioServer.add_bus()
 		bus = AudioServer.bus_count - 1
 		AudioServer.set_bus_name(bus, MIC_BUS)
@@ -101,7 +110,9 @@ func _ensure_mic() -> void:
 	add_child(_mic)
 
 
-## Reads the captured stereo samples, resamples to 16 kHz mono and sends whole 20 ms frames.
+## Reads the captured stereo samples, resamples to 16 kHz mono (averaging the source samples of each output sample:
+## a box low-pass, so no aliasing from dropped samples) and sends whole 20 ms frames. With an open microphone, silent
+## frames are skipped (noise gate with a short hangover), so silence costs no traffic and the speaking icon goes off.
 func _pump() -> void:
 	var frames := _capture.get_frames_available()
 	if frames <= 0:
@@ -109,16 +120,31 @@ func _pump() -> void:
 	var buf := _capture.get_buffer(frames)
 	var step := float(RATE) / AudioServer.get_mix_rate()
 	for s in buf:
+		_acc += (s.x + s.y) * 0.5
+		_acc_n += 1
 		_phase += step
 		if _phase >= 1.0:
 			_phase -= 1.0
-			_pending.append((s.x + s.y) * 0.5)
+			_pending.append(_acc / _acc_n)
+			_acc = 0.0
+			_acc_n = 0
+	var gate := _open_mic()
 	while _pending.size() >= FRAME:
+		var frame := _pending.slice(0, FRAME)
+		_pending = _pending.slice(FRAME)
+		if gate:
+			var sum := 0.0
+			for v in frame:
+				sum += v * v
+			if sqrt(sum / FRAME) >= GATE_RMS:
+				_gate_open_until = _clock + GATE_HANGOVER
+			elif _clock > _gate_open_until:
+				continue
 		var packet := PackedByteArray()
 		packet.resize(FRAME)
 		for i in FRAME:
-			packet[i] = _mulaw_encode(_pending[i])
-		_pending = _pending.slice(FRAME)
+			packet[i] = _mulaw_encode(frame[i])
+		_last_heard[Net.local_id()] = _clock
 		_rpc_voice.rpc(packet)
 
 

@@ -14,7 +14,9 @@
   (`Repair_<piece>`, `Pickup_<n>`, `Station<i>`) because every peer builds the world from `Main.SEED`.
 - The design source of truth is `docs/GDD.md`. Open TODOs for local work: `docs/TODO_LOCAL.md`.
 - Before pushing: `godot --headless --path . --import` then `godot --headless --path . res://tests/TestTrain.tscn`,
-  `res://tests/TestRoute.tscn` and `res://tests/TestMenu.tscn` (all must print PASSED; TestMenu prints one expected
-  ConfigFile parse error), and `GODOT=<godot> tests/run_net_test.sh` (prints NET TEST PASSED; picks a random free port).
+  `res://tests/TestRoute.tscn` and `res://tests/TestMenu.tscn` (all must print PASSED, with no ERROR lines), and `GODOT=<godot> tests/run_net_test.sh` (prints NET TEST PASSED; picks a random free port).
 - Screenshot runs (`tests/Screenshot.tscn` under xvfb with opengl3) are slow on software rendering: allow up to
-  20 minutes per mode (`timeout 1200`).
+  20 minutes per mode (`timeout 1200`) and run the modes one after another. Each run clears its own old PNGs and
+  prints `DONE n shots`.
+- Modal windows use `Game.open_ui(id)` / `Game.close_ui(id)` (not `Game.ui_open = true/false`). Confirm dialogs:
+  `ConfirmCard.ask(...)`. Saves: `Game.save_slot` ("solo" / "host").

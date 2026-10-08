@@ -15,8 +15,10 @@ extends Node3D
 
 const SKIN := Color(1.0, 0.76, 0.6)
 const SLEEVE := Color(0.85, 0.55, 0.3)
-const RIGHT_REST := Vector3(0.36, -0.36, -0.62)
-const LEFT_REST := Vector3(-0.36, -0.36, -0.62)
+const RIGHT_REST := Vector3(0.42, -0.42, -0.62)
+const LEFT_REST := Vector3(-0.42, -0.42, -0.62)
+## Glove + sleeve size: small enough that the tool, not the glove, reads at mid-swing.
+const ARM_SCALE := 0.92
 const SWITCH_TIME := 0.34
 const DROP_TIME := 0.24
 
@@ -27,15 +29,15 @@ const DROP_TIME := 0.24
 const ANIMS := {
 	"hammer": {"len": 0.46, "event": 0.5, "keys": [
 		[0.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
-		[0.36, Vector3(0.05, 0.16, 0.1), Vector3(0.4, 0.0, 0.25), Vector3(1.1, 0.0, 0.1)],
+		[0.36, Vector3(0.05, 0.16, 0.1), Vector3(0.4, 0.0, 0.25), Vector3(0.95, 0.45, 0.1)],
 		[0.5, Vector3(-0.02, -0.1, -0.15), Vector3(-0.35, 0.0, 0.05), Vector3(-1.25, 0.0, 0.0)],
 		[0.62, Vector3(-0.02, -0.09, -0.14), Vector3(-0.3, 0.0, 0.05), Vector3(-1.1, 0.0, 0.0)],
 		[1.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]]},
 	"wrench": {"len": 0.6, "event": 0.62, "keys": [
 		[0.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
 		[0.25, Vector3(-0.12, 0.07, -0.12), Vector3(-0.2, 0.0, 0.0), Vector3(-0.6, 0.0, 0.0)],
-		[0.62, Vector3(-0.13, 0.05, -0.13), Vector3(-0.2, 0.0, -0.3), Vector3(-0.6, 0.0, -1.27)],
-		[0.74, Vector3(-0.13, 0.05, -0.13), Vector3(-0.2, 0.0, -0.3), Vector3(-0.6, 0.0, -1.27)],
+		[0.62, Vector3(-0.13, 0.05, -0.13), Vector3(-0.2, 0.0, -0.3), Vector3(-0.85, 0.0, -1.0)],
+		[0.74, Vector3(-0.13, 0.05, -0.13), Vector3(-0.2, 0.0, -0.3), Vector3(-0.85, 0.0, -1.0)],
 		[1.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]]},
 	"nail_gun": {"len": 0.3, "event": 0.0, "keys": [
 		[0.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
@@ -118,7 +120,7 @@ func setup(p: CharacterBody3D, cam: Camera3D) -> void:
 ## Leather work glove and jacket sleeve (Blender model arm.glb): hand at the pivot, forearm towards the camera.
 func _arm(pivot: Node3D) -> void:
 	var arm := Props.instance("arm")
-	arm.scale = Vector3.ONE * 1.15
+	arm.scale = Vector3.ONE * ARM_SCALE
 	if pivot == left:
 		arm.scale.x = -arm.scale.x  # mirrored for the left hand
 	pivot.add_child(arm)

@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvbticbo2jtct"
-path="res://.godot/imported/rail_rail_albedo.jpg-c03ac97e82b41a41076cd3c88d66d2e3.ctex"
+uid="uid://ct38lt2e5ohle"
+path="res://.godot/imported/nails_box_nails_box_albedo.jpg-4134890c1408cf5949eedb33393f77e2.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "ecc19ef702c7d10ef56eb23c96bb8a84"
+"md5": "2e6181d2b6d495090bc84d6080b93d0b"
 }
 
 [deps]
 
-source_file="res://assets/models/props/rail_rail_albedo.jpg"
-dest_files=["res://.godot/imported/rail_rail_albedo.jpg-c03ac97e82b41a41076cd3c88d66d2e3.ctex"]
+source_file="res://assets/models/props/nails_box_nails_box_albedo.jpg"
+dest_files=["res://.godot/imported/nails_box_nails_box_albedo.jpg-4134890c1408cf5949eedb33393f77e2.ctex"]
 
 [params]
 

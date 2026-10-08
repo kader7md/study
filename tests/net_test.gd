@@ -163,7 +163,12 @@ func _host() -> void:
 	Net.debug_force_impostor = true
 	print("Lobby")
 	check(Net.host_game(port) == OK and Net.is_online() and Net.is_host(), "hosting on port %d" % port)
-	check(Net.invite_code().length() == 11, "has an invite code (%s)" % Net.invite_code())
+	var lan_ok := Net.invite_code().length() == 11 if not Net.lan_addresses().is_empty() else Net.invite_code() == ""
+	check(lan_ok, "invite code: the LAN code, or none without a network (%s)" % Net.invite_code())
+	check(not InviteCode.decode(Net.invite_code(), Net.DEFAULT_PORT).get("ip", "").begins_with("127."), "never a loopback invite code")
+	check(Net.set_manual_public_ip("203.0.113.7") and Net.internet_code().length() == 11, "a typed public IP gives an internet code")
+	check(not Net.set_manual_public_ip("192.168.1.5"), "a LAN address is refused as the public IP")
+	Net.set_manual_public_ip("")
 	var joined := await _wait_until(func(): return Net.players.size() == 2, 30.0)
 	check(joined, "the client joined the lobby")
 	if not joined:
@@ -360,6 +365,12 @@ func _client() -> void:
 		check(host_player.get_node_or_null("Body") != null and not host_player.camera.visible, "the host's body shows, without floating arms")
 		check(host_player.display_name == "Host", "with the host's name")
 	check(main.get_node_or_null("WorldSync") != null, "world sync is running")
+	# buying at the departure station's shop: the host's inventory pays, the result comes back to us
+	var gold0 := Game.count("gold")
+	var nails0 := Game.count("nails")
+	check(Game.buy("nails") == null, "a client's buy is only a request (no fake success)")
+	check(await _wait_until(func(): return Game.count("nails") == nails0 + 10 and Game.count("gold") == gold0 - int(Game.SHOP.nails.price), 6.0),
+		"bought nails at the station shop (gold %d -> %d)" % [gold0, Game.count("gold")])
 	if shot_dir != "" and host_player:
 		_look_at_player(me, host_player)
 		await _wait(1.5)
@@ -565,15 +576,23 @@ func _crew_host() -> void:
 	var loaded := await _wait_until(func(): return _main() != null and ids.all(func(id: int): return Net.is_peer_ready(id)), 60.0)
 	check(loaded, "everyone loaded the world")
 	check(not Game.world_sabotage, "with 3 players the world does not sabotage (there is an impostor)")
+	check(Game.save_slot == "host", "an online run saves in the host slot")
 	var told := await _wait_until(func(): return _flags.size() >= 2, 30.0)
 	check(told, "both clients report their role (test only)")
 	var impostors := 1 if Game.role == "impostor" else 0
 	for id: String in _flags:
 		impostors += 1 if _flags[id] == "impostor" else 0
 	check(impostors == 1, "exactly one impostor among 3 players")
+	# one client (started with "rejoin") drops out and comes back with the same name
+	var back := await _wait_until(func(): return _flags.has("rejoined"), 50.0)
+	check(back, "a dropped player rejoined the running run")
+	if back:
+		var rid := int(_flags["rejoined"])
+		check(Net.players.size() == 3 and Net.player_node(rid) != null, "the rejoined player has a Player again (Player_%d)" % rid)
 	await _wait(0.5)
 	Net.leave_to_menu()
 	await _wait(1.0)
+	check(Game.world_sabotage and Game.save_slot == "solo", "after leaving, the world sabotages again (solo rule) and saves go to the solo slot")
 
 
 func _crew_client() -> void:
@@ -596,7 +615,18 @@ func _crew_client() -> void:
 	check(loaded, "in the world with a role (%s)" % ("?" if roles.is_empty() else roles[0]))
 	if loaded:
 		_tell.rpc_id(1, str(Net.local_id()), roles[0])
-	check(await _wait_until(func(): return _disconnect_reason != "", 30.0), "the host ended it: '%s'" % _disconnect_reason)
+	if loaded and OS.get_cmdline_user_args().has("rejoin"):
+		await _wait(2.0)
+		var my_name := Net.player_name(Net.local_id())
+		Net.leave_to_menu()
+		await _wait(1.5)
+		Net.local_name = my_name
+		Net.join_game("127.0.0.1:%d" % port)
+		var again := await _wait_until(func(): return _main() != null and _main().player != null and Net.run_active, 40.0)
+		check(again, "rejoined the run as %s and got a player" % my_name)
+		if again:
+			_tell.rpc_id(1, "rejoined", Net.local_id())
+	check(await _wait_until(func(): return _disconnect_reason != "", 40.0), "the host ended it: '%s'" % _disconnect_reason)
 
 
 # --- Latecomer (a third process) ------------------------------------------------------------

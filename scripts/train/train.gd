@@ -157,6 +157,13 @@ func mech_health() -> float:
 	return h
 
 
+## The furthest the front may go: the buffer stop just past the last platform, so the train always stops with its
+## middle inside the final station (and the run can end there).
+func end_of_line() -> float:
+	var last := track.station_distances[track.station_distances.size() - 1] if not track.station_distances.is_empty() else track.get_length()
+	return minf(track.get_length() - 1.0, last + Track.STATION_LENGTH * 0.5 + total_length * 0.5 - 2.0)
+
+
 func rear_distance() -> float:
 	return distance - total_length
 
@@ -210,8 +217,10 @@ func _physics_process(delta: float) -> void:
 		if gap >= 0.0:
 			new_front = gap + 0.01 + total_length
 			_hit_gap(track.blocking_gate(rear_distance(), rear_distance() + step) >= 0)
-	var limited := clampf(new_front, total_length + 1.0, track.get_length() - 1.0)
+	var limited := clampf(new_front, total_length + 1.0, end_of_line())
 	if limited != new_front:
+		if step > 0.0 and absf(speed) > 1.0 and limited >= end_of_line():
+			Game.say("The train rolls up to the buffer stop at the end of the line")
 		speed = 0.0
 	if limited > distance:
 		Game.add_stat("distance", limited - distance)
@@ -313,15 +322,25 @@ func _spawn_anchors(side: float) -> void:
 	found.sort_custom(func(a: Vector3, b: Vector3): return a.distance_to(center) < b.distance_to(center))
 	found = found.slice(0, 6)
 	if found.size() < 2:
-		# no trees nearby: big rocks to anchor to
+		# no trees nearby: big rocks to anchor to, on dry ground (not in the lake, not off a bridge)
 		for k in 2:
-			found.append(track.ground_point(d + (k - 0.5) * 8.0, -side * 12.0))
+			found.append(_dry_anchor_point(d + (k - 0.5) * 8.0, -side))
 	for p in found:
 		var a := AnchorSpot.new()
 		a.train = self
 		get_parent().add_child(a)
 		a.global_position = p
 		_anchors.append(a)
+
+
+## A dry ground point on the `dir` side of the track near distance d (tries 12, 8, 16 m out, then along the track).
+func _dry_anchor_point(d: float, dir: float) -> Vector3:
+	for along in [0.0, -10.0, 10.0, -20.0, 20.0]:
+		for u in [12.0, 8.0, 16.0]:
+			var p := track.ground_point(d + along, dir * u)
+			if p.y > Track.WATER_LEVEL + 0.5 and not track.is_bridge_at(d + along):
+				return p
+	return track.ground_point(d, dir * 8.0)
 
 
 func attach_hook(h: HookSpot) -> bool:

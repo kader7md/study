@@ -1,7 +1,7 @@
 """Builds the Trust Issues train, repair items and tools in Blender, bakes worn PBR-style textures, exports .glb.
 
 Run headless:
-    blender --background --python blender/scripts/build_assets.py -- <repo_root> [only=train,props,gate]
+    blender --background --python blender/scripts/build_assets.py -- <repo_root> [only=train,props,gate,rail,pickups]
 Or open Blender → Scripting tab → open this file → Run Script.
 
 Style: stylized realism (Sea of Thieves / Valheim direction): real proportions, rivets, bolts, iron straps,
@@ -76,6 +76,12 @@ MATS = {
     "lamp_red": ("lamp", (1.0, 0.1, 0.04), 0.0, 0.2),
     "concrete": ("rock", (0.36, 0.35, 0.33), 0.0, 0.9),
     "paper": ("canvas", (0.8, 0.72, 0.52), 0.0, 0.9),
+    # pickups
+    "gold_ore": ("brass", (1.0, 0.72, 0.16), 1.0, 0.28),
+    "ore_rock": ("rock", (0.13, 0.115, 0.1), 0.0, 0.9),
+    "coal_lump": ("rock", (0.045, 0.043, 0.045), 0.1, 0.45),
+    "rope": ("canvas", (0.55, 0.43, 0.25), 0.0, 0.95),
+    "rail_steel": ("iron", (0.3, 0.28, 0.26), 0.75, 0.45),
 }
 _mats = {}
 
@@ -776,11 +782,7 @@ def build_props():
     join("Plank", parts, origin=(0, 0, 0))
     bake_and_export(os.path.join(OUT_PROPS, "plank.glb"), 512)
 
-    clear_scene()
-    join("Rail", [box("rail_head", (0.08, 4.0, 0.05), (0, 0, 0.05), "steel", 0.008),
-                  box("rail_web", (0.03, 4.0, 0.08), (0, 0, 0.0), "rust", 0.004),
-                  box("rail_foot", (0.15, 4.0, 0.025), (0, 0, -0.05), "rust", 0.004)], origin=(0, 0, 0))
-    bake_and_export(os.path.join(OUT_PROPS, "rail.glb"), 512)
+    build_rail()
 
     clear_scene()
     # forged claw hammer: hickory handle with leather grip, steel head with curved claw
@@ -855,6 +857,169 @@ def build_props():
              cyl("worm", 0.012, 0.05, (0.0, 0, 0.215), "brass", axis="X", verts=10)]
     join("Wrench", parts, origin=(0, 0, -0.12))
     bake_and_export(os.path.join(OUT_PROPS, "wrench.glb"), 512)
+
+
+def build_rail():
+    """A 4 m length of flat-bottom rail: a rounded, worn steel head, a rusty web and foot, bolt holes and fishplates
+    at both ends (where the game bolts it), so a placed rail reads as a real rail instead of a bar."""
+    clear_scene()
+    parts = [box("rail_head", (0.075, 4.0, 0.045), (0, 0, 0.052), "rail_steel", 0.016),
+             box("rail_head_top", (0.06, 3.99, 0.012), (0, 0, 0.076), "steel", 0.005),
+             box("rail_web", (0.026, 4.0, 0.075), (0, 0, 0.0), "rust", 0.006),
+             box("rail_neck", (0.045, 4.0, 0.02), (0, 0, 0.03), "rust", 0.006),
+             box("rail_foot", (0.15, 4.0, 0.018), (0, 0, -0.048), "rust", 0.006),
+             box("rail_foot_slope", (0.07, 4.0, 0.016), (0, 0, -0.034), "rust", 0.006)]
+    for end in (-1, 1):
+        y = end * 1.82
+        for sx in (-1, 1):
+            parts.append(box(f"fish{end}{sx}", (0.012, 0.42, 0.055), (sx * 0.022, y, 0.0), "iron", 0.004))
+        for k in (-1, 1):
+            parts.append(cyl(f"bolt{end}{k}", 0.012, 0.08, (0, y + k * 0.11, 0.0), "steel", axis="X", verts=8))
+            for sx in (-1, 1):
+                parts.append(cyl(f"nut{end}{k}{sx}", 0.018, 0.012, (sx * 0.034, y + k * 0.11, 0.0), "iron", axis="X", verts=6))
+    join("Rail", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "rail.glb"), 512)
+
+
+# --- Trackside pickups: gold ore, coal, scrap, planks, nails, supply crate ----------------------
+
+def lump(name, radius, loc, material, scale=(1, 1, 1), jitter=0.22, subdiv=2, seed=0):
+    """Irregular rock / ore lump: an icosphere with its vertices pushed in and out (flat shaded, chunky)."""
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=subdiv, radius=radius, location=loc)
+    obj = bpy.context.active_object
+    obj.scale = scale
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    rng = random.Random(seed)
+    for v in obj.data.vertices:
+        k = 1.0 + rng.uniform(-jitter, jitter)
+        v.co = v.co * k
+    obj.name = name
+    obj.data.materials.append(mat(material))
+    for poly in obj.data.polygons:
+        poly.use_smooth = False
+    return obj
+
+
+def build_gold_ore():
+    """gold_ore.glb: a dark boulder crusted all over its upper half with gold nuggets of many sizes, plus a few loose
+    crumbs at its foot, so it reads as gold from every side (no evenly spaced round "eyes")."""
+    clear_scene()
+    parts = [lump("boulder", 0.8, (0, 0, 0.62), "ore_rock", (1.15, 0.95, 0.85), 0.14, 3, 11),
+             lump("boulder2", 0.5, (0.62, 0.38, 0.33), "ore_rock", (1.0, 0.9, 0.75), 0.2, 2, 12),
+             lump("boulder3", 0.38, (-0.72, -0.34, 0.25), "ore_rock", (1.1, 0.9, 0.7), 0.22, 2, 13)]
+    rng = random.Random(5)
+    golden = 2.39996  # golden-angle spiral: even but irregular-looking cover
+    for k in range(34):
+        t = (k + 0.5) / 34.0
+        zc = 0.15 + 0.85 * t          # 0.15..1 of the way up the boulder
+        ring = math.sqrt(max(1.0 - zc * zc, 0.0))
+        a = k * golden + rng.uniform(-0.3, 0.3)
+        nx, ny, nz = math.cos(a) * ring, math.sin(a) * ring, zc
+        sx, sy, sz = 0.8 * 1.15, 0.8 * 0.95, 0.8 * 0.85
+        p = (nx * sx * 0.97, ny * sy * 0.97, 0.62 + nz * sz * 0.97)
+        r = rng.uniform(0.06, 0.1) if k % 4 else rng.uniform(0.12, 0.17)
+        parts.append(lump(f"nugget{k}", r, p, "gold_ore", (1.25, 1.0, 0.65), 0.35, 1, 100 + k))
+    for k in range(6):
+        a = rng.uniform(0, math.tau)
+        parts.append(lump(f"crumb{k}", rng.uniform(0.06, 0.1), (math.cos(a) * 1.05, math.sin(a) * 0.95, 0.05), "gold_ore", (1, 1, 0.6), 0.3, 1, 300 + k))
+    join("GoldOre", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "gold_ore.glb"), 1024)
+
+
+def build_pickups():
+    build_gold_ore()
+
+    # coal: a heap of glossy black lumps on a few sacking scraps
+    clear_scene()
+    parts = [box("sack", (0.8, 0.7, 0.02), (0, 0, 0.01), "canvas", 0.01, rot=(0, 0, math.radians(12)))]
+    rng = random.Random(9)
+    for k in range(22):
+        ring = 0 if k < 5 else (1 if k < 13 else 2)
+        a = rng.uniform(0, math.tau)
+        d = (0.05, 0.2, 0.32)[ring]
+        z = (0.24, 0.14, 0.07)[ring] + rng.uniform(-0.03, 0.03)
+        parts.append(lump(f"coal{k}", rng.uniform(0.07, 0.12), (math.cos(a) * d, math.sin(a) * d, z), "coal_lump", (1.2, 1.0, 0.8), 0.3, 1, 400 + k))
+    join("CoalPile", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "coal_pile.glb"), 512)
+
+    # scrap: a bent plate, a rail offcut, a cog, a pipe and loose bolts
+    clear_scene()
+    parts = [box("plate", (0.5, 0.36, 0.02), (0.02, 0.02, 0.05), "rust", 0.006, rot=(math.radians(8), math.radians(-6), math.radians(20))),
+             box("plate_bend", (0.18, 0.36, 0.02), (0.3, 0.1, 0.12), "rust", 0.006, rot=(math.radians(8), math.radians(-40), math.radians(20))),
+             box("offcut_head", (0.06, 0.6, 0.04), (-0.18, -0.05, 0.12), "rail_steel", 0.01, rot=(0, 0, math.radians(-35))),
+             box("offcut_web", (0.022, 0.6, 0.06), (-0.18, -0.05, 0.08), "rust", 0.004, rot=(0, 0, math.radians(-35))),
+             box("offcut_foot", (0.12, 0.6, 0.016), (-0.18, -0.05, 0.045), "rust", 0.004, rot=(0, 0, math.radians(-35))),
+             cyl("cog", 0.13, 0.04, (0.12, -0.2, 0.2), "iron", verts=24, rot=(math.radians(70), 0, math.radians(15))),
+             cyl("cog_hub", 0.04, 0.07, (0.12, -0.2, 0.2), "steel", verts=12, rot=(math.radians(70), 0, math.radians(15))),
+             rod("pipe", (-0.3, 0.25, 0.05), (0.15, 0.32, 0.18), 0.04, "black_paint", 14)]
+    for k in range(10):
+        a = math.tau * k / 10
+        parts.append(box(f"tooth{k}", (0.05, 0.04, 0.04), (0.12 + math.cos(a) * 0.15, -0.2 + math.sin(a) * 0.05, 0.2 + math.sin(a) * 0.14), "iron", 0.004,
+                         rot=(math.radians(70), 0, math.radians(15))))
+    for k, (x, y) in enumerate(((0.3, -0.3), (-0.35, -0.25), (0.05, 0.38), (-0.05, -0.35))):
+        parts.append(cyl(f"bolt{k}", 0.014, 0.1, (x, y, 0.02), "steel", axis="X", verts=8, rot=(0, math.radians(90), k * 0.9)))
+        parts.append(cyl(f"nut{k}", 0.024, 0.02, (x + 0.04, y, 0.02), "iron", verts=6, rot=(0, math.radians(90), k * 0.9)))
+    join("ScrapPile", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "scrap_pile.glb"), 512)
+
+    # planks: a bundle of five boards tied with two rope bands
+    clear_scene()
+    parts = []
+    for k, (y, z) in enumerate(((-0.1, 0.04), (0.0, 0.04), (0.1, 0.04), (-0.05, 0.11), (0.05, 0.11))):
+        parts.append(box(f"board{k}", (1.2 + 0.04 * (k % 2), 0.095, 0.06), (0.02 * (k - 2), y, z), "wood_grey" if k % 2 else "wood", 0.006))
+    for x in (-0.38, 0.38):
+        parts.append(box(f"band{x}", (0.04, 0.3, 0.02), (x, 0, 0.15), "rope", 0.006))
+        for sy in (-1, 1):
+            parts.append(box(f"band_side{x}{sy}", (0.04, 0.02, 0.15), (x, sy * 0.15, 0.08), "rope", 0.006))
+        parts.append(box(f"band_knot{x}", (0.06, 0.05, 0.035), (x, 0.0, 0.165), "rope", 0.012))
+    join("WoodBundle", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "wood_bundle.glb"), 512)
+
+    # nails: a small open slatted crate with a heap of nail heads and a paper label
+    clear_scene()
+    parts = [box("bottom", (0.6, 0.45, 0.03), (0, 0, 0.015), "wood_dark", 0.005)]
+    for sy in (-1, 1):
+        for k in range(2):
+            parts.append(box(f"side{sy}{k}", (0.6, 0.025, 0.14), (0, sy * 0.212, 0.09 + k * 0.16), "wood", 0.006))
+    for sx in (-1, 1):
+        for k in range(2):
+            parts.append(box(f"end{sx}{k}", (0.025, 0.45, 0.14), (sx * 0.29, 0, 0.09 + k * 0.16), "wood", 0.006))
+        parts.append(box(f"handle{sx}", (0.03, 0.18, 0.04), (sx * 0.31, 0, 0.3), "wood_dark", 0.008))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            parts.append(box(f"corner{sx}{sy}", (0.035, 0.035, 0.34), (sx * 0.285, sy * 0.208, 0.17), "iron", 0.004))
+    parts.append(box("heap", (0.52, 0.38, 0.04), (0, 0, 0.27), "steel", 0.02))
+    rng = random.Random(3)
+    for k in range(26):
+        x, y = rng.uniform(-0.23, 0.23), rng.uniform(-0.16, 0.16)
+        parts.append(cyl(f"head{k}", 0.018, 0.008, (x, y, 0.295 + rng.uniform(0, 0.02)), "steel", verts=8, rot=(rng.uniform(-0.6, 0.6), rng.uniform(-0.6, 0.6), 0)))
+    parts.append(box("label", (0.3, 0.004, 0.09), (0, -0.226, 0.17), "paper", 0.002))
+    parts.append(box("label_band", (0.3, 0.006, 0.02), (0, -0.227, 0.2), "signal_red", 0.002))
+    join("NailsBox", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "nails_box.glb"), 512)
+
+    # supply crate: a sturdy plank crate with iron corners, a stencil band and a canvas tarp roped on top
+    clear_scene()
+    w, d, h = 1.0, 0.8, 0.62
+    parts = [box("core", (w - 0.04, d - 0.04, h - 0.04), (0, 0, h / 2), "wood_dark", 0.01)]
+    for k in range(3):
+        z = 0.1 + k * 0.21
+        for sy in (-1, 1):
+            parts.append(box(f"slat_y{sy}{k}", (w, 0.03, 0.19), (0, sy * d / 2, z), "wood", 0.008))
+        for sx in (-1, 1):
+            parts.append(box(f"slat_x{sx}{k}", (0.03, d, 0.19), (sx * w / 2, 0, z), "wood", 0.008))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            parts.append(box(f"post{sx}{sy}", (0.07, 0.07, h + 0.02), (sx * (w / 2 - 0.01), sy * (d / 2 - 0.01), h / 2), "wood_dark", 0.01))
+            parts.append(box(f"cap{sx}{sy}", (0.09, 0.09, 0.08), (sx * (w / 2 - 0.01), sy * (d / 2 - 0.01), h - 0.02), "iron", 0.008))
+            parts.append(box(f"foot{sx}{sy}", (0.09, 0.09, 0.08), (sx * (w / 2 - 0.01), sy * (d / 2 - 0.01), 0.04), "iron", 0.008))
+    parts.append(box("band", (w + 0.02, d + 0.02, 0.05), (0, 0, h * 0.55), "signal_red", 0.004))
+    parts.append(box("tarp", (w - 0.06, d - 0.04, 0.1), (0, 0, h + 0.04), "canvas", 0.04))
+    parts.append(box("tarp_hang", (w - 0.2, 0.03, 0.16), (0, -d / 2 - 0.01, h - 0.04), "canvas", 0.01))
+    for x in (-0.25, 0.25):
+        parts.append(box(f"rope{x}", (0.03, d + 0.06, 0.03), (x, 0, h + 0.1), "rope", 0.008))
+    join("SupplyCrate", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "supply_crate.glb"), 1024)
 
 
 # --- Locked track gate, its signal post and the key ------------------------------------------
@@ -996,4 +1161,10 @@ if __name__ == "__main__":
         build_props()
     if ONLY is None or "gate" in ONLY:
         build_gate_props()
+    if ONLY is not None and "rail" in ONLY:
+        build_rail()
+    if ONLY is None or "pickups" in ONLY:
+        build_pickups()
+    elif "gold" in ONLY:
+        build_gold_ore()
     print("done")

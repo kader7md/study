@@ -17,7 +17,11 @@ signal run_finished(run_stats: Dictionary)
 
 ## Checkpoint stations after the departure station (index 0). Station 5 is the last one (the port).
 const STATION_COUNT := 5
-const SAVE_PATH := "user://checkpoint.json"
+## Solo and hosted runs keep separate saves, so an online session never overwrites the solo run (and back).
+const SAVE_PATH := "user://checkpoint_solo.json"
+const HOST_SAVE_PATH := "user://checkpoint_host.json"
+## Saves from before the split (read as the solo save when there is no solo save yet).
+const LEGACY_SAVE_PATH := "user://checkpoint.json"
 const MENU_SCENE := "res://scenes/menu/MainMenu.tscn"
 const MAIN_SCENE := "res://scenes/main/Main.tscn"
 
@@ -69,10 +73,22 @@ var wind_active := false:
 		if wind_active != value:
 			wind_active = value
 			wind_changed.emit(value)
-var ui_open := false:
+## Modal windows that are open right now (shop, pause menu, end screen...): id -> true. While any is open the mouse
+## is free. Use open_ui(id) / close_ui(id), so closing one window never releases another's lock.
+var _ui_windows: Dictionary = {}
+## True while any modal window is open. Setting it false closes every lock (scene changes, resets); setting it true
+## opens an anonymous one (prefer open_ui).
+var ui_open: bool:
+	get:
+		return not _ui_windows.is_empty()
 	set(value):
-		ui_open = value
-		ui_changed.emit(value)
+		if value:
+			open_ui(&"_other")
+		elif not _ui_windows.is_empty():
+			_ui_windows.clear()
+			ui_changed.emit(false)
+## Which save slot this run writes: "solo" (offline) or "host" (an online run, saved on the host).
+var save_slot := "solo"
 
 ## Run statistics (see STAT_KEYS). Time runs from leaving station 0 and stops while the game is paused.
 var stats: Dictionary = {}
@@ -103,6 +119,26 @@ func _ready() -> void:
 	new_game(false)
 
 
+## A modal window opens: the mouse is freed until every open window has closed again.
+func open_ui(id: StringName) -> void:
+	var was := ui_open
+	_ui_windows[id] = true
+	if not was:
+		ui_changed.emit(true)
+
+
+func close_ui(id: StringName) -> void:
+	if not _ui_windows.has(id):
+		return
+	_ui_windows.erase(id)
+	if _ui_windows.is_empty():
+		ui_changed.emit(false)
+
+
+func is_ui_open(id: StringName) -> bool:
+	return _ui_windows.has(id)
+
+
 func _setup_input() -> void:
 	for action: String in INPUTS:
 		if InputMap.has_action(action):
@@ -126,8 +162,7 @@ func _process(delta: float) -> void:
 
 
 func debug_keys_enabled() -> bool:
-	var settings := get_node_or_null(^"/root/Settings")
-	return debug_keys or (settings != null and bool(settings.get_value("developer", "debug_keys", false)))
+	return debug_keys or bool(Settings.get_value("developer", "debug_keys", false))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -152,20 +187,18 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## NET: true offline and on the host: only the host changes game state (clients get it from Net / WorldSync).
 func is_host() -> bool:
-	var net := get_node_or_null(^"/root/Net")
-	return net == null or net.is_host()
+	return Net.is_host()
 
 
 func _net_online() -> bool:
-	var net := get_node_or_null(^"/root/Net")
-	return net != null and net.is_online()
+	return Net.is_online()
 
 
 ## NET: reloads the world: online the host reloads every peer, a client never does it on its own.
 func _reload_world() -> void:
 	if _net_online():
 		if is_host():
-			get_node(^"/root/Net").reload_world.call_deferred()
+			Net.reload_world.call_deferred()
 		return
 	get_tree().reload_current_scene.call_deferred()
 
@@ -212,10 +245,14 @@ static func cost_text(cost: Dictionary) -> String:
 	return ", ".join(parts)
 
 
-func buy(item_id: String) -> bool:
+## Host / offline: buys item_id with the crew's gold (true when bought). On a client it only sends the request and
+## returns null: the result (inventory, message) comes back from the host.
+func buy(item_id: String) -> Variant:
 	if not is_host():
-		get_node(^"/root/Net").request(self, &"buy", [item_id])  # NET: the host's inventory pays
-		return true
+		Net.request(self, &"buy", [item_id])  # NET: the host's inventory pays
+		return null
+	if not SHOP.has(item_id):
+		return false
 	var entry: Dictionary = SHOP[item_id]
 	if not take("gold", entry.price):
 		say("Not enough gold for %s (%d gold)" % [entry.label, entry.price])
@@ -260,27 +297,25 @@ func on_gate_opened(segment: int) -> void:
 func say(text: String) -> void:
 	print("[game] ", text)
 	# NET: on the host, feedback to a client's request goes to that client only
-	var net := get_node_or_null(^"/root/Net")
-	if net and net.route_message(text):
+	if Net.route_message(text):
 		return
 	message.emit(text)
 
 
 func show_banner(text: String) -> void:
 	print("[banner] ", text)
-	var net := get_node_or_null(^"/root/Net")
-	if net:
-		net.route_banner(text)  # NET: the host's banners show for everyone
+	Net.route_banner(text)  # NET: the host's banners show for everyone
 	banner.emit(text)
 
 
 # --- Stations, checkpoints, game over --------------------------------------
 
 ## Called by the train when it comes to a stop inside a station.
+## A station further on than next_station counts too (the train rolled through the one before without stopping).
 func on_train_stopped_at_station(index: int) -> void:
-	if index != next_station:
+	if index < next_station:
 		return
-	next_station += 1
+	next_station = index + 1
 	revive_all()
 	if index >= STATION_COUNT:
 		run_timing = false
@@ -305,17 +340,27 @@ func save_checkpoint(station_index: int) -> void:
 		"gates": opened_gates.duplicate(),
 		"complete": run_complete,
 	}
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if not is_host():
+		return  # NET: only the host keeps the run's save
+	var f := FileAccess.open(save_path(save_slot), FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(checkpoint))
 
 
-## The checkpoint saved on disk (user://checkpoint.json), or {} when there is none or it is unusable.
-## Finished runs are not offered for Continue.
-static func read_save() -> Dictionary:
-	if not FileAccess.file_exists(SAVE_PATH):
+## The file of a save slot ("solo" or "host").
+static func save_path(slot: String) -> String:
+	return HOST_SAVE_PATH if slot == "host" else SAVE_PATH
+
+
+## The checkpoint saved on disk in `slot` ("solo" or "host"), or {} when there is none or it is unusable.
+## Finished runs are not offered for Continue. The solo slot falls back to a save from before the split.
+static func read_save(slot := "solo") -> Dictionary:
+	var path := save_path(slot)
+	if not FileAccess.file_exists(path) and slot == "solo":
+		path = LEGACY_SAVE_PATH
+	if not FileAccess.file_exists(path):
 		return {}
-	var text := FileAccess.get_file_as_string(SAVE_PATH)
+	var text := FileAccess.get_file_as_string(path)
 	var data: Variant = JSON.parse_string(text)
 	if not data is Dictionary:
 		return {}
@@ -338,14 +383,14 @@ static func read_save() -> Dictionary:
 
 
 ## Station number of the save on disk (for "Continue (station N)"), or -1 when there is none.
-static func saved_station() -> int:
-	var d := read_save()
+static func saved_station(slot := "solo") -> int:
+	var d := read_save(slot)
 	return int(d.station) if not d.is_empty() else -1
 
 
 ## Prepares the run state from the save on disk (Main then builds the world at that station). False if no save.
-func continue_from_save() -> bool:
-	var d := read_save()
+func continue_from_save(slot := "solo") -> bool:
+	var d := read_save(slot)
 	if d.is_empty():
 		return false
 	use_checkpoint(d)
@@ -365,9 +410,24 @@ func use_checkpoint(cp: Dictionary) -> void:
 
 
 func on_player_downed(_player: Node) -> void:
+	check_crew_wipe()
+
+
+## Host: when every player still in the run is down (someone went down, or the last one standing left the game),
+## the crew is lost and the run goes back to the last checkpoint.
+func check_crew_wipe() -> void:
+	if not is_host() or not is_instance_valid(track) or not track.is_inside_tree():
+		return
+	var alive := 0
+	var total := 0
 	for p in get_tree().get_nodes_in_group("player"):
+		if p.is_queued_for_deletion():
+			continue
+		total += 1
 		if not p.downed:
-			return
+			alive += 1
+	if total == 0 or alive > 0:
+		return
 	# TODO(M4/M5): if only the impostor is alive, they choose: kill themself (crew loses) or revive everyone.
 	show_banner("THE CREW IS DEAD\nBack to the last checkpoint…")
 	crew_lost.emit()
@@ -435,9 +495,9 @@ func new_game(reload: bool) -> void:
 ## Leaves the run: closes the network session (online, the host tells everyone it ended the run), then goes to the
 ## main menu. The checkpoint on disk stays, so the main menu offers Continue.
 func return_to_menu() -> void:
-	var net := get_node_or_null(^"/root/Net")
-	if net:
-		net.end_session("The host ended the run")
+	Net.end_session("The host ended the run")
+	world_sabotage = true  # the next run decides again (Net.start_run turns it off with an impostor)
+	save_slot = "solo"
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	new_game(false)

@@ -40,6 +40,7 @@ var _snap_distance := 0.0
 var _snap_speed := 0.0
 var _snap_age := 0.0
 var _has_snap := false
+var _tree_size := 0         # nodes under Main after name_tree (host and clients must agree)
 var _puppets := {}          # name -> {"node": Node3D, "pos": Vector3, "rot": Quaternion}
 
 
@@ -50,6 +51,7 @@ func setup(main_node: Node) -> void:
 	_host = Net.is_host()
 	process_physics_priority = -10  # before Train, so the cars use this frame's distance
 	name_tree(main)
+	_tree_size = count_tree(main)
 	if train:
 		_hooks.assign(train.cars[0].find_children("*", "HookSpot", true, false))
 	if _host:
@@ -61,6 +63,16 @@ func setup(main_node: Node) -> void:
 		Game.run_finished.connect(_on_run_finished)
 		Game.objective_changed.connect(_on_objective_changed)
 		main.child_entered_tree.connect(_on_main_child)
+
+
+## Number of nodes name_tree walks (a cheap checksum: a peer whose world was built differently has another count).
+static func count_tree(root: Node) -> int:
+	var n := 0
+	for c in root.get_children():
+		if c is Player or c is MultiplayerSpawner or c is WorldSync:
+			continue
+		n += 1 + count_tree(c)
+	return n
 
 
 ## Gives every auto-named node ("@Area3D@123") a name that is the same on every peer: "<Class>_<n>" by order among its
@@ -121,7 +133,7 @@ func snapshot() -> Dictionary:
 	for i in Train.MAX_WHEELS:
 		states.append(train.wheel_state(i))
 		wear.append(train.wheel_wear[i])
-		bolt_hits.append(int(train.wheel_slot(i).get("_hits")))
+		bolt_hits.append(train.wheel_slot(i).net_hits())
 	var cds := PackedFloat32Array()
 	if Game.sabotage:
 		for id: String in SabotageManager.ABILITIES:
@@ -258,6 +270,7 @@ func send_full_state(peer: int) -> void:
 	for seg in track.gate_count():
 		gates.append(track.is_gate_locked(seg))
 	var state := {
+		"tree": _tree_size,
 		"broken": _poll_repairs(true),
 		"rolls": rolls,
 		"gone": _gone,
@@ -364,7 +377,8 @@ func _name_dynamic(node: Node) -> void:
 		prefix = "Eagle"
 	elif node is FallenPart:
 		prefix = "Fallen"
-		node.set_meta("net_part", _part_index_of(node))
+		if not node.has_meta("net_part") or int(node.get_meta("net_part")) < 0:
+			node.set_meta("net_part", _part_index_of(node))
 	elif node is AnchorSpot:
 		prefix = "Anchor"
 	elif node is Meteor:
@@ -449,7 +463,7 @@ func _rpc_snapshot(s: Dictionary) -> void:
 	for i in mini(states.size(), Train.MAX_WHEELS):
 		train.net_set_wheel(i, states[i], wear[i])
 		if i < bolt_hits.size():
-			train.wheel_slot(i).set("_hits", bolt_hits[i])  # the "Bolt the wheel 1/3" prompt
+			train.wheel_slot(i).net_set_hits(bolt_hits[i])  # the "Bolt the wheel 1/3" prompt
 	var g: Array = s.g
 	Game.next_station = g[0]
 	Game.wind_active = g[1]
@@ -523,6 +537,8 @@ func _make_puppet(n: String, e: Array) -> Node3D:
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_full_state(s: Dictionary) -> void:
+	if OS.is_debug_build() and int(s.get("tree", _tree_size)) != _tree_size:
+		push_error("WorldSync: this world has %d named nodes, the host's has %d: node paths will not match" % [_tree_size, int(s.get("tree", 0))])
 	var host_broken := {}
 	for e: Array in s.broken:
 		host_broken[int(e[0])] = e
@@ -625,7 +641,7 @@ func _apply_part(index: int, st: Array) -> void:
 		var slot := p.slot()
 		if is_instance_valid(slot):
 			slot.queue_free()
-		p._on_placed(null)  # shows the piece and adds its nails / welds
+		p.net_place_pending()  # shows the piece and adds its nails / welds
 	_name_part_nodes(p)
 	if pending:
 		var progress: Array = st[3]

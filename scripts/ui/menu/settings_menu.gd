@@ -191,15 +191,20 @@ func _slider(row: HBoxContainer, min_v: float, max_v: float, step: float, fmt: C
 	return s
 
 
-func _option(row: HBoxContainer, items: Array, section: String, key: String) -> OptionButton:
+## A dropdown for Settings[section][key]. The setting stores the item index, or with `values` the value at that index.
+func _option(row: HBoxContainer, items: Array, section: String, key: String, values: Array = []) -> OptionButton:
 	var o := OptionButton.new()
 	o.custom_minimum_size = Vector2(300, 42)
 	o.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	for it: Variant in items:
 		o.add_item(str(it))
 	row.add_child(o)
-	_sync.append(func() -> void: o.select(clampi(int(Settings.get_value(section, key)), 0, items.size() - 1)))
-	o.item_selected.connect(func(i: int) -> void: Settings.set_value(section, key, i))
+	if values.is_empty():
+		_sync.append(func() -> void: o.select(clampi(int(Settings.get_value(section, key)), 0, items.size() - 1)))
+		o.item_selected.connect(func(i: int) -> void: Settings.set_value(section, key, i))
+	else:
+		_sync.append(func() -> void: o.select(maxi(values.find(type_convert(Settings.get_value(section, key), typeof(values[0]))), 0)))
+		o.item_selected.connect(func(i: int) -> void: Settings.set_value(section, key, values[i]))
 	return o
 
 
@@ -312,12 +317,8 @@ func _build_graphics_tab() -> void:
 	var fps_names: Array[String] = []
 	for f: int in Settings.FPS_LIMITS:
 		fps_names.append("Unlimited" if f == 0 else "%d FPS" % f)
-	var fps := _option(_row(page, "Max FPS"), fps_names, "graphics", "max_fps")
 	# max_fps stores the FPS value, not the index
-	_sync.append(func() -> void: fps.select(maxi(Settings.FPS_LIMITS.find(int(Settings.get_value("graphics", "max_fps"))), 0)))
-	for c in fps.item_selected.get_connections():
-		fps.item_selected.disconnect(c.callable)
-	fps.item_selected.connect(func(i: int) -> void: Settings.set_value("graphics", "max_fps", Settings.FPS_LIMITS[i]))
+	_option(_row(page, "Max FPS"), fps_names, "graphics", "max_fps", Settings.FPS_LIMITS)
 
 	_header(page, "Quality")
 	_slider(_row(page, "Resolution scale", "Lower = faster, softer 3D"), 50, 100, 5,

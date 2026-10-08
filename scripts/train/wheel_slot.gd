@@ -8,6 +8,15 @@ var index := 0
 var _hits := 0
 
 
+## NET: bolt hits so far (WorldSync sends them so the "Bolt the wheel 1/3" prompt matches the host).
+func net_hits() -> int:
+	return _hits
+
+
+func net_set_hits(n: int) -> void:
+	_hits = n
+
+
 func get_prompt(player: Node) -> String:
 	match train.wheel_state(index):
 		1:

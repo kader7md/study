@@ -5,14 +5,27 @@ extends Node
 ## station: station 1 (canopy, name board, shop kiosk) from the track and from the platform.
 ## gate: locked gate and key. end: Chapter 1 end screen. tools: tool animations and carry poses.
 
+## Each run first deletes the old PNGs of its own mode in <output_dir> (so a run that times out leaves no stale
+## pictures that look fresh) and prints "DONE n shots" when it finishes. Run the modes one after another:
+## on software rendering each takes several minutes, and parallel runs starve each other.
+
 var main: Node3D
 var out := "user://"
 var free_cam: Camera3D
+var shot_count := 0
+
+## File name prefixes each mode writes (the default run writes the numbered landscape / repair / train shots).
+const MODE_PREFIXES := {
+	"menu": ["menu_"], "hud": ["hud_"], "gate": ["gate_"], "end": ["end_"], "tools": ["tool_", "carry_"],
+	"station": ["station_"], "repair": ["6_", "7_"], "train": ["8_", "9_"],
+}
 
 
 func _ready() -> void:
 	if OS.get_cmdline_user_args().size() > 0:
 		out = OS.get_cmdline_user_args()[0]
+	_clear_old(OS.get_cmdline_user_args())
+	tree_exiting.connect(func() -> void: print("DONE %d shots" % shot_count))
 	if OS.get_cmdline_user_args().has("menu"):
 		await _menu_shots()
 		get_tree().quit()
@@ -186,6 +199,7 @@ func _hud_shots(track: Track, train: Train, player: Player) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
 	img.save_png("%s/hud_5_play_1280x720.png" % out)
+	shot_count += 1
 	print("saved hud_5_play_1280x720")
 func _gate_shots(track: Track, train: Train, player: Player) -> void:
 	var seg := 0
@@ -321,4 +335,20 @@ func _shot(name: String, settle := 0.4) -> void:
 		await get_tree().create_timer(settle).timeout
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("%s/%s.png" % [out, name])
+	shot_count += 1
 	print("saved ", name)
+
+
+func _clear_old(args: PackedStringArray) -> void:
+	var prefixes: Array = []
+	for mode: String in MODE_PREFIXES:
+		if args.has(mode):
+			prefixes.append_array(MODE_PREFIXES[mode])
+	if prefixes.is_empty():
+		prefixes = ["1_", "2_", "3_", "4_", "5_", "6_", "7_", "8_", "9_"]
+	var dir := DirAccess.open(out)
+	if dir == null:
+		return
+	for f in dir.get_files():
+		if f.ends_with(".png") and prefixes.any(func(p: String) -> bool: return f.begins_with(p)):
+			dir.remove(f)

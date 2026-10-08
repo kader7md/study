@@ -96,7 +96,8 @@ func _ready() -> void:
 
 	Game.wind_changed.connect(_on_wind_changed)
 	if start_station == 0:
-		Game.show_banner("TRUST ISSUES\nShe was taken. Follow the tracker: 5 stations to go.\nShovel coal, push the lever, repair the rails.")
+		print("[banner] TRUST ISSUES (intro)")
+		hud.show_intro("TRUST ISSUES", "She was taken. Follow the tracker: 5 stations to go.")
 	else:
 		Game.show_banner("Back at Station %d" % start_station)
 

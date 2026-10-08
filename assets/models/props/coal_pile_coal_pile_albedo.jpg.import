@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvbticbo2jtct"
-path="res://.godot/imported/rail_rail_albedo.jpg-c03ac97e82b41a41076cd3c88d66d2e3.ctex"
+uid="uid://cwic7p477bid2"
+path="res://.godot/imported/coal_pile_coal_pile_albedo.jpg-e33da9a6efaa5a658ef99d66266c571a.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "ecc19ef702c7d10ef56eb23c96bb8a84"
+"md5": "41e82e252b4fa45a6063d66580f29bd6"
 }
 
 [deps]
 
-source_file="res://assets/models/props/rail_rail_albedo.jpg"
-dest_files=["res://.godot/imported/rail_rail_albedo.jpg-c03ac97e82b41a41076cd3c88d66d2e3.ctex"]
+source_file="res://assets/models/props/coal_pile_coal_pile_albedo.jpg"
+dest_files=["res://.godot/imported/coal_pile_coal_pile_albedo.jpg-e33da9a6efaa5a658ef99d66266c571a.ctex"]
 
 [params]
 

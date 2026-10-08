@@ -59,11 +59,11 @@ func supports_upnp() -> bool:
 
 func describe_invite(port: int) -> Dictionary:
 	var lan := lan_addresses()
-	var ip := lan[0] if not lan.is_empty() else "127.0.0.1"
+	var ip := lan[0] if not lan.is_empty() else ""
 	var lines := PackedStringArray()
 	for a in lan:
 		lines.append("%s:%d" % [a, port])
-	return {"code": InviteCode.encode(ip, port), "ip": ip, "lines": lines}
+	return {"code": InviteCode.encode(ip, port) if ip != "" else "", "ip": ip, "lines": lines}
 
 
 ## The PC's IPv4 addresses on its local networks, best guess first (192.168.x before 10.x and 172.16-31.x).
@@ -101,6 +101,18 @@ func open_upnp(port: int) -> Dictionary:
 	_upnp_port = port
 	var external := upnp.query_external_address()
 	return {"ok": true, "external_ip": external, "text": "Port %d is open on the router (UPnP)" % port}
+
+
+## Blocking (seconds): asks the router for the network's public IP without mapping any port. "" when there is no
+## UPnP router. Run it on a thread.
+static func query_public_ip() -> String:
+	var upnp := UPNP.new()
+	if upnp.discover(1500, 2, "InternetGatewayDevice") != UPNP.UPNP_RESULT_SUCCESS:
+		return ""
+	var gateway := upnp.get_gateway()
+	if gateway == null or not gateway.is_valid_gateway():
+		return ""
+	return upnp.query_external_address()
 
 
 ## Blocking: removes the UPnP mapping again (if we made one).

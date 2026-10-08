@@ -47,13 +47,15 @@ wait "$HOST_PID"; HOST_CODE=$?
 wait "$CLIENT_PID"; CLIENT_CODE=$?
 wait "$LATE_PID"; LATE_CODE=$?
 
-# Three players without the debug override: the real "one secret impostor" rule.
+# Three players without the debug override: the real "one secret impostor" rule, and a player who drops and rejoins.
 CREW_PORT=$((PORT + 1))
-timeout 90 "$GODOT" --headless --path . res://tests/NetTest.tscn -- crew_host --port "$CREW_PORT" >"$LOGS/crew_host.log" 2>&1 &
+timeout 150 "$GODOT" --headless --path . res://tests/NetTest.tscn -- crew_host --port "$CREW_PORT" >"$LOGS/crew_host.log" 2>&1 &
 CREW_HOST_PID=$!
 sleep 1
 for n in 1 2; do
-	timeout 90 "$GODOT" --headless --path . res://tests/NetTest.tscn -- crew_client --port "$CREW_PORT" >"$LOGS/crew_client$n.log" 2>&1 &
+	# the second crew client drops out mid-run and rejoins with the same name
+	EXTRA=""; [ "$n" -eq 2 ] && EXTRA="rejoin"
+	timeout 150 "$GODOT" --headless --path . res://tests/NetTest.tscn -- crew_client --port "$CREW_PORT" $EXTRA >"$LOGS/crew_client$n.log" 2>&1 &
 	eval "CREW_PID_$n=\$!"
 done
 wait "$CREW_HOST_PID"; CREW_CODE=$?
