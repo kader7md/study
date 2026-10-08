@@ -11,6 +11,69 @@ For **train cars**, also generate the **breakable parts** separately (panels, do
 
 ---
 
+## ⭐ Asset sheets: everything in one image (like the Elden Ring concept sheet)
+
+Generate these in **Higgsfield** in **landscape 16:9 at the highest resolution**. Each sheet is one big image with a
+**key art scene on the left** and **rows of labelled assets on the right**, in the same style.
+Do the **master sheet** first. If the assets come out too small, use the 5 themed sheets (fewer items each, more detail).
+Save them as `assets/concept/sheet_<name>.png`.
+
+### Master sheet (all key assets)
+```
+Game concept art asset sheet for a cosy cartoon co-op adventure game called "TRUST ISSUES", landscape 16:9 poster layout.
+Left third: key art of a chunky red steam train with gold bands crossing a wooden trestle bridge over a turquoise river,
+pine forest hills and snowy mountains behind, golden afternoon light, four small chunky cartoon friends on the train.
+Right two thirds: neatly organised rows of separate game assets on a dark wooden board, each asset isolated with a small
+label underneath, grouped in titled sections:
+TRAIN: steam locomotive, covered goods wagon, open workshop wagon with canopy, rusty locked container wagon, spare train
+wheel, wooden wall panel, red boiler plate, cab door, roof panel.
+TOOLS: claw hammer, orange nail gun, welding torch, portable orange welding machine with cable reel, coal shovel, big wrench.
+REPAIR & RESOURCES: wooden railway sleeper plank, steel rail section, box of nails, coal pile, log stack, scrap metal pile,
+gold ore rock, wooden crate, medkit, oil can, grappling hook, scrap spear.
+NATURE: stylised pine tree, snowy pine, round oak tree, birch tree, spooky dead tree, bush, grass clump, mossy boulder,
+layered cliff rock, river stones, low-poly snowy mountain.
+STATION & PROPS: small countryside station building, stone platform with roof, market stall shop, wooden water tower,
+bench, iron lamp post, blank sign, grave stone, café table and chairs, crafting workbench, round meeting table with a bell,
+stone altar with candles, barrel, toolbox, lantern.
+Style: stylized 3D game assets, chunky rounded shapes, soft bevelled edges, bright warm colours, clean hand-painted textures,
+slightly exaggerated proportions, cosy funny look similar to RV There Yet and Peak, consistent lighting on every asset,
+3/4 view, clean presentation, high detail, readable silhouettes
+```
+
+### Themed sheets (more detail per asset)
+Use the same layout sentence for each, and change only the title and the list:
+
+**Layout sentence (start every themed sheet with this):**
+```
+Game concept art asset sheet for the cosy cartoon co-op game "TRUST ISSUES", landscape 16:9, small key art scene on the left,
+rows of separate isolated assets on the right on a dark wooden board, each with a small label, stylized 3D game assets,
+chunky rounded shapes, soft bevels, bright warm colours, hand-painted textures, RV There Yet / Peak style, 3/4 view.
+```
+
+1. **`sheet_train`**: key art: the steam train at a small station. Assets: steam locomotive (front 3/4 + side view), same
+   locomotive damaged with boiler plates and cab walls missing showing the frame, covered goods wagon and its damaged version,
+   open workshop wagon with canopy, rusty locked container wagon with padlock, loose train wheel, wooden wall panel, red boiler
+   plate with gold band, cab door with window, roof panel, coupling, buffers, train lamp.
+2. **`sheet_tools`**: key art: cartoon hands welding a rail with sparks. Assets: claw hammer, nail gun, welding torch, welding
+   machine with cable reel, coal shovel, wrench, crowbar, saw, sleeper plank, steel rail, box of nails, bolts, medkit, oil can,
+   grappling hook, scrap spear, lantern, rope coil.
+3. **`sheet_nature`**: key art: a railway winding through forest hills to a snowy mountain pass. Assets: 4 pine tree variants,
+   snowy pine, oak, birch, willow, dead spooky tree, tree stump, fallen log, 3 bush variants, grass clumps, flowers, ferns,
+   small rocks, mossy boulders, cliff rock formations, river stones, snowy mountain, waterfall piece, reeds, lily pads.
+4. **`sheet_stations`**: key art: a cosy countryside train station at sunset. Assets: station building, platform with roof,
+   ticket booth, market stall shop, water tower, coal bunker, signal post, buffer stop, wooden trestle bridge section,
+   track piece, bench, lamp post, blank sign, grave stone, fence pieces, barrels, crates, sacks, harbour dock, villain yacht.
+5. **`sheet_characters`**: key art: four chunky cartoon friends arguing on a train roof, one secretly smirking (the impostor).
+   Assets (all T-pose, front view): the host in a date outfit, the girlfriend, friend in a hoodie and beanie, friend in overalls
+   and cap, henchman in black suit and sunglasses, funny green zombie, angry cartoon eagle, silly goat, black helicopter.
+
+**After the sheets:** send them to me. I'll pick the assets, cut each one out, and write a single-object prompt for each
+(the table prompts below) so Tripo3D gets one clean object per image.
+
+---
+
+## Single-asset prompts (for Tripo3D: one object per image)
+
 ## STYLE (paste before every prompt)
 
 ```
