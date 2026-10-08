@@ -41,13 +41,25 @@ func on_weld(delta: float, _player: Node, source: Node) -> bool:
 			_refuse_cd = Time.get_ticks_msec() + 3000
 		return false
 	progress = minf(progress + delta / WELD_TIME, 1.0)
+	_show_progress()
+	if progress >= 1.0:
+		done.emit()
+	return true
+
+
+func _show_progress() -> void:
 	_mat.emission_energy_multiplier = 3.0 * progress
 	_mat.albedo_color = Color(0.25, 0.25, 0.27).lerp(Color(1.0, 0.6, 0.3), progress)
-	if progress >= 1.0:
+	if progress >= 1.0 and not finished:
 		finished = true
 		collision_layer = 0
 		var tween := create_tween()
 		tween.tween_property(_mat, "emission_energy_multiplier", 0.0, 1.5)
 		tween.parallel().tween_property(_mat, "albedo_color", Color(0.62, 0.64, 0.68), 1.5)
-		done.emit()
-	return true
+
+
+## NET: a client mirrors the host's welding progress (no `done` signal: the host finishes the work).
+func net_set_progress(p: float) -> void:
+	if not finished and p != progress:
+		progress = p
+		_show_progress()

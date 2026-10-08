@@ -6,6 +6,9 @@ extends CharacterBody3D
 ## torch taken from a STATION welder machine: hold LMB, the cable has a length limit).
 ## Carry repair items (plank, rail, wheel) in both hands; [G] puts them back.
 ## Debug impostor (F2): [Tab] opens the sabotage menu, then keys 1-4; meteor is aimed (LMB drop, RMB cancel).
+## NET: one Player per peer (Players/Player_<peer id>, spawned by Net). The local one moves itself and sends its
+## position (InputSync); everything that changes game state goes through Net.request() so it runs on the host.
+## Other players are shown with a third-person RemoteBody; their first-person arms and camera stay hidden.
 
 const WALK := 4.5
 const SPRINT := 7.5
@@ -54,6 +57,25 @@ var _ride_grace := 0.0
 ## Tests can force the aim point.
 var _test_aim := Vector3.INF
 
+# NET: identity and replicated state (see scripts/net/player_sync.gd)
+var peer_id := 1
+var display_name := ""
+var color := Color(0.85, 0.55, 0.3)
+## Position (local to the ridden train car when net_car >= 0), yaw and camera pitch, written by the owning peer.
+var net_pos := Vector3.ZERO
+var net_yaw := 0.0
+var net_pitch := 0.0
+var net_car := -1
+## Host-owned: the station welder this player holds the torch of (a node path, "" = none).
+var welder_path := ""
+## Host: where a client was aiming when it sent the request being run.
+var net_aim := Vector3.INF
+var _remote_body: RemoteBody
+var _shown_carry := ""
+var _seen_welder_path := ""
+var _weld_acc := 0.0
+var _last_net_pos := Vector3.ZERO
+
 
 func _ready() -> void:
 	add_to_group("player")
@@ -71,8 +93,15 @@ func _ready() -> void:
 	add_child(cs)
 
 	# Body for other players to see (hidden from our own camera via render layer 2)
-	var body := Build.box(self, Vector3(0.7, 1.4, 0.45), Vector3(0, 0.8, 0), Color(0.85, 0.55, 0.3))
-	body.layers = 2
+	if is_local():
+		var body := Build.box(self, Vector3(0.7, 1.4, 0.45), Vector3(0, 0.8, 0), Color(0.85, 0.55, 0.3))
+		body.layers = 2
+	else:
+		# NET: another peer's player: a third-person body with a name tag
+		_remote_body = RemoteBody.new()
+		_remote_body.name = "Body"
+		add_child(_remote_body)
+		_remote_body.setup(display_name if display_name != "" else String(name), color)
 
 	camera = Camera3D.new()
 	camera.position.y = 1.6
@@ -80,7 +109,11 @@ func _ready() -> void:
 	camera.near = 0.03
 	camera.cull_mask &= ~2
 	add_child(camera)
-	camera.make_current()
+	if is_local():
+		camera.make_current()
+	else:
+		camera.visible = false  # NET: hides the first-person arms and tools of other players
+		camera.clear_current(false)
 
 	_ray = RayCast3D.new()
 	_ray.target_position = Vector3(0, 0, -REACH)
@@ -99,10 +132,16 @@ func _ready() -> void:
 	add_child(_cable)
 	_cable.visible = false
 
-	if DisplayServer.get_name() != "headless":
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	Game.ui_changed.connect(_on_ui_changed)
+	if is_local():
+		if DisplayServer.get_name() != "headless":
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		Game.ui_changed.connect(_on_ui_changed)
 	select_tool("hammer")
+
+
+## NET: true for the player this peer controls (always true offline).
+func is_local() -> bool:
+	return is_multiplayer_authority()
 
 
 # --- Hands, tools, carrying --------------------------------------------------------
@@ -190,6 +229,7 @@ func take_welder(source: WelderSource) -> void:
 		Game.say("Hands full")
 		return
 	welder_source = source
+	welder_path = str(source.get_path())  # NET: the owner's client picks the torch up from this
 	select_tool("welder")
 	Game.say("Welding torch in hand (cable %d m). Switch tools or walk away to put it back." % int(source.cable_length))
 
@@ -211,8 +251,22 @@ func select_tool(tool: String) -> void:
 func carry(item: String) -> void:
 	carried_item = item
 	_unplug(false)
+	_show_carry(item)
+
+
+## Builds what the hands hold for `item` ("" = nothing). NET: also runs when carried_item arrives from the host.
+func _show_carry(item: String) -> void:
+	_shown_carry = item
 	if _carry_model:
 		_carry_model.queue_free()
+		_carry_model = null
+	if _remote_body:
+		return  # another player: RemoteBody shows it
+	if item == "":
+		_left.visible = false
+		_right.position = _right_rest
+		select_tool(current_tool)
+		return
 	_carry_model = Props.instance(item)
 	match item:
 		"plank":
@@ -238,12 +292,7 @@ func carry(item: String) -> void:
 
 func consume_carried() -> void:
 	carried_item = ""
-	if _carry_model:
-		_carry_model.queue_free()
-		_carry_model = null
-	_left.visible = false
-	_right.position = _right_rest
-	select_tool(current_tool)
+	_show_carry("")
 
 
 ## [G]: put the carried item back (refunds it to the crew inventory).
@@ -266,7 +315,7 @@ func _on_ui_changed(open: bool) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if Game.ui_open:
+	if Game.ui_open or not is_local():
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * MOUSE_SENS)
@@ -298,11 +347,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("attack"):
 		use_tool()
 	elif event.is_action_pressed("drop"):
-		put_back()
+		Net.request(self, &"put_back")  # NET: state changes run on the host
 	elif event.is_action_pressed("interact") and focused and focused.get_hold_time(self) <= 0.0:
-		focused.interact(self)
+		Net.request(focused, &"interact", [self])
 	elif event.is_action_pressed("interact_alt") and focused:
-		focused.interact_alt(self)
+		Net.request(focused, &"interact_alt", [self])
 
 
 func _handle_sabotage_input(event: InputEvent) -> bool:
@@ -313,7 +362,8 @@ func _handle_sabotage_input(event: InputEvent) -> bool:
 		return true
 	if aiming_meteor:
 		if event.is_action_pressed("attack"):
-			if _aim_point != Vector3.INF and sab.use("meteor", _aim_point):
+			# NET: the host runs the sabotage (online it answers later, so stop aiming right away)
+			if _aim_point != Vector3.INF and Net.request(sab, &"use", ["meteor", _aim_point]) != false:
 				aiming_meteor = false
 			return true
 		if event.is_action_pressed("cancel"):
@@ -331,7 +381,7 @@ func _handle_sabotage_input(event: InputEvent) -> bool:
 				Game.sabotage_menu_open = false
 				Game.say("Aim the meteor: [LMB] drop, [RMB] cancel")
 			else:
-				sab.use(id)
+				Net.request(sab, &"use", [id])
 			return true
 	return false
 
@@ -346,28 +396,24 @@ func use_tool() -> void:
 		var tween := create_tween()
 		tween.tween_property(_right, "rotation:x", -1.1, 0.08).set_ease(Tween.EASE_IN)
 		tween.tween_property(_right, "rotation:x", 0.0, 0.2).set_ease(Tween.EASE_OUT)
-		if hit is Interactable and hit.on_tool_hit("hammer", self):
-			return
-		if hit and hit.has_method("take_hit"):
-			hit.take_hit(HAMMER_DAMAGE)
+		if hit:
+			Net.request(self, &"tool_hit", [hit, "hammer", HAMMER_DAMAGE])  # NET: runs on the host
 	elif current_tool == "wrench":
 		_tool_cd = 0.35
 		var tween := create_tween()
 		tween.tween_property(_right, "rotation:z", -0.9, 0.12)
 		tween.tween_property(_right, "rotation:z", 0.0, 0.18)
-		if hit is Interactable and hit.on_tool_hit("wrench", self):
-			return
-		if hit and hit.has_method("take_hit"):
-			hit.take_hit(HAMMER_DAMAGE * 0.75)
+		if hit:
+			Net.request(self, &"tool_hit", [hit, "wrench", HAMMER_DAMAGE * 0.75])
 	elif current_tool == "come_along":
 		_tool_cd = 0.3
 		var train := Game.train
-		if hit is HookSpot:
-			train.attach_hook(hit)
-		elif hit is AnchorSpot:
-			train.attach_anchor(hit)
-		elif train and train.tipped and is_instance_valid(train.hook) and global_position.distance_to(train.hook.global_position) < 8.0:
-			if train.crank():
+		var cranking := not (hit is HookSpot or hit is AnchorSpot) and train != null and train.tipped \
+			and is_instance_valid(train.hook) and global_position.distance_to(train.hook.global_position) < 8.0
+		if hit is HookSpot or hit is AnchorSpot or cranking:
+			# NET: runs on the host; a client pumps the handle as long as the chain is anchored
+			var result: Variant = Net.request(self, &"come_along_hit", [hit])
+			if cranking and (result == true or (result == null and is_instance_valid(train.anchor))):
 				# pump the ratchet handle
 				var tween := create_tween()
 				tween.tween_property(_right, "rotation:x", 0.9, 0.12)
@@ -380,21 +426,48 @@ func use_tool() -> void:
 		var tween := create_tween()
 		tween.tween_property(_right, "position:z", _right.position.z + 0.08, 0.04)
 		tween.tween_property(_right, "position:z", _right.position.z, 0.1)
-		if hit is Interactable and hit.on_tool_hit("nail_gun", self):
-			return
-		if hit and hit.has_method("take_hit"):
-			hit.take_hit(NAIL_GUN_DAMAGE)
+		if hit:
+			Net.request(self, &"tool_hit", [hit, "nail_gun", NAIL_GUN_DAMAGE])
+
+
+## A tool hits `hit`: repair work first (nails, bolts, wheels...), otherwise damage (zombies, eagles).
+## NET: runs on the host (directly offline). Returns true if the hit did something.
+func tool_hit(hit: Node, tool: String, damage: float) -> bool:
+	if hit is Interactable and hit.on_tool_hit(tool, self):
+		return true
+	if hit and hit.has_method("take_hit"):
+		hit.take_hit(damage)
+		return true
+	return false
+
+
+## The come-along used on `hit`: hook it to the train, chain it to an anchor, or crank. NET: runs on the host.
+func come_along_hit(hit: Node) -> bool:
+	var train := Game.train
+	if train == null:
+		return false
+	if hit is HookSpot:
+		return train.attach_hook(hit)
+	if hit is AnchorSpot:
+		return train.attach_anchor(hit)
+	if train.tipped and is_instance_valid(train.hook) and global_position.distance_to(train.hook.global_position) < 8.0:
+		return train.crank()
+	return false
 
 
 # --- Update -------------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
+	if not is_local():
+		_remote_update(delta)  # NET: another peer moves this player
+		return
 	_tool_cd = maxf(_tool_cd - delta, 0.0)
-	_update_cold(delta)
+	if Game.is_host():
+		_update_cold(delta)  # NET: health and frost are host state
 
 	if global_position.y < Track.WATER_LEVEL - 1.2:
 		Game.say("You fell in the water!")
-		take_damage(20.0)
+		Net.request(self, &"take_damage", [20.0])
 		respawn_on_train()
 	elif global_position.y < -80.0:
 		respawn_on_train()
@@ -423,6 +496,70 @@ func _physics_process(delta: float) -> void:
 	_update_focus(delta)
 	_update_welder(delta)
 	_update_aim()
+	_write_net_state()
+
+
+# --- NET: replication helpers ---------------------------------------------------------
+
+## Owner: what InputSync sends (position relative to the ridden car, so riders stay glued to it).
+func _write_net_state() -> void:
+	var train := Game.train
+	net_car = train.cars.find(_ride_car) if train and is_instance_valid(_ride_car) else -1
+	net_pos = train.cars[net_car].global_transform.affine_inverse() * global_position if net_car >= 0 else global_position
+	net_yaw = rotation.y
+	net_pitch = camera.rotation.x
+
+
+## Another peer's player: glide to its synced position and look, keep its body up to date.
+func _remote_update(delta: float) -> void:
+	var train := Game.train
+	var target := net_pos
+	if net_car >= 0 and train and net_car < train.cars.size():
+		target = train.cars[net_car].global_transform * net_pos
+	var k := 1.0 - exp(-18.0 * delta)
+	if global_position.distance_to(target) > 6.0:
+		global_position = target
+	else:
+		global_position = global_position.lerp(target, k)
+	rotation.y = lerp_angle(rotation.y, net_yaw, k)
+	camera.rotation.x = net_pitch
+	if Game.is_host():
+		_update_cold(delta)
+		# the torch cable is pulled out if they walked off with it
+		if is_instance_valid(welder_source):
+			var plug := welder_source.plug_position()
+			if Vector2(global_position.x - plug.x, global_position.z - plug.z).length() > welder_source.cable_length + 6.0:
+				_unplug(false)
+	if _remote_body:
+		var walk := net_pos.distance_to(_last_net_pos) / maxf(delta, 0.001)
+		_last_net_pos = net_pos
+		_remote_body.set_pitch(net_pitch)
+		_remote_body.set_held("hammer" if current_tool == "welder" and welder_path == "" else current_tool, carried_item)
+		_remote_body.animate(delta, walk if walk < 20.0 else 0.0)
+
+
+func _process(_delta: float) -> void:
+	# NET: carried items and the welder torch can change on the host; refresh the hands here
+	if carried_item != _shown_carry:
+		_show_carry(carried_item)
+	if welder_path != _seen_welder_path:
+		_seen_welder_path = welder_path
+		if is_local() and not Game.is_host():
+			welder_source = get_node_or_null(welder_path) as WelderSource if welder_path != "" else null
+			if welder_source:
+				select_tool("welder")
+			elif current_tool == "welder":
+				select_tool("hammer")
+
+
+func set_speaking(on: bool) -> void:
+	if _remote_body:
+		_remote_body.set_speaking(on)
+
+
+## Host: a client switched away from the torch (or walked too far).
+func unplug_welder() -> void:
+	_unplug(false)
 
 
 ## Moves the player along with the train car they stand on (position and turning), before walking.
@@ -463,7 +600,7 @@ func _update_focus(delta: float) -> void:
 		hold_progress += delta
 		if hold_progress >= hold_needed:
 			hold_progress = 0.0
-			focused.interact(self)
+			Net.request(focused, &"interact", [self])
 	else:
 		hold_progress = 0.0
 
@@ -497,7 +634,15 @@ func _update_welder(delta: float) -> void:
 	if Input.is_action_pressed("attack") and not Game.ui_open:
 		var hit := _ray.get_collider() if _ray.is_colliding() else null
 		if hit is Interactable:
-			welding = hit.on_weld(delta, self, welder_source)
+			if Game.is_host():
+				welding = hit.on_weld(delta, self, welder_source)
+			else:
+				# NET: weld time goes to the host in small batches
+				welding = true
+				_weld_acc += delta
+				if _weld_acc >= 0.1:
+					Net.request(self, &"weld_tick", [hit, _weld_acc])
+					_weld_acc = 0.0
 	_set_weld_fx(welding)
 	if welding:
 		var t := Time.get_ticks_msec() * 0.02
@@ -512,6 +657,8 @@ func _update_welder(delta: float) -> void:
 func aim_point() -> Vector3:
 	if _test_aim != Vector3.INF:
 		return _test_aim
+	if net_aim != Vector3.INF:
+		return net_aim  # NET: the host uses the aim the client sent with its request
 	return _ray.get_collision_point() if _ray.is_colliding() else Vector3.INF
 
 
@@ -519,13 +666,23 @@ func weld_tick(target: Interactable, delta: float) -> bool:
 	## Test helper: weld `target` for `delta` seconds as if aiming at it with LMB held.
 	if not is_instance_valid(welder_source):
 		return false
+	if not is_local():
+		# NET: a client's torch only reaches as far as the cable
+		var plug := welder_source.plug_position()
+		if Vector2(global_position.x - plug.x, global_position.z - plug.z).length() > welder_source.cable_length + 6.0:
+			_unplug(false)
+			return false
 	return target.on_weld(delta, self, welder_source)
 
 
 func _unplug(announce: bool) -> void:
 	if is_instance_valid(welder_source) and announce:
 		Game.say("The welder cable pulled out: the torch is back at the station welder")
+	if is_instance_valid(welder_source) and is_inside_tree() and is_local() and not Game.is_host():
+		Net.request(self, &"unplug_welder")  # NET: the host holds the torch state
 	welder_source = null
+	if Game.is_host():
+		welder_path = ""
 	if _cable:
 		_cable.visible = false
 	_set_weld_fx(false)

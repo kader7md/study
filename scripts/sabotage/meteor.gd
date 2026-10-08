@@ -41,6 +41,16 @@ func _process(delta: float) -> void:
 
 func _impact() -> void:
 	set_process(false)
+	if Game.is_host():
+		_apply_impact()  # NET: clients only see the rock land; the host's damage arrives through world sync
+	# Leave a crater
+	_rock.queue_free()
+	_warning.queue_free()
+	Build.cylinder(self, RADIUS * 0.8, 0.04, Vector3(0, 0.03, 0), Color(0.15, 0.1, 0.08))
+	get_tree().create_timer(30.0).timeout.connect(queue_free)
+
+
+func _apply_impact() -> void:
 	var train := Game.train
 	var track := Game.track
 	var hit_train := false
@@ -62,8 +72,3 @@ func _impact() -> void:
 	for p in get_tree().get_nodes_in_group("player"):
 		if p.global_position.distance_to(target) < RADIUS * 1.5:
 			p.take_damage(PLAYER_DAMAGE)
-	# Leave a crater
-	_rock.queue_free()
-	_warning.queue_free()
-	Build.cylinder(self, RADIUS * 0.8, 0.04, Vector3(0, 0.03, 0), Color(0.15, 0.1, 0.08))
-	get_tree().create_timer(30.0).timeout.connect(queue_free)

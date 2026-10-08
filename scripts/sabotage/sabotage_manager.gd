@@ -58,6 +58,8 @@ func use(id: String, target := Vector3.ZERO) -> bool:
 
 
 func _process(delta: float) -> void:
+	if not Game.is_host():
+		return  # NET: the host runs sabotage; clients get the cooldowns in the world snapshot
 	for id: String in cooldowns:
 		cooldowns[id] = maxf(cooldowns[id] - delta, 0.0)
 	if _wind_left > 0.0:

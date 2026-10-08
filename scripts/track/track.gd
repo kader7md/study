@@ -326,6 +326,7 @@ func break_piece(index: int, cratered := false) -> bool:
 	if _deck_shapes.has(index):
 		_deck_shapes[index].set_deferred("disabled", true)
 	var repair := RailRepair.new()
+	repair.name = "Repair_%d" % index  # NET: the same path on every peer
 	repair.setup(self, index, cratered)
 	add_child(repair)
 	repair.global_transform = transform_at(piece_center(index))
