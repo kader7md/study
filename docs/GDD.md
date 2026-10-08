@@ -1,6 +1,6 @@
-# Game Design Doc (draft v0.2)
+# Game Design Doc (draft v0.3)
 
-**Working title:** *Last Train* (placeholder, other ideas: *Off the Rails*, *Kidnap Express*)
+**Title:** to be picked, see [13. Title ideas](#13-title-ideas) (not about the train: about the girl, the impostor and the chase)
 **Engine:** Godot 4 (GDScript) · **Assets:** Tripo3D + Blender (see `VIDEO_METHOD.md`)
 **Platform:** PC, **Steam** (friend invites through Steam lobbies)
 **Players:** 1–5 online co-op · **Impostor:** 1 secret saboteur when there are 3–5 players
@@ -24,13 +24,16 @@ on an old coal train (**Chapter 1**), then across the sea on a raft they build t
 - Only the impostor knows they're the impostor.
 
 ### Voting (Among Us style, with a twist)
-- The crew can call a **vote** and pick someone.
+- On the train there's a **meeting table**. Any player can go to it and call a **meeting**, then everyone votes for someone.
+- **Each player gets 1 meeting call per checkpoint run** (the stretch between two stations). It resets at every station.
+  The impostor also has one, so not calling one doesn't give them away.
+- Meetings can happen any time during the run, whenever someone gets suspicious.
 - The voted player is **not kicked**. They keep playing normally.
 - **If the voted player was the impostor:** their sabotage abilities are **silently locked/frozen**.
 - **If the vote hit an innocent:** nothing happens.
 - Nobody is told the result, so **the crew never knows for sure whether they caught the impostor.**
   That keeps the paranoia going all game.
-- *Open: how often can they vote? Does a lock last forever or for a while? See 10.*
+- *Default: a correct vote locks the impostor's sabotage until the end of the current chapter (tune in playtests).*
 
 ### Win and lose
 - **Crew loses** when **all players are dead**.
@@ -69,7 +72,7 @@ on an old coal train (**Chapter 1**), then across the sea on a raft they build t
 - **The game changes from train to sea.** The crew opens the train's container (boat engine, gasoline, boat tools)
   and **builds a raft** (Raft-style), then chases the yacht.
 - **Carried over:** gold, the crafting table and blueprints.
-- **New impostor sabotages:** 🦈 shark, 🐟 piranhas, 🌊 tsunami, 🌀 whirlpool / windstorm *(confirm which, see 10)*.
+- **New impostor sabotages:** 🦈 shark, 🐟 piranhas, 🌊 tsunami, 🌪️ windstorm.
 - Ending: reach the yacht and rescue her *(how the yacht finale plays: see 10)*.
 
 ## 4. Core loop: the train (Chapter 1)
@@ -135,7 +138,18 @@ If the crew votes them correctly, the menu **locks** without telling anyone (see
 | 🦈 **Shark** | Attacks the raft and bites pieces off it, or attacks swimmers |
 | 🐟 **Piranhas** | A swarm that hurts anyone in the water |
 | 🌊 **Tsunami** | A big wave that can flip or damage the raft |
-| 🌀 **Whirlpool / windstorm** | Pulls the raft off course, or blows it back |
+| 🌪️ **Windstorm** | Blows the raft off course or backwards, can knock players into the water |
+
+## 5b. Combat and damage
+Players fight zombies, eagles, sharks and the rest with:
+| Weapon | How you get it | Notes |
+|--------|----------------|-------|
+| **Shovel** | Start item (it's also the coal shovel) | Melee, weak, always available |
+| **Spear** | Crafting table (wood + scrap) | Melee with longer reach, can be thrown. Good against sharks in Chapter 2 |
+| **Guns** | Blueprints (quest reward or bought with gold) + ammo | Strong, ammo is limited |
+| **Damaging items** | Shops / crafting (e.g. explosives, traps, molotovs) | Ideas to expand later |
+
+Friendly fire is **on**, which gives the impostor sneaky chances and players plenty of funny accidents.
 
 ## 6. Crafting and blueprints
 - **Crafting table** on the train (and on the raft in Chapter 2).
@@ -144,12 +158,24 @@ If the crew votes them correctly, the menu **locks** without telling anyone (see
   1. **Earn them** from side quests and puzzles (labyrinth, mountain climb, see 7).
   2. **Buy them with gold** at station shops.
 
-## 7. Side quests and puzzles (off the train)
-- **Labyrinth key:** a locked route needs a key. The key is in a **labyrinth near a zombie nest, at night**.
-  Players must sneak (stealth: crouch, stay out of zombies' sight) to get it.
-- **Mountain climb (Peak style):** climb a mountain with stamina, the grappling hook and help from teammates to reach a key or blueprint,
-  then **get back to the train**, which keeps waiting or slowly runs low on fuel.
-- Rewards: **keys** (open locked routes) and **blueprints** (special items).
+## 7. Quest maps: games inside the game
+The side quests are **full separate maps, each like a small game of its own**.
+Instead of making one big horror game with many levels, **each quest map takes the feel of one famous game or genre**.
+The train stops, the crew enters the quest map, wins a **key** (opens locked routes) and/or a **blueprint**, and gets back to the train.
+
+| Quest map | Inspired by | Gameplay | Reward |
+|-----------|-------------|----------|--------|
+| **The Mountain** | Peak | A real climbing map. Stamina, grappling hook, helping each other up, falling, cold at the top | Key / blueprint |
+| **The Nest** | Backrooms / horror games | A dark labyrinth at night by the zombie nest. Sneak, hide, don't make noise, find the key | Key to a locked route |
+| *ideas for more* | | | |
+| The Junkyard / Factory | Lethal Company-style scavenging | Grab loot and get out before the monster finds you | Gold + scrap + blueprint |
+| The Tower | Only Up / Getting Over It | Vertical parkour, one mistake and you fall | Special blueprint |
+| The Mine | Deep Rock-style co-op | Mine gold under a collapsing mine, defend from creatures | Lots of gold |
+| The Swamp | Survival horror | Fog, sounds, something hunting you | Key |
+
+- **Make these our own:** same *feel*, but our own art, names and rules. No copying other games' assets or names.
+- The impostor can still sabotage inside quest maps *(which sabotages work there is decided per map)*.
+- Each quest map is a **separate scene/module**, so we can add them one at a time after the core game works.
 
 ## 8. Death and revive
 - A dead player leaves a **body**. Teammates must **carry the body** to revive them. Three ways:
@@ -171,13 +197,16 @@ If the crew votes them correctly, the menu **locks** without telling anyone (see
   e.g. "find the train station ✔, reach station 1, get engine oil…". The host can use the **phone with the tracker**.
 - Comedy: goofy physics, ragdolls, players carrying each other's bodies around.
 
+## 9b. Game length
+- **Chapter 1 ≈ 10 hours when played perfectly** (more for most groups). Chapter 2 adds more on top.
+- The length comes mostly from the **quest maps** (each one is a mini game) plus 5 long train runs.
+- Saves at every station, so groups play over several sessions.
+
 ## 10. Still open
-1. **Combat:** how do players fight zombies, sharks and the rest: spear, guns from blueprints, shovel melee?
-2. **Votes:** how often can the crew vote? Does a correct vote lock sabotage forever or for a while?
-3. **Sea sabotage:** "widstrom", is that a **whirlpool** or a **windstorm** (or both)?
-4. **Yacht finale:** when the raft reaches the yacht, what happens: a fight with the kidnapper, a boarding sequence? Who is the kidnapper?
-5. **Game length:** how long should a full run (both chapters) take?
-6. **Title:** keep *Last Train*? With a sea chapter, maybe something broader.
+1. **Yacht finale:** when the raft reaches the yacht, what happens: a fight with the kidnapper, a boarding sequence? Who is the kidnapper?
+2. **Title:** pick one from 13.
+3. **Correct-vote lock:** until the end of the chapter (default), or only for a while?
+4. **Which quest maps** go in Chapter 1, and in what order across the 5 runs?
 
 ## 11. Technical plan
 - **Multiplayer from day one.** It's the hardest part, so the game is built around it.
@@ -210,8 +239,22 @@ Animations: Mixamo / Quaternius (walk, run, shovel, carry, climb, crouch, hit, k
 | M5 | **Vertical slice** ⭐ | Board the train → reach station 1 (shop, station-only repairs, grave), death + medkit revive, cold. **Playtest with friends** |
 | M6 | Intro + kidnap | Café intro, 4 kidnap scenes, impostor chooses with a timer |
 | M7 | Chapter 1 content | 5 stations, zombies, eagles, freezing wind, wheels, gold rocks, goat altar, crafting + blueprints |
-| M8 | Side quests | Night labyrinth key + Peak-style mountain climb |
+| M8 | Quest maps | The Nest (horror labyrinth) + The Mountain (Peak-style). More maps added one by one later |
 | M9 | **Chapter 2** | Container reveal, raft building, sea sabotages, yacht chase + finale |
 | M10 | Polish + Steam | Menus, sound, balance, Steam page and export |
 
 The intro comes *after* the train gameplay on purpose. If the train isn't fun with friends, nothing else matters.
+
+## 13. Title ideas
+Not about the train. About **her**, **the traitor friend** and **the chase**:
+
+| Title | Why |
+|-------|-----|
+| ⭐ **Who Took Her?** | The impostor literally chose how she was taken. The question stays open all game |
+| **Not Without Her** | The boyfriend's promise, and the chase |
+| **Among Friends** | One of your friends is the traitor (impostor pun) |
+| **Chasing Her** | Simple, it's the whole game |
+| **Trust No Friend** | Impostor focus |
+| **Date Night Gone Wrong** | Funny, matches the cartoon style |
+| **Catch Them If You Can** | The chase |
+| **Love & Lies** | Girlfriend + impostor |
