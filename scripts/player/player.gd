@@ -75,6 +75,8 @@ var _shown_carry := ""
 var _seen_welder_path := ""
 var _weld_acc := 0.0
 var _last_net_pos := Vector3.ZERO
+var _remote_car := -1
+var _remote_local := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -317,6 +319,10 @@ func _on_ui_changed(open: bool) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if Game.ui_open or not is_local():
 		return
+	Net.run_as(peer_id, _handle_input, [event])  # NET: feedback from our own input stays on our screen
+
+
+func _handle_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * MOUSE_SENS)
 		camera.rotate_x(-event.relative.y * MOUSE_SENS)
@@ -461,6 +467,10 @@ func _physics_process(delta: float) -> void:
 	if not is_local():
 		_remote_update(delta)  # NET: another peer moves this player
 		return
+	Net.run_as(peer_id, _local_physics, [delta])  # NET: our own feedback stays on our screen
+
+
+func _local_physics(delta: float) -> void:
 	_tool_cd = maxf(_tool_cd - delta, 0.0)
 	if Game.is_host():
 		_update_cold(delta)  # NET: health and frost are host state
@@ -513,18 +523,22 @@ func _write_net_state() -> void:
 ## Another peer's player: glide to its synced position and look, keep its body up to date.
 func _remote_update(delta: float) -> void:
 	var train := Game.train
-	var target := net_pos
-	if net_car >= 0 and train and net_car < train.cars.size():
-		target = train.cars[net_car].global_transform * net_pos
 	var k := 1.0 - exp(-18.0 * delta)
-	if global_position.distance_to(target) > 6.0:
-		global_position = target
+	if net_car >= 0 and train and net_car < train.cars.size():
+		# riding: smooth in the car's own space, so a fast train doesn't leave them sliding behind
+		var car := train.cars[net_car].global_transform
+		if _remote_car != net_car:
+			_remote_car = net_car
+			_remote_local = car.affine_inverse() * global_position
+		_remote_local = net_pos if _remote_local.distance_to(net_pos) > 6.0 else _remote_local.lerp(net_pos, k)
+		global_position = car * _remote_local
 	else:
-		global_position = global_position.lerp(target, k)
+		_remote_car = -1
+		global_position = net_pos if global_position.distance_to(net_pos) > 6.0 else global_position.lerp(net_pos, k)
 	rotation.y = lerp_angle(rotation.y, net_yaw, k)
 	camera.rotation.x = net_pitch
 	if Game.is_host():
-		_update_cold(delta)
+		Net.run_as(peer_id, _update_cold, [delta])  # "you died" goes to that player
 		# the torch cable is pulled out if they walked off with it
 		if is_instance_valid(welder_source):
 			var plug := welder_source.plug_position()

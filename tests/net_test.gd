@@ -25,7 +25,7 @@ var _finished := false
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	for m in ["host", "client", "late", "shots"]:
+	for m in ["host", "client", "late", "shots", "crew_host", "crew_client"]:
 		if args.has(m):
 			mode = m
 	var i := args.find("--port")
@@ -58,6 +58,10 @@ func _ready() -> void:
 		await _host()
 	elif mode == "late":
 		await _late()
+	elif mode == "crew_host":
+		await _crew_host()
+	elif mode == "crew_client":
+		await _crew_client()
 	else:
 		await _client()
 	_finish()
@@ -220,9 +224,15 @@ func _host() -> void:
 		repair.finish_instantly()
 	Game.add("gold", 7)
 	check(Game.count("gold") == gold + 7, "inventory changed on the host")
+	var wagon := train.cars[2]
+	var ride_from := wagon.to_local(them.global_position) if them else Vector3.INF
+	check(ride_from.length() < 4.0, "the client stands in the workshop wagon")
 	train.lever = 1
 	var passed := await _wait_until(func(): return train.rear_distance() > (gap + 1) * Track.PIECE_LENGTH + 2.0, 40.0)
 	check(passed, "the train crosses the rebuilt piece")
+	if them:
+		var drift := wagon.to_local(them.global_position).distance_to(ride_from)
+		check(drift < 1.0, "the client's player rides along, seen on the host (drift %.2f m)" % drift)
 	train.lever = 0
 	await _wait_until(func(): return train.is_stopped(), 20.0)
 	_tell.rpc_id(cid, "host_done", true)
@@ -262,6 +272,7 @@ func _host() -> void:
 	check(Game.wind_active == client_is_impostor, "a client's sabotage request runs only if it is the impostor (wind %s)" % Game.wind_active)
 	_tell.rpc_id(cid, "wind_checked", Game.wind_active)
 	await _wait_until(func(): return _flags.has("client_checked"), 30.0)
+	check(them != null and them.has_node("VoiceOut"), "a voice frame from the client plays at its body")
 
 	print("Everyone back to the start (the crew-wiped / F6 path)")
 	var old_main := main.get_instance_id()
@@ -399,11 +410,18 @@ func _client() -> void:
 		check(await _wait_until(func(): return repair.planks.has(1) and repair.planks[1].fixed, 5.0), "the plank is nailed down (seen on the client)")
 		var nail0 := repair.get_node_or_null("Plank1/Nail0") as NailSpot
 		check(nail0 != null and nail0.finished, "the nails went in")
+	# ride along: stand in the workshop wagon while the host drives on
+	var wagon := train.cars[2]
+	_teleport(me, wagon.to_global(Vector3(0.7, Train.FLOOR_HEIGHT + 0.3, 1.2)))
+	await _wait(1.0)
+	var ride_from := wagon.to_local(me.global_position)
 	_tell.rpc_id(1, "client_worked", true)
 
 	print("The host finishes the repair")
 	var gold := Game.count("gold")
 	check(await _wait_until(func(): return _flags.has("host_done"), 60.0), "the host finished")
+	var drift := wagon.to_local(me.global_position).distance_to(ride_from)
+	check(drift < 1.0, "we rode along in the wagon (drift %.2f m)" % drift)
 	check(not track.is_broken(gap), "the repaired piece is whole on the client")
 	check(Game.count("gold") >= gold + 7, "the inventory change arrived (gold %d -> %d)" % [gold, Game.count("gold")])
 	check(train.rear_distance() > (gap + 1) * Track.PIECE_LENGTH, "the train crossed it on the client too")
@@ -464,6 +482,13 @@ func _client() -> void:
 	check(await _wait_until(func(): return _flags.has("wind_checked"), 30.0), "the host checked the sabotage")
 	var wind: bool = _flags.get("wind_checked", false)
 	check(await _wait_until(func(): return Game.wind_active == wind, 5.0), "the wind state matches the host's (%s)" % wind)
+	# a 20 ms voice frame (a tone), as push-to-talk would send it
+	var frame := PackedByteArray()
+	for i in Voice.FRAME:
+		frame.append(Voice._mulaw_encode(sin(i * 0.3) * 0.5))
+	Net.get_node("Voice")._rpc_voice.rpc_id(1, frame)
+	check(absf(Voice._mulaw_decode(Voice._mulaw_encode(0.5)) - 0.5) < 0.02, "voice samples survive mu-law")
+	await _wait(0.5)
 	_tell.rpc_id(1, "client_checked", true)
 
 	print("Back to the start")
@@ -480,6 +505,55 @@ func _client() -> void:
 	check(dropped and _disconnect_reason == "Host left the game", "told: '%s'" % _disconnect_reason)
 	await _wait(1.0)
 	check(_main() == null and not Net.is_online(), "back at the menu, offline")
+
+
+# --- Three players: the real impostor rule ---------------------------------------------------
+
+## Host of a 3-player run (no debug override): exactly one secret impostor, no world sabotage.
+func _crew_host() -> void:
+	Net.local_name = "Host"
+	check(Net.host_game(port) == OK, "hosting a 3-player run")
+	var full := await _wait_until(func(): return Net.players.size() == 3 and Net.all_ready(), 40.0)
+	check(full, "3 players in the lobby, all ready")
+	if not full:
+		return
+	Net.start_run()
+	var ids := Net.players.keys().filter(func(id: int): return id != 1)
+	var loaded := await _wait_until(func(): return _main() != null and ids.all(func(id: int): return Net.is_peer_ready(id)), 60.0)
+	check(loaded, "everyone loaded the world")
+	check(not Game.world_sabotage, "with 3 players the world does not sabotage (there is an impostor)")
+	var told := await _wait_until(func(): return _flags.size() >= 2, 30.0)
+	check(told, "both clients report their role (test only)")
+	var impostors := 1 if Game.role == "impostor" else 0
+	for id: String in _flags:
+		impostors += 1 if _flags[id] == "impostor" else 0
+	check(impostors == 1, "exactly one impostor among 3 players")
+	await _wait(0.5)
+	Net.leave_to_menu()
+	await _wait(1.0)
+
+
+func _crew_client() -> void:
+	Net.local_name = "Crew"
+	await _wait(1.0)
+	var joined := false
+	for attempt in 4:
+		Net.join_game("127.0.0.1:%d" % port)
+		joined = await _wait_until(func(): return Net.players.has(Net.local_id()), 15.0)
+		if joined:
+			break
+		await _wait(1.5)
+	check(joined, "joined the 3-player lobby")
+	if not joined:
+		return
+	Net.set_ready(true)
+	var roles := []
+	Net.role_assigned.connect(func(r: String): roles.append(r))
+	var loaded := await _wait_until(func(): return _main() != null and _main().player != null and not roles.is_empty(), 60.0)
+	check(loaded, "in the world with a role (%s)" % ("?" if roles.is_empty() else roles[0]))
+	if loaded:
+		_tell.rpc_id(1, str(Net.local_id()), roles[0])
+	check(await _wait_until(func(): return _disconnect_reason != "", 30.0), "the host ended it: '%s'" % _disconnect_reason)
 
 
 # --- Latecomer (a third process) ------------------------------------------------------------

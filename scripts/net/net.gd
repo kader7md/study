@@ -611,6 +611,17 @@ func request(target: Object, method: StringName, args: Array = []) -> Variant:
 	return null
 
 
+## Runs fn(args) on behalf of `peer`: on the host, Game.say messages it makes go to that player only.
+func run_as(peer: int, fn: Callable, args: Array = []) -> Variant:
+	if not is_online() or not is_host():
+		return fn.callv(args)
+	var prev := _actor
+	_actor = peer
+	var result: Variant = fn.callv(args)
+	_actor = prev
+	return result
+
+
 ## The remote peer whose request the host is running right now, or 0.
 func remote_actor() -> int:
 	return _actor if _actor != 0 and _actor != local_id() else 0
