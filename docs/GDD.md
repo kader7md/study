@@ -308,9 +308,16 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
 - **Multiplayer from day one.** It's the hardest part, so the game is built around it.
   Godot high-level multiplayer, **host-authoritative** (the host player's PC runs the game). **Steam lobbies and invites via GodotSteam.**
   Use ENet locally for quick testing.
+  *Built (v1, see `docs/NETWORK.md`):* ENet behind a backend layer that GodotSteam plugs into; host on a port, join by
+  invite code (IP + port in 10 characters) or IP; a lobby with names, colours, ready and kick; the host starts the run
+  and every peer builds the same world from the seed. Clients move themselves and ask the host for everything else
+  (use, tool hits, carry, weld, buy, sabotage). The host streams the train 20 times a second plus every repair, pickup,
+  inventory change and sabotage. Exactly one secret impostor with 3 to 5 players, told only to that player.
+  Proximity push-to-talk voice chat. No joining mid-run yet; if the host leaves, the run ends for everyone.
 - **The train is a path follower:** it moves along a track curve (`Path3D` + `PathFollow3D`) with real speed, not full physics.
   It's stable online and easy to derail on purpose at broken track.
 - **Players on a moving train or raft:** they stand in the vehicle's local space so they don't slide off. This is a known hard problem, and we solve it early.
+  *Built:* online, each player's position is sent relative to the car they stand on, so riders stay glued to the train on every screen.
 - **The raft (Chapter 2)** is a grid-based buildable platform (like Raft) with simple buoyancy and wave motion.
 - **Sabotage map:** the impostor opens a top-down map view to place meteors and the rest.
 - **Carry system:** pick up and carry bodies, goats and resources. One shared system.
@@ -328,7 +335,7 @@ Animations: Mixamo / Quaternius (walk, run, shovel, carry, climb, crouch, hit, k
 | # | Milestone | Done when |
 |---|-----------|-----------|
 | M0 | PC + MCP setup | See `TODO_LOCAL.md` |
-| M1 | **Multiplayer base** | 2+ players join a Steam/ENet lobby, walk around in first person and see each other |
+| M1 | **Multiplayer base** | 2+ players join a Steam/ENet lobby, walk around in first person and see each other (ENet done, Steam backend stubbed) |
 | M2 | **Train core** | Train drives on a track, furnace + coal, forward/back/stop, players ride it without sliding |
 | M3 | **Gather + repair + carry** | Collect coal/wood/scrap, missing rail repaired, carry items/bodies |
 | M4 | **Impostor + voting** | Secret role, sabotage menu + meteor with cooldown, vote that silently locks sabotage |

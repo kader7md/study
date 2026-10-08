@@ -56,6 +56,7 @@ func _ready() -> void:
 			_bumps[k] = rng.randf_range(-12.0, 12.0)
 	_label = Build.label(self, "", Vector3(0, 2.0, 0), 40)
 	_area = BuildArea.new()
+	_area.name = "Area"  # NET: stable child names (Repair_<piece>/Area, Plank<k>/Nail<n>, Bolt<side>_<n>...)
 	_area.repair = self
 	Build.collider(_area, Vector3(3.2, 2.2, Track.PIECE_LENGTH), Vector3(0, -0.9, 0))
 	add_child(_area)
@@ -74,6 +75,7 @@ func _ready() -> void:
 		slot.enabled = false
 		slot.hint = "A rail needs planks under it (at least 3 of 4, nailed or joined)"
 		slot.placed.connect(_on_rail_placed.bind(x))
+		slot.name = "RailSlot%d" % side
 		_rail_slots.append(slot)
 	_update()
 
@@ -145,34 +147,44 @@ func place_plank(k: int, player: Node) -> String:
 		Game.say("The plank fell into the river! Over water, join planks to a supported neighbour.")
 		return kind
 	var roll: float = ground_under(k).roll if kind == "ground" else randf_range(-1.5, 1.5)
+	_add_plank(k, kind == "ground", roll, -0.25 if not has_support_neighbour_back(k) else 0.25)
+	if kind != "ground":
+		Game.say("Plank over the water: join it to its neighbour with the NAIL GUN")
+	_update()
+	return kind
+
+
+## Puts a plank in slot k: nailed down on the ground (2 nails) or joined over water (1 nail-gun joint at joint_z).
+func _add_plank(k: int, grounded: bool, roll: float, joint_z: float) -> void:
 	var node := Props.instance("plank")
+	node.name = "Plank%d" % k
 	node.position = Vector3(0, Track.SLEEPER_Y, SLOTS[k])
 	node.rotation.z = deg_to_rad(roll)
 	add_child(node)
 	var spot := PlankSpot.new()
+	spot.name = "Spot"
 	spot.repair = self
 	spot.slot = k
 	Build.collider(spot, Vector3(2.4, 0.25, 0.4), Vector3.ZERO)
 	spot.collision_layer = 0  # only aimable once fixed (so hammer hits go to the nails first)
 	node.add_child(spot)
-	planks[k] = {"node": node, "roll": roll, "grounded": kind == "ground", "fixed": false, "left": 0, "spot": spot}
-	if kind == "ground":
+	planks[k] = {"node": node, "roll": roll, "grounded": grounded, "fixed": false, "left": 0, "spot": spot, "joint_z": joint_z}
+	if grounded:
 		planks[k].left = 2
-		for x in [-0.95, 0.95]:
+		for n in 2:
 			var nail := NailSpot.new()
-			nail.position = Vector3(x, 0.02, 0)
+			nail.name = "Nail%d" % n
+			nail.position = Vector3(-0.95 if n == 0 else 0.95, 0.02, 0)
 			node.add_child(nail)
 			nail.done.connect(_on_fastened.bind(k))
 	else:
 		planks[k].left = 1
 		var joint := NailSpot.new()
+		joint.name = "Nail0"
 		joint.require_tool = "nail_gun"
-		joint.position = Vector3(0.0, 0.02, -0.25 if not has_support_neighbour_back(k) else 0.25)
+		joint.position = Vector3(0.0, 0.02, joint_z)
 		node.add_child(joint)
 		joint.done.connect(_on_fastened.bind(k))
-		Game.say("Plank over the water: join it to its neighbour with the NAIL GUN")
-	_update()
-	return kind
 
 
 func has_support_neighbour_back(k: int) -> bool:
@@ -237,14 +249,18 @@ func build_roll() -> float:
 # --- Rails and bolts -------------------------------------------------------------------
 
 func _on_rail_placed(_player: Node, x: float) -> void:
+	var side := 0 if x < 0.0 else 1
 	var rail := Props.instance("rail")
+	rail.name = "Rail%d" % side
 	rail.position = Vector3(x, Track.RAIL_Y + 0.4, 0)
 	rail.rotation.z = deg_to_rad(build_roll())
 	add_child(rail)
 	create_tween().tween_property(rail, "position:y", Track.RAIL_Y + x * tan(deg_to_rad(build_roll())), 0.2).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	_rails_placed += 1
-	for z in [-Track.PIECE_LENGTH * 0.5 + 0.25, Track.PIECE_LENGTH * 0.5 - 0.25]:
+	for j in 2:
+		var z := -Track.PIECE_LENGTH * 0.5 + 0.25 if j == 0 else Track.PIECE_LENGTH * 0.5 - 0.25
 		var bolt := NailSpot.new()
+		bolt.name = "Bolt%d_%d" % [side, j]
 		bolt.style = "bolt"
 		bolt.position = Vector3(x + (0.06 if x > 0 else -0.06), Track.RAIL_Y, z)
 		if x < 0:
@@ -328,6 +344,69 @@ func _process(_delta: float) -> void:
 func finish_instantly() -> void:
 	Game.add_stat("repairs")
 	track.repair_piece(index, 0.0)
+
+
+# --- NET: build progress for clients ------------------------------------------------------
+
+## The host sends this after every change: planks {slot: [roll, grounded, fixed, fasteners left, nail hits, joint z]},
+## rails placed (sides) and bolt hits.
+func net_state() -> Dictionary:
+	var p := {}
+	for k: int in planks:
+		var e: Dictionary = planks[k]
+		var hits := []
+		for n in (e.node as Node).get_children():
+			if n is NailSpot:
+				hits.append(n.hits)
+		p[k] = [e.roll, e.grounded, e.fixed, e.left, hits, e.get("joint_z", 0.0)]
+	var rails := []
+	var bolts := []
+	for side in 2:
+		if has_node("Rail%d" % side):
+			rails.append(side)
+			for j in 2:
+				var b := get_node_or_null("Bolt%d_%d" % [side, j]) as NailSpot
+				bolts.append(b.hits if b else 0)
+	return {"p": p, "r": rails, "b": bolts, "bl": _bolts_left}
+
+
+## A client copies the host's build progress (visuals and prompts only; the host finishes the repair).
+func apply_net_state(s: Dictionary) -> void:
+	var p: Dictionary = s.get("p", {})
+	for key: Variant in p:
+		var k := int(key)
+		var e: Array = p[key]
+		if not planks.has(k):
+			_add_plank(k, e[1], e[0], e[5])
+		var d: Dictionary = planks[k]
+		d.roll = e[0]
+		(d.node as Node3D).rotation.z = deg_to_rad(e[0])
+		d.fixed = e[2]
+		d.left = e[3]
+		if d.fixed and d.grounded:
+			(d.spot as PlankSpot).collision_layer = Build.LAYER_INTERACT
+		var hits: Array = e[4]
+		var i := 0
+		for n in (d.node as Node).get_children():
+			if n is NailSpot and i < hits.size():
+				(n as NailSpot).net_set_hits(hits[i])
+				i += 1
+	var rails: Array = s.get("r", [])
+	var bolts: Array = s.get("b", [])
+	var bi := 0
+	for side: int in rails:
+		if not has_node("Rail%d" % side):
+			var slot := get_node_or_null("RailSlot%d" % side)
+			if slot:
+				slot.queue_free()
+			_on_rail_placed(null, (side - 0.5) * Track.GAUGE)
+		for j in 2:
+			var b := get_node_or_null("Bolt%d_%d" % [side, j]) as NailSpot
+			if b and bi < bolts.size():
+				b.net_set_hits(bolts[bi])
+			bi += 1
+	_bolts_left = s.get("bl", _bolts_left)
+	_update()
 
 
 ## A placed plank: hammer taps level it (once nailed).

@@ -88,6 +88,7 @@ var _wheel_slots: Array[Interactable] = []
 ## Breakable cover pieces of all cars (see BodyPart).
 var parts: Array[BodyPart] = []
 var _smoke: MeshInstance3D
+var _lever_mesh: MeshInstance3D
 var _block_msg_cooldown := 0.0
 var _rng := RandomNumberGenerator.new()
 
@@ -175,6 +176,12 @@ func is_stopped() -> bool:
 func _physics_process(delta: float) -> void:
 	if track == null:
 		return
+	# NET: on clients the host's snapshots move the train (WorldSync); here we only show it
+	if not Game.is_host():
+		tip_angle = move_toward(tip_angle, tip_target, 90.0 * delta)
+		_place_cars()
+		_update_effects(delta)
+		return
 	_block_msg_cooldown = maxf(_block_msg_cooldown - delta, 0.0)
 
 	var uphill := maxf(track.grade_at(center_distance()) * signf(speed), 0.0)
@@ -214,13 +221,23 @@ func _physics_process(delta: float) -> void:
 	tip_angle = move_toward(tip_angle, tip_target, 90.0 * delta)
 	_place_cars()
 	_update_station()
+	_update_effects(delta)
+
+
+## Smoke, the come-along chain, spinning wheels and the lever handle.
+func _update_effects(delta: float) -> void:
 	_update_smoke(delta)
 	if is_instance_valid(hook) and is_instance_valid(anchor):
+		_chain.visible = true
 		var to := anchor.global_position + Vector3.UP * 1.0
 		_chain.update(hook.global_position, to, hook.global_position.distance_to(to) * 1.02)
+	elif _chain.visible and not Game.is_host():
+		_chain.visible = false  # NET: a client follows the host's hook / anchor
 	for i in _wheel_nodes.size():
 		if _wheel_state[i] == 0:
 			_wheel_nodes[i].rotation.x -= speed * delta / 0.45
+	if _lever_mesh:
+		_lever_mesh.rotation.x = -lever * 0.5
 
 
 static func crash_damage(v: float) -> float:
@@ -447,6 +464,29 @@ func lever_text() -> String:
 
 # --- Wheels: fall off, get carried back, placed and bolted ----------------------------
 
+## NET: a client mirrors the host's wheel i (state 0 ok, 1 missing, 2 placed but not bolted; wear).
+func net_set_wheel(i: int, state: int, wear: float) -> void:
+	wheel_wear[i] = wear
+	var old := _wheel_state[i]
+	if old == state:
+		return
+	match state:
+		0:
+			_wheel_state[i] = 0
+			_wheel_nodes[i].visible = true
+			_wheel_nodes[i].position = _wheel_home[i]
+			_wheel_nodes[i].rotation = Vector3.ZERO
+		1:
+			_wheel_state[i] = 1
+			_wheel_nodes[i].visible = false
+			if old == 0:
+				_drop_wheel(i)
+				wheel_lost.emit(wheels - 1)
+		2:
+			place_wheel(i)
+	wheels = _ok_wheels().size()
+
+
 ## A random good wheel comes off (used by checkpoint loading and tests).
 func lose_wheel(announce := true) -> void:
 	var ok := _ok_wheels()
@@ -662,6 +702,7 @@ func _build_locomotive(car: Node3D, model: Node3D, length: float) -> void:
 	# Lever
 	var lever_mesh := Build.box(car, Vector3(0.1, 0.9, 0.1), Vector3(-0.9, f + 0.55, 1.6), Color(0.95, 0.7, 0.2))
 	Build.sphere(lever_mesh, 0.1, Vector3(0, 0.45, 0), Color(0.6, 0.1, 0.08))
+	_lever_mesh = lever_mesh
 	var lever_spot := ActionSpot.create(car, Vector3(0.6, 1.2, 0.6), Vector3(-0.9, f + 0.6, 1.6),
 		func(_p): return "Lever: %s   [E] forward / [Q] back" % lever_text(),
 		func(_p):

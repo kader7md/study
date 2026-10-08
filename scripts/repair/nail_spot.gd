@@ -50,13 +50,29 @@ func on_tool_hit(tool: String, _player: Node) -> bool:
 			return false
 		_paid = true
 	hits = HAMMER_HITS if tool == "nail_gun" else hits + 1
-	if style == "bolt":
-		_nail.position.x = -0.08 * float(hits) / HAMMER_HITS
-	else:
-		_nail.position.y = -0.2 * float(hits) / HAMMER_HITS
+	_show_hits()
 	if hits >= HAMMER_HITS:
 		finished = true
 		set_deferred("monitorable", false)
 		collision_layer = 0
 		done.emit()
 	return true
+
+
+func _show_hits() -> void:
+	if style == "bolt":
+		_nail.position.x = -0.08 * float(hits) / HAMMER_HITS
+	else:
+		_nail.position.y = -0.2 * float(hits) / HAMMER_HITS
+
+
+## NET: a client mirrors the host's progress (no nails taken, no `done` signal: the host finishes the work).
+func net_set_hits(h: int) -> void:
+	if h == hits:
+		return
+	hits = h
+	_show_hits()
+	if hits >= HAMMER_HITS and not finished:
+		finished = true
+		set_deferred("monitorable", false)
+		collision_layer = 0

@@ -47,9 +47,11 @@ What's in it:
   beside the track**: pick it up [E], use it on the padlock [E], the boom swings up (placeholder until the quest maps).
   An objective line on the HUD says what to do next ("Gate locked: find the key", "Rebuild the broken track ahead"...)
 - **Chapter 1 complete** screen at the port with the run stats (time, distance, track rebuilt, panels, wheels lost,
-  gates, gold), then *Back to main menu* (`Game.return_to_menu()`, reloads Main while there is no menu scene) or *Keep exploring*
+  gates, gold), then *Back to main menu* or *Keep exploring*
 - **Balance**: supplies beside every gap and gate, softlock guards (supply crate, coal crate, emergency wheel, a limping
   train can always reach a station). See the balance table in the GDD
+- **Online co-op for 1 to 5 players** (host-authoritative, ENet): crew lobby with invite codes, ready and kick, other
+  players drawn as chunky workers with name tags, a secret impostor with 3+ players, push-to-talk proximity voice
 
 ### Controls
 | Key | Action |
@@ -64,7 +66,7 @@ What's in it:
 | F11 | Fullscreen on/off |
 | F2 | Debug: play as **impostor** (**Tab** = sabotage menu, then 1–4; meteor: aim + LMB) |
 | F3 | Debug: world sabotage on/off |
-| F5 / F6 | Last checkpoint / new game |
+| F5 / F6 | Last checkpoint / new game (offline or host only) |
 
 ### Rebuilding the models
 ```bash
@@ -77,6 +79,16 @@ blender --background --python blender/scripts/render_showcase.py -- . renders [s
 
 All keys can be changed in Settings > Controls.
 
+### Playing together (1 to 5 players)
+- **Host:** *Host game* in the main menu opens the **crew lobby** (or run `res://scenes/net/Lobby.tscn`, which also offers
+  solo / host / join on its own). Share the **invite code** (Copy code), e.g. `60N00-H8QZN`: it is your IP and port.
+  Friends on your Wi-Fi join right away. Over the internet, forward **UDP port 24565** on your router or press
+  **Open the port (UPnP)**. Press **Start the run** when everyone is ready (alone it says *Start solo*: plain offline play).
+- **Join:** *Join game*, paste the code (or type `192.168.1.20` / `192.168.1.20:24565`), then **I'm ready**.
+- The host's PC runs the game; everyone sees the same train, track, repairs and inventory. With 3 to 5 players one of
+  you is secretly the **impostor** (a private banner tells only them). If the host leaves, everyone goes back to the menu.
+- Details, the Steam plug-in steps and the invite-code format: [`docs/NETWORK.md`](docs/NETWORK.md).
+
 ### Tests
 ```bash
 godot --headless --path . --import                     # once after pulling (registers classes and imports assets)
@@ -86,7 +98,8 @@ godot --headless --path . res://tests/TestRoute.tscn   # the whole Chapter 1 rou
                                                        # checkpoint, the end screen and a station 3 restart (~1-2 min)
 # Screenshots need a display (or xvfb-run); modes: repair, train, menu, hud, gate, end, tools
 xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/Screenshot.tscn -- <out_dir> menu
+tests/run_net_test.sh                                   # multiplayer: headless host + client (+ latecomer, + 3 players); GODOT=/path/to/godot
 ```
 
 ### Not built yet (see GDD milestones)
-Multiplayer (M1, in progress) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **quest maps (next; the keys lie beside the gates until then)** · Chapter 2 sea
+Steam lobbies (the backend is stubbed, ENet works) · joining mid-run · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **quest maps (next; the keys lie beside the gates until then)** · Chapter 2 sea

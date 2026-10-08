@@ -53,7 +53,7 @@ func _ready() -> void:
 		var st := Station.new()
 		add_child(st)
 		st.setup(track, i)
-		st.shop_requested.connect(func(s: Station): hud.open_shop(s))
+		st.shop_requested.connect(_on_shop_requested)
 
 	var terrain := Terrain.new()
 	terrain.name = "Terrain"
@@ -76,15 +76,14 @@ func _ready() -> void:
 	add_child(sab)
 	Game.sabotage = sab
 
-	player = Player.new()
-	player.name = "Player"
-	add_child(player)
-	# Start on the station platform next to the locomotive
+	# Start on the station platform next to the locomotive, looking at it
 	var t := track.transform_at(train.distance - 4.0)
-	player.global_position = t.origin + t.basis.x * 3.5 + Vector3.UP * 1.4
-	player.look_at(train.cars[0].global_position + Vector3.UP * 1.5, Vector3.UP)
-	player.rotation.x = 0.0
-	player.rotation.z = 0.0
+	var spawn_pos := t.origin + t.basis.x * 3.5 + Vector3.UP * 1.4
+	var look := train.cars[0].global_position + Vector3.UP * 1.5 - spawn_pos
+	var spawn_xform := Transform3D(Basis.looking_at(Vector3(look.x, 0.0, look.z), Vector3.UP), spawn_pos)
+	# NET: one Player per peer under Main/Players (offline: just ours, right away). On a client `player` is set a
+	# moment later, when the host spawns it (Net sets main.player and hud.player then).
+	player = Net.spawn_players(self, spawn_xform)
 
 	hud = HUD.new()
 	hud.player = player
@@ -100,6 +99,14 @@ func _ready() -> void:
 		Game.show_banner("TRUST ISSUES\nShe was taken. Follow the tracker: 5 stations to go.\nShovel coal, push the lever, repair the rails.")
 	else:
 		Game.show_banner("Back at Station %d" % start_station)
+
+
+## [E] on a station shop. NET: when a client pressed it (the action runs on the host), open the shop on their screen.
+func _on_shop_requested(s: Station) -> void:
+	if Net.remote_actor() != 0:
+		Net.open_shop_for(Net.remote_actor(), s.index)
+		return
+	hud.open_shop(s)
 
 
 func _build_environment() -> void:

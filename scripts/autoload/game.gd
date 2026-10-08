@@ -58,7 +58,8 @@ var inventory: Dictionary = {}
 var next_station := 1
 ## Last saved checkpoint ({} = new game).
 var checkpoint: Dictionary = {}
-## Debug role for solo testing: "crew" (world sabotage runs by itself) or "impostor" ([Tab] menu, keys 1-4).
+## This peer's role: "crew" or "impostor" ([Tab] menu, keys 1-4). NET: set per peer by Net at the start of a run
+## (only the impostor's own peer is told); offline, F2 toggles it for testing.
 var role := "crew"
 var sabotage_menu_open := false
 var world_sabotage := true
@@ -120,17 +121,42 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# NET: debug keys only offline or on the host (F2 offline only: online the roles come from Net)
+	if not is_host():
+		return
 	if event.is_action_pressed("restart_checkpoint"):
 		restart_from_checkpoint()
 	elif event.is_action_pressed("new_game"):
 		new_game(true)
-	elif event.is_action_pressed("toggle_role"):
+	elif event.is_action_pressed("toggle_role") and not _net_online():
 		role = "impostor" if role == "crew" else "crew"
 		sabotage_menu_open = false
 		say("Debug role: %s%s" % [role.to_upper(), " ([Tab] = sabotage menu)" if role == "impostor" else ""])
 	elif event.is_action_pressed("toggle_world_sabotage"):
 		world_sabotage = not world_sabotage
 		say("World sabotage: %s" % ("ON" if world_sabotage else "OFF"))
+
+
+# --- NET ---------------------------------------------------------------------
+
+## NET: true offline and on the host: only the host changes game state (clients get it from Net / WorldSync).
+func is_host() -> bool:
+	var net := get_node_or_null(^"/root/Net")
+	return net == null or net.is_host()
+
+
+func _net_online() -> bool:
+	var net := get_node_or_null(^"/root/Net")
+	return net != null and net.is_online()
+
+
+## NET: reloads the world: online the host reloads every peer, a client never does it on its own.
+func _reload_world() -> void:
+	if _net_online():
+		if is_host():
+			get_node(^"/root/Net").reload_world.call_deferred()
+		return
+	get_tree().reload_current_scene.call_deferred()
 
 
 # --- Inventory -------------------------------------------------------------
@@ -176,6 +202,9 @@ static func cost_text(cost: Dictionary) -> String:
 
 
 func buy(item_id: String) -> bool:
+	if not is_host():
+		get_node(^"/root/Net").request(self, &"buy", [item_id])  # NET: the host's inventory pays
+		return true
 	var entry: Dictionary = SHOP[item_id]
 	if not take("gold", entry.price):
 		say("Not enough gold for %s (%d gold)" % [entry.label, entry.price])
@@ -219,11 +248,18 @@ func on_gate_opened(segment: int) -> void:
 
 func say(text: String) -> void:
 	print("[game] ", text)
+	# NET: on the host, feedback to a client's request goes to that client only
+	var net := get_node_or_null(^"/root/Net")
+	if net and net.route_message(text):
+		return
 	message.emit(text)
 
 
 func show_banner(text: String) -> void:
 	print("[banner] ", text)
+	var net := get_node_or_null(^"/root/Net")
+	if net:
+		net.route_banner(text)  # NET: the host's banners show for everyone
 	banner.emit(text)
 
 
@@ -279,7 +315,7 @@ func restart_from_checkpoint() -> void:
 		new_game(true)
 		return
 	load_checkpoint_state()
-	get_tree().reload_current_scene.call_deferred()
+	_reload_world()
 
 
 ## Restores the run state saved in the checkpoint (inventory, stats, opened gates) without reloading the scene.
@@ -312,7 +348,7 @@ func new_game(reload: bool) -> void:
 	objective = ""
 	inventory_changed.emit()
 	if reload:
-		get_tree().reload_current_scene.call_deferred()
+		_reload_world()
 
 
 ## Leaves the run: closes the network session (if the Net autoload exists), then goes to the main menu,
