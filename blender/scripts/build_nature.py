@@ -15,6 +15,17 @@ import bpy  # noqa: E402
 import build_assets as A  # noqa: E402
 
 OUT = os.path.join(A.ROOT, "assets", "models", "nature")
+# materials of the overworld scatter models (ground plants, brambles)
+A.MATS.update({
+    "grass_blade": ("foliage", (0.16, 0.3, 0.07), 0.0, 0.9),
+    "fern_leaves": ("foliage", (0.08, 0.22, 0.05), 0.0, 0.85),
+    "flower_red": ("plain", (0.7, 0.08, 0.06), 0.0, 0.7),
+    "flower_yellow": ("plain", (0.85, 0.65, 0.08), 0.0, 0.7),
+    "flower_white": ("plain", (0.85, 0.85, 0.8), 0.0, 0.7),
+    "flower_blue": ("plain", (0.25, 0.3, 0.75), 0.0, 0.7),
+    "bramble": ("wood", (0.14, 0.07, 0.05), 0.0, 0.9),
+    "berry": ("plain", (0.45, 0.02, 0.05), 0.0, 0.4),
+})
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -198,7 +209,189 @@ def bush(name):
     A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 512)
 
 
-if __name__ == "__main__":
+def rock_spire(name):
+    """A tall crag (about 18 m): stacked, shrinking, weathered blocks, leaning a little."""
+    A.clear_scene()
+    random.seed(41)
+    parts = []
+    z = 0.0
+    lean = (random.uniform(-0.25, 0.25), random.uniform(-0.25, 0.25))
+    for i in range(7):
+        h = random.uniform(2.2, 3.2)
+        w = 7.0 - i * 0.75 + random.uniform(-0.4, 0.4)
+        b = A.box(f"block{i}", (w, w * random.uniform(0.75, 0.95), h), (lean[0] * i, lean[1] * i, z + h / 2), "cliff", 0.0,
+                  rot=(0, 0, random.uniform(0, 1.2)))
+        displace(b, 0.7, 1.1, "VORONOI", subdiv=1)
+        parts.append(b)
+        z += h * 0.9
+    A.join(name, parts, origin=(0, 0, 0))
+    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 1024)
+
+
+def cliff_big(name):
+    """A wide cliff face (about 22 x 9 x 16 m) with strata ledges, to dress steep mountainsides."""
+    A.clear_scene()
+    random.seed(43)
+    parts = []
+    for col in range(4):
+        x = -8.0 + col * 5.4 + random.uniform(-0.6, 0.6)
+        z = 0.0
+        for i in range(5):
+            h = random.uniform(2.4, 3.8)
+            w = random.uniform(5.5, 7.0)
+            dpt = random.uniform(6.0, 9.0) - i * 0.9
+            b = A.box(f"c{col}_{i}", (w, dpt, h), (x, random.uniform(-0.8, 0.8) + i * 0.6, z + h / 2), "cliff", 0.0,
+                      rot=(0, 0, random.uniform(-0.15, 0.15)))
+            displace(b, 0.8, 1.3, "VORONOI", subdiv=1)
+            parts.append(b)
+            z += h * 0.93
+    A.join(name, parts, origin=(0, 0, 0))
+    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 1024)
+
+
+def cave(name):
+    """A rock cave: a thick, lumpy shell (about 18 m wide, 9 m high) with a wide mouth on the -Y side."""
+    import bmesh
+    A.clear_scene()
+    random.seed(47)
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=9.0, location=(0, 0, 0))
+    obj = bpy.context.active_object
+    obj.scale = (1.0, 1.25, 0.85)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    kill = [f for f in bm.faces if f.calc_center_median().z < -0.5 or
+            (f.calc_center_median().y < -6.0 and f.calc_center_median().z < 5.8 and abs(f.calc_center_median().x) < 5.5)]
+    bmesh.ops.delete(bm, geom=kill, context="FACES")
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj = A._finish(obj, "shell", "cliff", 0.0)
+    sol = obj.modifiers.new("Solid", "SOLIDIFY")
+    sol.thickness = 2.2
+    sol.offset = 1.0
+    displace(obj, 1.2, 1.6, "VORONOI")
+    # a few fallen blocks around the mouth
+    parts = [obj]
+    for k in range(4):
+        r = ico(f"blk{k}", random.uniform(0.8, 1.5), (random.uniform(-7, 7), random.uniform(-12, -9), 0.3), "rock", 2)
+        displace(r, 0.4, 0.6, "VORONOI")
+        parts.append(r)
+    A.join(name, parts, origin=(0, 0, 0))
+    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 1024)
+
+
+def log(name):
+    """A fallen trunk (about 5 m) with broken branch stubs."""
+    A.clear_scene()
+    random.seed(53)
+    trunk = cone_between("trunk", (-2.6, 0, 0.36), (2.6, 0, 0.32), 0.38, 0.3, "bark", 14)
+    displace(trunk, 0.05, 0.15)
+    parts = [trunk]
+    for k in range(4):
+        x = random.uniform(-2.0, 2.0)
+        a = random.uniform(0, math.pi * 2)
+        parts.append(cone_between(f"stub{k}", (x, 0, 0.36), (x + random.uniform(-0.3, 0.3), math.cos(a) * 0.9, 0.36 + math.sin(a) * 0.9 + 0.3),
+                                  0.09, 0.03, "bark", 6))
+    for side in (-1, 1):
+        parts.append(A.cyl(f"end{side}", 0.3 if side > 0 else 0.38, 0.04, (2.62 * side, 0, 0.36 if side < 0 else 0.32), "wood", axis="X", verts=14, bevel=0.0))
+    A.join(name, parts, origin=(0, 0, 0))
+    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 512)
+
+
+def grass_clump(name):
+    """A tuft of 16 bent grass blades (about 0.7 m)."""
+    A.clear_scene()
+    random.seed(59)
+    parts = []
+    for k in range(16):
+        a = k * 2 * math.pi / 16 + random.uniform(-0.2, 0.2)
+        r = random.uniform(0.05, 0.18)
+        h = random.uniform(0.45, 0.8)
+        lean = random.uniform(0.15, 0.4)
+        base = (math.cos(a) * r, math.sin(a) * r, -0.02)
+        tip = (math.cos(a) * (r + lean), math.sin(a) * (r + lean), h)
+        b = cone_between(f"blade{k}", base, tip, 0.035, 0.002, "grass_blade", 3)
+        b.scale = (1.0, 1.0, 1.0)
+        parts.append(b)
+    A.join(name, parts, origin=(0, 0, 0))
+    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 256)
+
+
+def flowers(name):
+    """Wild flowers: thin stems with red, yellow, white and blue heads."""
+    A.clear_scene()
+    random.seed(61)
+    parts = []
+    colours = ["flower_red", "flower_yellow", "flower_white", "flower_blue"]
+    for k in range(9):
+        x, y = random.uniform(-0.35, 0.35), random.uniform(-0.35, 0.35)
+        h = random.uniform(0.3, 0.55)
+        parts.append(cone_between(f"stem{k}", (x, y, -0.02), (x + random.uniform(-0.05, 0.05), y, h), 0.012, 0.008, "grass_blade", 4))
+        parts.append(ico(f"head{k}", random.uniform(0.04, 0.07), (x, y, h + 0.02), colours[k % 4], 1, scale=(1, 1, 0.55)))
+    for k in range(6):
+        a = random.uniform(0, math.pi * 2)
+        parts.append(cone_between(f"leaf{k}", (0, 0, 0), (math.cos(a) * 0.3, math.sin(a) * 0.3, 0.2), 0.03, 0.004, "grass_blade", 3))
+    A.join(name, parts, origin=(0, 0, 0))
+    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 256)
+
+
+def fern(name):
+    """A fern: eight arching fronds (about 1 m)."""
+    A.clear_scene()
+    random.seed(67)
+    parts = []
+    for k in range(8):
+        a = k * 2 * math.pi / 8 + random.uniform(-0.2, 0.2)
+        mid = (math.cos(a) * 0.45, math.sin(a) * 0.45, 0.7)
+        tip = (math.cos(a) * 1.0, math.sin(a) * 1.0, 0.35)
+        f1 = cone_between(f"f{k}a", (0, 0, 0), mid, 0.14, 0.12, "fern_leaves", 4)
+        f2 = cone_between(f"f{k}b", mid, tip, 0.12, 0.01, "fern_leaves", 4)
+        for f in (f1, f2):
+            f.scale = (1.0, 1.0, 1.0)
+            displace(f, 0.04, 0.1)
+        parts += [f1, f2]
+    A.join(name, parts, origin=(0, 0, 0))
+    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 512)
+
+
+def thorn_bush(name):
+    """A bramble thicket (about 2.5 m wide): a tangle of thorny dark canes with red berries. It hurts to walk through."""
+    A.clear_scene()
+    random.seed(71)
+    parts = []
+    for k in range(22):
+        a = random.uniform(0, math.pi * 2)
+        p0 = (random.uniform(-0.4, 0.4), random.uniform(-0.4, 0.4), 0.0)
+        p1 = (math.cos(a) * random.uniform(0.6, 1.3), math.sin(a) * random.uniform(0.6, 1.3), random.uniform(0.6, 1.3))
+        p2 = (p1[0] * 1.3, p1[1] * 1.3, p1[2] * random.uniform(0.3, 0.8))
+        parts.append(cone_between(f"cane{k}a", p0, p1, 0.04, 0.03, "bramble", 5))
+        parts.append(cone_between(f"cane{k}b", p1, p2, 0.03, 0.01, "bramble", 5))
+        for t in range(3):
+            f = random.uniform(0.2, 0.9)
+            q = tuple(p0[i] + (p1[i] - p0[i]) * f for i in range(3))
+            parts.append(cone_between(f"th{k}_{t}", q, (q[0] + random.uniform(-0.1, 0.1), q[1] + random.uniform(-0.1, 0.1), q[2] + 0.1), 0.012, 0.0, "bramble", 3))
+        if k % 3 == 0:
+            parts.append(ico(f"berry{k}", 0.05, p2, "berry", 1))
+    for k in range(6):
+        c = ico(f"leaf{k}", random.uniform(0.35, 0.55), (random.uniform(-0.8, 0.8), random.uniform(-0.8, 0.8), random.uniform(0.4, 0.9)), "bush_leaves", 1)
+        displace(c, 0.15, 0.2)
+        parts.append(c)
+    A.join(name, parts, origin=(0, 0, 0))
+    A.bake_and_export(os.path.join(OUT, f"{name}.glb"), 512)
+
+
+OVERWORLD = {"rock_spire": rock_spire, "cliff_big": cliff_big, "cave": cave, "log": log, "grass_clump": grass_clump,
+             "flowers": flowers, "fern": fern, "thorn_bush": thorn_bush}
+
+
+if __name__ == "__main__" and "--" in sys.argv and len(sys.argv) > sys.argv.index("--") + 2:
+    # build only the named models: blender ... -- <repo_root> rock_spire log ...
+    for model in sys.argv[sys.argv.index("--") + 2:]:
+        OVERWORLD[model](model)
+    print("done")
+elif __name__ == "__main__":
+    for model, fn in OVERWORLD.items():
+        fn(model)
     pine("pine")
     pine("pine_snow", 10.0, snow=True)
     oak("oak")

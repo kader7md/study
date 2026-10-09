@@ -40,17 +40,26 @@ const GATE_FRACTIONS := [0.64, 0.72, 0.6, 0.66, 0.74]
 
 ## Segment themes (segment i runs from station i to station i+1).
 ## heights: track height keypoints as (fraction of segment, metres). Station heights are in STATION_HEIGHTS.
-## rivers: crossings as (fraction, width m). lake: (from, to, side, inner u) where side +1 = right of the track.
-## walls: how high the land rises far from the track (valley walls / mountains).
+## rivers: crossings as (fraction, width m); each river runs as a gorge across the whole landscape.
+## lake: (from, to, side, inner u[, outer u]) where side +1 = right of the track; no outer edge = the open sea.
+## Landscape (see Landscape.height): walls = how high the land rises 30-170 m from the track; hills = rolling hill
+## height further out; mountains = height of the ridged mountains that start mstart metres from the track;
+## terrace = how much they break into cliff bands; snow = snow line (m); dry, forest, rock = ground colour,
+## tree density and rockiness (0-1).
 const STATION_HEIGHTS := [0.0, 8.0, 4.0, 46.0, 6.0, 2.0]
 const THEMES := [
-	{"name": "Forest hills", "heights": [[0.25, 7.0], [0.55, 2.0], [0.78, 11.0]], "rivers": [[0.55, 26.0]], "walls": 18.0},
-	{"name": "River valley", "heights": [[0.3, 3.0], [0.5, 2.0], [0.72, 7.0]], "rivers": [[0.5, 70.0]], "walls": 30.0},
-	{"name": "Mountain pass", "heights": [[0.25, 15.0], [0.5, 27.0], [0.75, 39.0]], "rivers": [[0.5, 46.0]], "walls": 85.0},
+	{"name": "Forest hills", "heights": [[0.25, 7.0], [0.55, 2.0], [0.78, 11.0]], "rivers": [[0.55, 26.0]], "walls": 18.0,
+		"hills": 38.0, "mountains": 120.0, "mstart": 330.0, "terrace": 0.15, "snow": 230.0, "dry": 0.1, "forest": 0.9, "rock": 0.25},
+	{"name": "River valley", "heights": [[0.3, 3.0], [0.5, 2.0], [0.72, 7.0]], "rivers": [[0.5, 70.0]], "walls": 30.0,
+		"hills": 24.0, "mountains": 210.0, "mstart": 220.0, "terrace": 0.7, "snow": 190.0, "dry": 0.3, "forest": 0.6, "rock": 0.55},
+	{"name": "Mountain pass", "heights": [[0.25, 15.0], [0.5, 27.0], [0.75, 39.0]], "rivers": [[0.5, 46.0]], "walls": 85.0,
+		"hills": 40.0, "mountains": 360.0, "mstart": 120.0, "terrace": 0.45, "snow": 135.0, "dry": 0.2, "forest": 0.45, "rock": 0.9},
 	{"name": "The lake", "heights": [[0.3, 30.0], [0.55, 10.0], [0.76, 3.0]], "rivers": [[0.76, 90.0]],
-		"lake": [0.6, 0.97, 1, 22.0], "walls": 25.0},
+		"lake": [0.6, 0.97, 1, 22.0, 560.0], "walls": 25.0,
+		"hills": 30.0, "mountains": 190.0, "mstart": 280.0, "terrace": 0.35, "snow": 150.0, "dry": 0.2, "forest": 0.7, "rock": 0.45},
 	{"name": "The coast", "heights": [[0.4, 8.0], [0.7, 4.0]], "rivers": [],
-		"lake": [0.55, 1.2, -1, 24.0], "walls": 15.0},
+		"lake": [0.55, 1.2, -1, 24.0], "walls": 15.0,
+		"hills": 26.0, "mountains": 90.0, "mstart": 300.0, "terrace": 0.6, "snow": 400.0, "dry": 0.65, "forest": 0.35, "rock": 0.5},
 ]
 
 var station_distances: Array[float] = []
@@ -62,6 +71,8 @@ var _roll := {}         # rebuilt piece index -> tilt in degrees (how well the c
 var _rails: MultiMesh
 var _sleepers: MultiMesh
 var _noise := FastNoiseLite.new()
+## The shape of the land around the track (hills, mountains, rivers, lakes, quest sites).
+var land := Landscape.new()
 var _height_keys: Array[Vector2] = []  # (distance, height) keypoints of the track profile
 ## Boom position of each segment's locked gate (distance along the track).
 var gate_distances: Array[float] = []
@@ -74,12 +85,15 @@ var initial_gaps: Array[Dictionary] = []
 
 func build(rng: RandomNumberGenerator) -> void:
 	_noise.seed = rng.randi()
-	_noise.frequency = 0.006
-	_noise.fractal_octaves = 3
+	land.setup(self, _noise.seed)
 	_build_curve(rng)
+	land.build_params()
 	_build_bridge_flags()
 	_choose_gate_spots()
+	_choose_quest_zones()
+	_build_bridge_flags()  # the quest-site plateaus reshape the ground near the gates
 	_build_visuals()
+	_spawn_quest_markers()
 
 
 # --- Geometry ---------------------------------------------------------------
@@ -225,29 +239,11 @@ func theme_at(d: float) -> Dictionary:
 # --- Landscape --------------------------------------------------------------------
 
 ## Natural ground height at track distance d and sideways offset u (metres, + = right),
-## before the railway embankment is added. Rivers, lakes and valley walls come from THEMES.
+## before the railway embankment is added (see Landscape.height).
 func natural_height(d: float, u: float) -> float:
-	var ty := point_at(d).y
-	var au := absf(u)
-	var theme := theme_at(d)
-	var p := point_at(d) + flat_right(d) * u
-	var hills := _noise.get_noise_2d(p.x, p.z)
-	var h := ty - 0.4 + hills * lerpf(1.0, 10.0, smoothstep(8.0, 120.0, au))
-	h += float(theme.walls) * smoothstep(30.0, 170.0, au) * (0.6 + 0.4 * (hills + 1.0))
-	var seg := segment_at(d)
-	var seg_start := station_distances[seg]
-	for r: Array in theme.rivers:
-		var rd: float = seg_start + r[0] * SEGMENT_LENGTH
-		var k := 1.0 - smoothstep(r[1] * 0.5, r[1] * 0.5 + 30.0, absf(d - rd))
-		h = lerpf(h, WATER_LEVEL - 4.0, k)
-	if theme.has("lake"):
-		var lk: Array = theme.lake
-		var a: float = seg_start + lk[0] * SEGMENT_LENGTH
-		var b: float = seg_start + lk[1] * SEGMENT_LENGTH
-		var kd := smoothstep(a - 40.0, a + 20.0, d) * (1.0 - smoothstep(b - 20.0, b + 40.0, d))
-		var ku := smoothstep(lk[3] - 15.0, lk[3] + 15.0, u * float(lk[2]))
-		h = lerpf(h, WATER_LEVEL - 5.0, kd * ku)
-	return h
+	var on := point_at(d)
+	var p := on + flat_right(d) * u
+	return land.height(p.x, p.z, d, u, on.y)
 
 
 ## Final ground height: natural ground plus the embankment the rails sit on (none on bridges).
@@ -601,6 +597,69 @@ func _key_spot_for(d: float, seg: int) -> Vector2:
 				if h > WATER_LEVEL + 1.0 and h > ty - 2.0 and h < ty + 1.5 and slope < 0.5:
 					return Vector2(dk, uk)
 	return Vector2.ZERO
+
+
+# --- Quest sites -------------------------------------------------------------------------
+
+## Reserves a flat, cleared ZONE_SIZE x ZONE_SIZE plateau at rail height beside every gate (on the side that
+## needs the least earthworks and stays dry, preferring the key's side): the quest maps / portals go there later.
+func _choose_quest_zones() -> void:
+	land.zones.clear()
+	var half := Landscape.ZONE_SIZE * 0.5
+	var cu := Landscape.ZONE_GAP + half
+	for s in gate_distances.size():
+		var g := gate_distances[s]
+		var dc := g - 10.0
+		var zh := point_at(g).y - 0.3
+		var key_side := signf(key_spots[s].y) if key_spots[s].y != 0.0 else 1.0
+		var best_side := key_side
+		var best_cost := INF
+		for side: float in [key_side, -key_side]:
+			var cost := 0.0
+			for a: float in [-1.0, -0.5, 0.0, 0.5, 1.0]:
+				for b: float in [-1.0, -0.5, 0.0, 0.5, 1.0]:
+					var h := natural_height(dc + a * half, side * (cu + b * half))
+					cost += absf(h - zh) + (300.0 if h < WATER_LEVEL + 1.0 else 0.0)
+			if side == key_side:
+				cost *= 0.85
+			if cost < best_cost:
+				best_cost = cost
+				best_side = side
+		var on := point_at(dc)
+		var fwd := flat_forward(dc)
+		var right := flat_right(dc)
+		var c := on + right * best_side * cu
+		land.zones.append({"center": Vector2(c.x, c.z), "forward": Vector2(fwd.x, fwd.z).normalized(),
+			"right": Vector2(right.x, right.z).normalized(), "half": Vector2(half, half), "height": zh,
+			"side": best_side, "gate_index": s, "d": dc})
+		land.zones_changed()
+
+
+## Quest site beside segment `seg`'s gate: {center: Vector3 (on the flat ground), size: Vector2 (metres),
+## gate_index, forward: Vector3 (along the track), side: +1 right of the track / -1 left}.
+func quest_zone(seg: int) -> Dictionary:
+	var zn: Dictionary = land.zones[seg]
+	var c: Vector2 = zn.center
+	var f: Vector2 = zn.forward
+	return {"center": Vector3(c.x, float(zn.height), c.y), "size": Vector2(Landscape.ZONE_SIZE, Landscape.ZONE_SIZE),
+		"gate_index": int(zn.gate_index), "forward": Vector3(f.x, 0.0, f.y), "side": float(zn.side)}
+
+
+func quest_zone_count() -> int:
+	return land.zones.size()
+
+
+## A marker node "QuestZone_<seg>" at the centre of every quest site (facing along the track), with the site's
+## size and gate index as metadata. NET: the same names on every peer.
+func _spawn_quest_markers() -> void:
+	for s in land.zones.size():
+		var q := quest_zone(s)
+		var m := Marker3D.new()
+		m.name = "QuestZone_%d" % s
+		m.set_meta("size", q.size)
+		m.set_meta("gate_index", q.gate_index)
+		add_child(m)
+		m.global_transform = Transform3D(Basis.looking_at(q.forward, Vector3.UP), q.center)
 
 
 ## Spots where no tree should grow (gates, signal posts and keys stay visible).

@@ -43,3 +43,19 @@ Things we couldn't do from the cloud session. Do these **first** once the repo i
 - [ ] **Look at the game on a real GPU** (Forward+ instead of the cloud's software opengl3): lighting, shadows, FPS at
   1080p / 1440p, and the Graphics settings (window modes, V-Sync, resolution scale).
 - [ ] **Export builds** (Windows / Linux templates for 4.7.2) and try them on a friend's PC.
+
+## Open from the world-map pass
+⚠️ The big overworld (Landscape / Terrain / WorldFeatures / Atmosphere) works and passes the tests, but these are open:
+- [ ] **Frame rate on a real GPU.** Only measured on software rendering in the cloud (0.2 fps, ~510 draw calls,
+  ~0.7 M primitives at a ground view: meaningless for a GPU). Check FPS locally (`tests/Screenshot.tscn -- <dir> world ground`
+  prints `[fps]`); tune `Terrain.LOD_END`, the `SCATTER` view distances and the tree density if needed.
+- [ ] **Build time.** The terrain takes several seconds to build on every start (and five times in TestMenu). Ideas: cache the
+  heightmap per seed in `user://`, or compute it on worker threads (`Terrain.THREADS`; GDScript threads were slower in the
+  cloud test, re-measure on a desktop CPU).
+- [ ] **Hazard feel** (mud, quicksand, ice, thorns, geysers) and the out-of-bounds warning are untested by hand: walk them.
+- [ ] **New nature models** (`rock_spire`, `cliff_big`, `cave`, `flowers`, `fern`, `thorn_bush`): check they look right in-game;
+  if one is missing, rebuild with `blender --background --python blender/scripts/build_nature.py -- <repo> <names>`.
+- [ ] Caves are rock domes on open ground with a trimesh collider: check you can walk in and out.
+- [ ] Rope bridges, waterfalls and rockfalls: look at them in-game (no close-up screenshots were taken).
+- [ ] Multiplayer: the land is deterministic (checked in TestRoute), but rockfalls and falling trees play per peer (visual
+  timing may differ slightly between peers).

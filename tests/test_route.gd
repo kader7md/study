@@ -70,6 +70,7 @@ func _wait(seconds: float) -> void:
 
 func _run() -> void:
 	_check_layout()
+	_check_world()
 	_check_budget()
 	await _check_viewmodel()
 	Engine.time_scale = TIME_SCALE
@@ -129,6 +130,98 @@ func _check_layout() -> void:
 			bad_gap = bad_gap or track.is_bridge(int(gap.first) + k)
 	check(not bad_gap, "no pre-placed gap on a bridge or within %d m before a gate" % int(Track.GATE_GAP_BEFORE))
 	check(main.find_child("Pickup_0", true, false) != null and main.find_child("Repair_%d" % int(track.initial_gaps[0].first), true, false) != null, "deterministic names: Pickup_<n>, Repair_<piece>")
+
+
+## The overworld: a big, non-flat terrain around the whole line, flat quest sites by the gates, the same land
+## from the same seed, collision near players, things to find off the rails.
+func _check_world() -> void:
+	print("Overworld")
+	var terrain: Terrain = Game.terrain
+	var lo := INF
+	var hi := -INF
+	var far_points := 0
+	for k in 4000:
+		var d := float(k) / 4000.0 * track.get_length()
+		var u := (Landscape.R_OUT - 60.0) * (1.0 if k % 2 == 0 else -1.0) * float(k % 7 + 1) / 7.0
+		var p := track.point_at(d) + track.flat_right(d) * u
+		var h := terrain.ground_at(p.x, p.z)
+		if h > Terrain.NO_GROUND + 1.0:
+			far_points += 1
+			lo = minf(lo, h)
+			hi = maxf(hi, h)
+	check(far_points > 3900, "terrain covers %d m each side of the whole line (%d/4000 samples)" % [int(Landscape.R_OUT - 60.0), far_points])
+	check(hi - lo > 250.0, "the land is not flat: %d m from the lowest to the highest point" % int(hi - lo))
+	for s in track.gate_count():
+		var q := track.quest_zone(s)
+		var marker := main.find_child("QuestZone_%d" % s, true, false) as Node3D
+		check(marker != null and marker.global_position.distance_to(q.center) < 0.1 and int(q.gate_index) == s, "QuestZone_%d marks the quest site beside gate %d" % [s, s])
+		var c: Vector3 = q.center
+		var f: Vector3 = q.forward
+		var r := f.cross(Vector3.UP)
+		var half: float = (q.size as Vector2).x * 0.5 - 2.0
+		var zlo := INF
+		var zhi := -INF
+		for i in 11:
+			for j in 11:
+				var p := c + r * lerpf(-half, half, i / 10.0) + f * lerpf(-half, half, j / 10.0)
+				var h := terrain.ground_at(p.x, p.z)
+				zlo = minf(zlo, h)
+				zhi = maxf(zhi, h)
+		check((q.size as Vector2).x >= 80.0 and zhi - zlo < 0.6 and zlo > Track.WATER_LEVEL + 1.0, "quest site %d: %dx%d m, flat within %.2f m, dry" % [s, int(q.size.x), int(q.size.y), zhi - zlo])
+		# reachable on foot from the gate: no step steeper than 1:2 on the way over
+		var g := track.point_at(track.gate_distance(s))
+		var steep := 0.0
+		var prev := g
+		for k in range(1, 31):
+			var p := g.lerp(c, k / 30.0)
+			p.y = terrain.ground_at(p.x, p.z)
+			var run := Vector2(p.x - prev.x, p.z - prev.z).length()
+			steep = maxf(steep, absf(p.y - prev.y) / maxf(run, 0.01))
+			prev = p
+		check(steep < 0.5, "quest site %d is a walk from gate %d (steepest grade %.2f)" % [s, s, steep])
+		var clear := true
+		for h: Dictionary in terrain.features.hazards:
+			if track.land.in_zone((h.pos as Vector3).x, (h.pos as Vector3).z, float(h.radius)):
+				clear = false
+		check(clear, "quest site %d is clear of hazards and caves" % s)
+	# the same seed gives the same land: a second track from Main.SEED computes the same heights
+	var rng := RandomNumberGenerator.new()
+	rng.seed = Main.SEED
+	var twin := Track.new()
+	add_child(twin)
+	twin.build(rng)
+	var same := true
+	var pick := RandomNumberGenerator.new()
+	pick.seed = 7
+	var tested := 0
+	while tested < 3000:
+		var i := pick.randi_range(0, (terrain.gw - 1) / 2) * 2  # odd vertices far out are interpolated
+		var j := pick.randi_range(0, terrain.gh - 1)
+		var du := terrain.track_coords(terrain.origin.x + i * Terrain.CELL, terrain.origin.y + j * Terrain.CELL)
+		if absf(du.y) > Landscape.R_OUT:
+			continue
+		tested += 1
+		var vi := j * terrain.gw + i
+		var x := terrain.origin.x + i * Terrain.CELL
+		var z := terrain.origin.y + j * Terrain.CELL
+		var d: float = terrain.vertex_coords(vi).x
+		var u: float = terrain.vertex_coords(vi).y
+		if absf(twin.land.height(x, z, d, u, twin.point_at(clampf(d, -Terrain.EXTEND, twin.get_length() + Terrain.EXTEND)).y) - terrain.heights[vi]) > 0.05:
+			same = false
+	var zones_same := true
+	for s in track.gate_count():
+		zones_same = zones_same and twin.quest_zone(s).center.distance_to(track.quest_zone(s).center) < 0.01
+	check(same and zones_same, "the same seed builds the same land and quest sites (3000 grid heights compared)")
+	print("    terrain checksum %d" % hash(terrain.heights))
+	twin.queue_free()
+	# collision only near players, and there when one walks out
+	var far: Vector3 = track.quest_zone(2).center
+	terrain.update_collision([far])
+	check(terrain.has_collision_at(far), "walking out into the land: the ground under the player becomes solid")
+	var f := terrain.features
+	check(f.trails.size() >= 6 and f.caves.size() >= 4 and f.bridges.size() >= 2 and f.hazards.size() >= 25,
+		"off the rails: %d trails to viewpoints, %d caves, %d rope bridges, %d waterfalls, %d hazards, %d rockfalls" % [
+		f.trails.size(), f.caves.size(), f.bridges.size(), f.waterfalls.size(), f.hazards.size(), f.rockfalls.size()])
 
 
 ## Resources lying within 15 m of the track plus the starting inventory cover what the pre-placed gaps need,
