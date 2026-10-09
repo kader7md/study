@@ -507,7 +507,7 @@ func set_gate_locked(seg: int, locked: bool) -> void:
 	var gate := get_node_or_null("Gate_%d" % seg) as TrackGate
 	if gate:
 		gate.relock()
-	if get_node_or_null("Key_%d" % seg) == null:
+	if get_node_or_null("Key_%d" % seg) == null and not QuestManager.has_map(seg):
 		GateKey.create(self, seg, key_position(seg))
 
 
@@ -527,7 +527,7 @@ func spawn_gates(open_segments: Array) -> void:
 		var gate := TrackGate.new()
 		gate.setup(self, s, _gate_locked[s])
 		add_child(gate)
-		if _gate_locked[s]:
+		if _gate_locked[s] and not QuestManager.has_map(s):  # quest gates: the key is won on the quest map
 			GateKey.create(self, s, key_position(s))
 
 

@@ -91,3 +91,19 @@ Things we couldn't do from the cloud session. Do these **first** once the repo i
   still have the old speckled bake. Re-run `build_assets.py only=props` and `build_station.py only=tools` to give them
   the clean paint. Only the four train models were re-baked.
 - [ ] Rejoin tickets live only in memory. A player who closes the game cannot rejoin the running run (by design for now).
+
+## Open from the mountain quest pass
+⚠️ The Mountain (quest map, segment 2) is built and tested headless; these are the parts NOT done or NOT verified:
+- [ ] **Play it by hand on a real GPU** and tune: stamina numbers (`scripts/quest/climber.gd`: drain 8/s moving,
+  climb 2 m/s, so a ~13 m cliff costs ~52 of 100), fall damage (over 7 m), the cold (up to -45 max stamina).
+- [ ] **Entering builds the map in 2-4 s** (heightmap + scatter, `MountainMap.build`): a short freeze. Ideas: build
+  it on a thread while the banner shows, or pre-build it when the train stops at the gate.
+- [ ] **Looks:** the terraces read as rings from far away; more hand-placed Blender cliff faces along the risers, a
+  better rock tile texture (`build_mountain.py` `_rock_color`), and vines in the jungle would help.
+- [ ] **Climbing animation hook:** `player.is_climbing` / `player.is_hanging` are synced; the character agent's
+  third-person climbing animation still has to use them. First-person hands have no climbing pose yet.
+- [ ] **HUD:** the stamina bar is a fallback in `scripts/quest/quest_hud.gd`; it calls `HUD.set_stamina(value 0..100,
+  visible)` when the new HUD has it (value passed in 0..100, check it matches what the HUD expects).
+- [ ] **Overworld quest zone:** the portal uses `Terrain.quest_zone(seg)` when it exists, else stands where the key
+  used to lie. Check it once the terrain agent's plateaus are merged.
+- [ ] Ideas not built: crank lifts / gondola, a cave route, goats or snow leopards, impostor sabotage on quest maps.

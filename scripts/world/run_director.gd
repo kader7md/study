@@ -46,6 +46,8 @@ func compute_objective() -> String:
 	var track := Game.track
 	if Game.run_complete:
 		return "Chapter 1 complete! The trail leads on across the sea"
+	if Game.in_quest():
+		return Game.quest.objective()
 	if train == null or track == null:
 		return ""
 	var next := mini(Game.next_station, Game.STATION_COUNT)
@@ -66,6 +68,8 @@ func compute_objective() -> String:
 	if gate >= 0:
 		if Game.crew_count("key") > 0:
 			return "Open the gate: use the key on its padlock"
+		if QuestManager.has_map(gate) and Game.quest:
+			return Game.quest.gate_objective(gate)
 		return "Gate locked: find the key (it glows beside the track)"
 	if train.fuel <= 0.5 and Game.crew_count("coal") <= 0:
 		return "Out of coal! Collect coal beside the track (or buy it at a station)"

@@ -110,7 +110,8 @@ Repair (wood + scrap + nails) · Craft at the crafting table · Buy at stations 
 - Its **key** lies **4-10 m beside the track, within 8 m of the gate**: a big glowing iron key that bobs and spins, with a
   warm light, a beam of light and a KEY label, so it is found within seconds. [E] picks it up; [E] on the padlock uses it:
   the padlock drops, the boom swings up, the lamps turn green, and the train can go on.
-- Gates behind the last checkpoint stay open (their keys are gone). Later, each key comes from a quest map (see 7) instead.
+- Gates behind the last checkpoint stay open (their keys are gone). Gates with a quest map have no key beside the track:
+  a trailhead portal stands there instead and the key is won on the quest map (The Mountain guards segment 2, see 7).
 
 ### Hands-on repair (RV There Yet style: you do it with your hands, no "hold E")
 **Broken track: free building, together** (anywhere on the line)
@@ -269,6 +270,30 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
 | The Tower | Only Up / Getting Over It | Vertical parkour, one mistake and you fall | Special blueprint |
 | The Mine | Deep Rock-style co-op | Mine gold under a collapsing mine, defend from creatures | Lots of gold |
 | The Swamp | Survival horror | Fog, sounds, something hunting you | Key |
+
+### The Mountain (built: the mountain-pass gate, segment 2)
+- **Way in:** a trailhead portal stands beside the locked gate (in the terrain's reserved quest zone when there is one).
+  [hold E] takes the **whole crew** in together; the map is built far away from the line (the same on every peer).
+  A signpost at the start leads back without the key.
+- **The map:** an island peak ~305 m tall: beach camp → forest slope → cliff bands → a jungle gorge (a stone pillar and
+  two rope bridges, or walk round its east end) → snowfields → the summit, where the **key** waits on a cairn.
+  Terraces step up to the top; between them are ~13 m cliffs. Most cliffs also have a ramp somewhere round the
+  mountain (the long, walking way); some have none and must be climbed. A chimney, an overhang, falling ice up high,
+  icy patches, and long falls are the hazards.
+- **Climbing:** hold **[RMB]** (rebindable "Climb") on steep rock. A **stamina bar** drains while climbing (less while
+  holding still, much less in the chimney) and while sprinting; it recovers on the ground. [Space] while climbing
+  lunges up (costs stamina), [S]+[Space] pushes off. Reach the top edge and you mantle onto it; in the air, hold [RMB]
+  to jump-grab. Out of stamina you **hang** for 4 s: a crewmate can **pull you up** [E]; [E] on a crewmate otherwise
+  gives them a **boost**. Up in the snow the cold lowers max stamina; campfires warm you.
+- **Co-op tools:** **rope anchors** at the top of the climb-only cliffs: a rope from the crew's coils drops a rope
+  ladder anyone can climb without stamina (2 ropes at the start, more at every camp). **Food:** energy snacks and
+  coconuts restore stamina, warm stew restores health.
+- **Checkpoints:** 5 campfires (beach + 4 camps). When anyone reaches a camp, the crew respawns there: a player who
+  falls into the sea, off the map, or dies, is back at the last campfire at once (no "down" state on quest maps).
+  Falls over 7 m hurt.
+- **The key:** taking it adds the key to the crew inventory; a few seconds later everyone is back at the portal, and the
+  key opens the gate as before. Code: `scripts/quest/` (QuestManager, QuestPortal, Climber, MountainMap,
+  MountainLayout), models and ground textures from `blender/scripts/build_mountain.py`, test `tests/TestQuest.tscn`.
 
 - **Make these our own:** same *feel*, but our own art, names and rules. No copying other games' assets or names.
 - The impostor can still sabotage inside quest maps *(which sabotages work there is decided per map)*.

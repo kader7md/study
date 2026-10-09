@@ -94,7 +94,11 @@ func _check_layout() -> void:
 		var b := track.station_distances[s + 1]
 		var gate := main.find_child("Gate_%d" % s, true, false) as TrackGate
 		var key := main.find_child("Key_%d" % s, true, false) as GateKey
-		check(gate != null and key != null and track.is_gate_locked(s), "Gate_%d and Key_%d exist, the gate is locked" % [s, s])
+		if QuestManager.has_map(s):
+			var portal := main.find_child("Portal_%d" % s, true, false) as QuestPortal
+			check(gate != null and key == null and portal != null and track.is_gate_locked(s), "Gate_%d is locked, its key is won through Portal_%d (a quest map)" % [s, s])
+		else:
+			check(gate != null and key != null and track.is_gate_locked(s), "Gate_%d and Key_%d exist, the gate is locked" % [s, s])
 		check(g > a + Track.SEGMENT_LENGTH * 0.5 and g < b - Track.STATION_LENGTH * 0.5 - 30.0, "gate %d sits in the second half of its segment (%d m in), clear of the station" % [s, int(g - a)])
 		var on_bridge := false
 		for i in range(track.piece_at(g - 10.0), track.piece_at(g + 10.0) + 1):
@@ -115,7 +119,10 @@ func _check_layout() -> void:
 			var sig := gate.get_node_or_null("Signal") as Node3D
 			check(sig != null and absf(track.closest_distance(sig.global_position) - (g - Track.GATE_SIGNAL)) < 2.0, "a red signal post stands %d m before gate %d" % [int(Track.GATE_SIGNAL), s])
 			var lock := gate.get_node("Lock") as Interactable
-			check(lock.get_prompt(player).begins_with("Locked: find the key nearby"), "without a key the gate says 'Locked: find the key nearby'")
+			if QuestManager.has_map(s):
+				check(lock.get_prompt(player).begins_with("Locked: its key is won on"), "without a key the gate points to its quest map")
+			else:
+				check(lock.get_prompt(player).begins_with("Locked: find the key nearby"), "without a key the gate says 'Locked: find the key nearby'")
 	for s in Game.STATION_COUNT:
 		var want: int = Track.GAPS_PER_SEGMENT[s]
 		var have := track.initial_gaps.filter(func(gp: Dictionary): return int(gp.segment) == s).size()
@@ -297,18 +304,10 @@ func _drive_segment(seg: int) -> bool:
 func _open_gate(gate_seg: int, seg: int) -> void:
 	check(gate_seg == seg, "the train stopped in front of gate %d (%.1f m before the boom)" % [gate_seg, track.gate_distance(gate_seg) - train.distance])
 	var director: RunDirector = main.director
-	check(director.compute_objective().begins_with("Gate locked: find the key"), "objective: 'Gate locked: find the key'")
-	var key := main.find_child("Key_%d" % gate_seg, true, false) as GateKey
-	check(key != null, "Key_%d lies beside the track" % gate_seg)
-	if key == null:
-		track.open_gate(gate_seg)
-		return
-	var cab := train.cars[0].global_position
-	check(cab.distance_to(key.global_position) < 25.0, "the key is %.0f m from the locomotive" % cab.distance_to(key.global_position))
-	player.global_position = key.global_position + Vector3(0, 0.2, 1.5)
-	key.interact(player)
-	await _frames(2)
-	check(Game.count("key") == 1 and not is_instance_valid(key), "picked up the key")
+	if QuestManager.has_map(gate_seg):
+		await _quest_key(gate_seg)
+	else:
+		await _trackside_key(gate_seg)
 	check(director.compute_objective().begins_with("Open the gate"), "objective: 'Open the gate'")
 	var gate := main.find_child("Gate_%d" % gate_seg, true, false) as TrackGate
 	player.global_position = gate.global_position + gate.global_basis.z * 2.0
@@ -322,6 +321,41 @@ func _open_gate(gate_seg: int, seg: int) -> void:
 	var boom := gate.find_child("Boom", true, false) as Node3D
 	check(boom != null and boom.rotation.z > 1.2, "the boom swung up (%.0f°)" % (rad_to_deg(boom.rotation.z) if boom else 0.0))
 	check(track.blocking_distance(train.distance, train.distance + 50.0) < 0.0 or track.blocking_gate(train.distance, train.distance + 50.0) < 0, "the gate no longer blocks the train")
+
+
+## A quest gate: the crew goes through the portal, wins the key on the quest map (TestQuest plays it properly) and
+## comes back to the portal.
+func _quest_key(gate_seg: int) -> void:
+	var director: RunDirector = main.director
+	check(director.compute_objective().begins_with("Gate locked: win its key on"), "objective: '%s'" % director.compute_objective())
+	var quest := Game.quest
+	var portal := quest.get_node("Portal_%d" % gate_seg) as QuestPortal
+	check(portal.global_position.distance_to(train.cars[0].global_position) < 60.0, "the quest portal is %.0f m from the locomotive" % portal.global_position.distance_to(train.cars[0].global_position))
+	player.global_position = portal.global_position + portal.global_basis.z * 2.0
+	portal.interact(player)
+	await _frames(2)
+	check(quest.active and quest.map != null, "the crew entered %s" % QuestManager.map_title(gate_seg))
+	quest.debug_win()
+	await quest.left
+	await _frames(2)
+	check(Game.count("key") == 1 and not quest.active, "won the key on the quest map and came back")
+	check(player.global_position.distance_to(portal.global_position) < 8.0, "back beside the portal")
+
+
+func _trackside_key(gate_seg: int) -> void:
+	var director: RunDirector = main.director
+	check(director.compute_objective().begins_with("Gate locked: find the key"), "objective: 'Gate locked: find the key'")
+	var key := main.find_child("Key_%d" % gate_seg, true, false) as GateKey
+	check(key != null, "Key_%d lies beside the track" % gate_seg)
+	if key == null:
+		Game.add("key")  # keep the test going
+		return
+	var cab := train.cars[0].global_position
+	check(cab.distance_to(key.global_position) < 25.0, "the key is %.0f m from the locomotive" % cab.distance_to(key.global_position))
+	player.global_position = key.global_position + Vector3(0, 0.2, 1.5)
+	key.interact(player)
+	await _frames(2)
+	check(Game.count("key") == 1 and not is_instance_valid(key), "picked up the key")
 
 
 # --- Ending and restart ------------------------------------------------------------------------

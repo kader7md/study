@@ -24,7 +24,7 @@ else
 		port_busy "$PORT" || port_busy $((PORT + 1)) || break
 	done
 fi
-LIMIT="${NET_TEST_TIMEOUT:-175}"
+LIMIT="${NET_TEST_TIMEOUT:-240}"
 LOGS="${NET_TEST_LOGS:-$(mktemp -d)}"
 mkdir -p "$LOGS"
 

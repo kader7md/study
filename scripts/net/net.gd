@@ -51,7 +51,7 @@ const COLORS: Array[Color] = [
 const ALLOWED := {
 	"interact": "Interactable", "interact_alt": "Interactable",
 	"tool_hit": "Player", "come_along_hit": "Player", "weld_tick": "Player", "put_back": "Player",
-	"unplug_welder": "Player", "take_damage": "Player", "eat_slot": "Player", "winch_release": "Player",
+	"unplug_welder": "Player", "take_damage": "Player", "take_fall": "Player", "eat_slot": "Player", "winch_release": "Player",
 	"buy": "Game", "sell_nuggets": "Game", "move_slot": "Game", "use": "SabotageManager",
 }
 

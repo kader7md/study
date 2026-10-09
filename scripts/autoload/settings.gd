@@ -348,6 +348,7 @@ func _collect_defaults() -> void:
 		default_bindings[action] = list
 	default_bindings["attack"] = ["mouse:%d" % MOUSE_BUTTON_LEFT]
 	default_bindings["cancel"] = ["mouse:%d" % MOUSE_BUTTON_RIGHT]
+	default_bindings["climb"] = ["mouse:%d" % MOUSE_BUTTON_RIGHT]
 	for action: String in EXTRA_INPUTS:
 		var list: Array[String] = []
 		for key: Key in EXTRA_INPUTS[action]:

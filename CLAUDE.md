@@ -14,6 +14,9 @@
   `ActionSpot` = interactable from callables. Locked gates: `TrackGate` (`Gate_<seg>`, Track gate API) + `GateKey`
   (`Key_<seg>`). `RunDirector` (objective, softlock guards, ending) shows the `EndScreen`. Node names are deterministic
   (`Repair_<piece>`, `Pickup_<n>`, `Station<i>`) because every peer builds the world from `Main.SEED`.
+- Quest maps (`scripts/quest/`): `QuestManager` (Main/Quest: portals, enter/leave, campfire checkpoints, host state +
+  RPCs), `QuestPortal`, `Climber` (player climbing + stamina, `player.is_climbing` / `is_hanging`), `MountainMap` +
+  `MountainLayout` (The Mountain, segment 2). Test: `res://tests/TestQuest.tscn` (must print PASSED too).
 - The design source of truth is `docs/GDD.md`. Open TODOs for local work: `docs/TODO_LOCAL.md`.
 - Before pushing: `godot --headless --path . --import` then `godot --headless --path . res://tests/TestTrain.tscn`,
   `res://tests/TestRoute.tscn` and `res://tests/TestMenu.tscn` (all must print PASSED, with no ERROR lines), and `GODOT=<godot> tests/run_net_test.sh` (prints NET TEST PASSED; picks a random free port).

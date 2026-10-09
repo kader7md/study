@@ -12,7 +12,7 @@ extends RefCounted
 ##   Its visibility also gates the MultiplayerSpawner: a client only gets the players once its world is loaded.
 
 const INPUT_PROPS := ["net_pos", "net_yaw", "net_pitch", "net_car"]
-const INPUT_ON_CHANGE := ["current_tool", "welding", "look", "net_action"]
+const INPUT_ON_CHANGE := ["current_tool", "welding", "look", "net_action", "is_climbing", "is_hanging"]
 const STATE_PROPS := ["carried_item", "health", "warmth", "bleeding", "boosted", "downed", "welder_path"]
 const INTERVAL := 0.05
 

@@ -274,7 +274,8 @@ func _continue_checks() -> void:
 	await _frames(3)
 	check(Game.train.current_station == 2 and Game.next_station == 3, "the train starts at station 2 (next %d)" % Game.next_station)
 	check(not Game.track.is_gate_locked(0) and not Game.track.is_gate_locked(1) and Game.track.is_gate_locked(2), "gates 0-1 open, gate 2 locked")
-	check(main.get_node_or_null("Track/Key_2") != null and main.get_node_or_null("Track/Key_1") == null, "only the locked gate has its key")
+	# gate 2 is a quest gate: its key is won through the portal (The Mountain), so there is a portal instead of a key
+	check(main.get_node_or_null("Quest/Portal_2") != null and main.get_node_or_null("Track/Key_2") == null and main.get_node_or_null("Track/Key_1") == null, "the locked gate has its quest portal, open gates have no key")
 	check(Game.count("gold") == Game.START_INVENTORY.gold + 27 and typeof(Game.inventory.gold) == TYPE_INT, "the inventory came back (gold %s)" % str(Game.inventory.gold))
 	check(Game.stat("gates") >= 2.0, "and the run stats")
 	check(Game.count("soup") == 2 and Game.count("coal") == coal_saved and Game.slot_item(Net.local_id(), 0) == "hammer",

@@ -65,6 +65,12 @@ func _ready() -> void:
 	Game.terrain = terrain
 	_spawn_pickups()
 
+	# quest maps: a portal beside each quest gate; the maps themselves are built when the crew enters
+	var quest := QuestManager.new()
+	quest.name = "Quest"
+	add_child(quest)
+	quest.setup(self)
+
 	train = Train.new()
 	train.name = "Train"
 	add_child(train)
