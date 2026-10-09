@@ -53,7 +53,7 @@ timeout 150 "$GODOT" --headless --path . res://tests/NetTest.tscn -- crew_host -
 CREW_HOST_PID=$!
 sleep 1
 for n in 1 2; do
-	# the second crew client drops out mid-run and rejoins with the same name
+	# the second crew client drops out mid-run; a forged rejoin ticket is turned away, its real one gets back in
 	EXTRA=""; [ "$n" -eq 2 ] && EXTRA="rejoin"
 	timeout 150 "$GODOT" --headless --path . res://tests/NetTest.tscn -- crew_client --port "$CREW_PORT" $EXTRA >"$LOGS/crew_client$n.log" 2>&1 &
 	eval "CREW_PID_$n=\$!"

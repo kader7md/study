@@ -1,7 +1,7 @@
 """Builds the station props and the first-person arm in Blender (same helpers, wear and bake as build_assets.py).
 
 Run headless:
-    blender --background --python blender/scripts/build_station.py -- <repo_root> [only=station,kiosk,sign,tools,arm]
+    blender --background --python blender/scripts/build_station.py -- <repo_root> [only=station,kiosk,sign,platform,tools,arm]
 
 Exports to assets/models/props:
     station_shelter.glb  platform canopy: cast-iron columns with brackets, a pitched roof sloping to the track with a
@@ -10,6 +10,13 @@ Exports to assets/models/props:
     shop_kiosk.glb       wooden shop kiosk: serving window with a counter, striped awning, crates and a barrel.
                          The window faces the track (-X). The sign board above it is blank (Godot puts the text on it).
     station_sign.glb     name board on two iron posts, blank (Godot puts the station name on it). Faces -X.
+    platform_section.glb 6 m of platform (Station tiles it along the 60 m platform): a brick face on the track side
+                         and at the back, a rounded stone coping with a painted yellow safety line, and flagstones.
+                         Origin = platform top at the track-side edge (Godot x = Station.EDGE_X), middle of the
+                         section; the platform runs 4 m away from the track (+X).
+    station_bench.glb    slatted wooden bench on cast-iron ends, facing the track (-X). Origin on the floor.
+    station_lamp.glb     cast-iron platform lamp post with a glazed lantern. Origin at its foot.
+    gravestone.glb       weathered headstone on a plinth with a carved cross and a wreath, facing -X.
     come_along.glb       hand winch (ratchet puller): red body, long pump handle, chain and two hooks.
     arm.glb              first-person arm: work glove (palm, curled fingers, thumb, cuff) and the jacket sleeve.
                          Hand at the origin, the forearm runs along Blender -Y (= Godot +Z, towards the camera).
@@ -36,6 +43,13 @@ B.MATS.update({
     "glove": ("canvas", (0.36, 0.22, 0.1), 0.0, 0.75),
     "jacket": ("canvas", (0.62, 0.36, 0.16), 0.0, 0.9),
     "winch_red": ("paint", (0.55, 0.06, 0.04), 0.4, 0.45),
+    "platform_brick": ("brick", (0.36, 0.14, 0.08), 0.0, 0.9),
+    "flagstone": ("stone", (0.42, 0.4, 0.36), 0.0, 0.92),
+    "flagstone_dark": ("stone", (0.34, 0.33, 0.3), 0.0, 0.92),
+    "coping_stone": ("stone", (0.55, 0.53, 0.48), 0.0, 0.85),
+    "line_yellow": ("enamel", (0.85, 0.62, 0.08), 0.0, 0.6),
+    "headstone": ("stone", (0.45, 0.45, 0.43), 0.0, 0.9),
+    "moss": ("foliage", (0.12, 0.2, 0.06), 0.0, 0.95),
 })
 
 box, cyl, rod, sphere, torus, join = B.box, B.cyl, B.rod, B.sphere, B.torus, B.join
@@ -186,6 +200,67 @@ def build_sign():
     B.bake_and_export(os.path.join(OUT, "station_sign.glb"), 512)
 
 
+def build_platform():
+    """One 6 m platform section, a bench, a lamp post and the gravestone (see the module docstring)."""
+    B.clear_scene()
+    half = 3.0
+    parts = [box("body", (4.0, half * 2, 1.55), (2.0, 0, -0.875), "platform_brick", 0.0)]
+    # rounded stone coping along the edge, overhanging the brick face, in 1 m blocks
+    for k in range(6):
+        y = -half + 0.5 + k * 1.0
+        parts.append(box(f"coping{k}", (0.7, 0.988, 0.14), (0.25, y, -0.04), "coping_stone", 0.03))
+    parts.append(box("safety_line", (0.1, half * 2, 0.006), (0.5, 0, 0.031), "line_yellow", 0.0))
+    # flagstones, 4 across and 8 along, two shades, set a hair apart
+    rng = B.random.Random(11)
+    w, l = (4.0 - 0.6) / 4, half * 2 / 8
+    for i in range(4):
+        for j in range(8):
+            x = 0.6 + w * (i + 0.5)
+            y = -half + l * (j + 0.5)
+            m = "flagstone_dark" if rng.random() < 0.3 else "flagstone"
+            parts.append(box(f"flag{i}_{j}", (w - 0.014, l - 0.014, 0.1), (x, y, -0.05 + rng.uniform(-0.004, 0.003)), m, 0.008))
+    join("PlatformSection", parts, origin=(0, 0, 0))
+    B.bake_and_export(os.path.join(OUT, "platform_section.glb"), 2048, repack=True)
+
+    B.clear_scene()
+    parts = []
+    for j in range(3):
+        parts.append(box(f"seat{j}", (0.14, 1.8, 0.05), (-0.16 + j * 0.16, 0, 0.48), "wood", 0.006))
+    for j in range(2):
+        parts.append(box(f"back{j}", (0.05, 1.8, 0.14), (0.27, 0, 0.7 + j * 0.2), "wood", 0.006, rot=(0, math.radians(-12), 0)))
+    for s in (-0.75, 0.75):
+        parts.append(box(f"leg{s}", (0.5, 0.06, 0.06), (0.0, s, 0.25), "iron", 0.006, rot=(0, math.radians(30), 0)))
+        parts.append(box(f"legb{s}", (0.06, 0.06, 0.95), (0.27, s, 0.5), "iron", 0.006))
+        parts.append(box(f"arm{s}", (0.42, 0.05, 0.04), (0.05, s, 0.68), "iron", 0.006))
+        parts.append(sphere(f"knob{s}", 0.035, (-0.16, s, 0.69), "iron", seg=10))
+    join("StationBench", parts, origin=(0, 0, 0))
+    B.bake_and_export(os.path.join(OUT, "station_bench.glb"), 512)
+
+    B.clear_scene()
+    parts = [cyl("lpost", 0.06, 3.0, (0, 0, 1.5), "column_green", verts=12),
+             cyl("lbase", 0.14, 0.32, (0, 0, 0.16), "column_green", verts=12, radius2=0.08),
+             torus("lring", 0.075, 0.018, (0, 0, 2.2), "column_green", axis="Z", seg=16),
+             rod("ladder_bar", (0, -0.25, 2.75), (0, 0.25, 2.75), 0.015, "column_green", 8),
+             box("lcase", (0.28, 0.28, 0.36), (0, 0, 3.17), "black_paint", 0.02),
+             box("lglass", (0.22, 0.29, 0.26), (0, 0, 3.17), "lamp", 0.01),
+             cyl("lroof", 0.24, 0.16, (0, 0, 3.43), "black_paint", verts=4, radius2=0.03, rot=(0, 0, math.pi / 4)),
+             sphere("lfinial", 0.04, (0, 0, 3.53), "black_paint", seg=10)]
+    join("StationLamp", parts, origin=(0, 0, 0))
+    B.bake_and_export(os.path.join(OUT, "station_lamp.glb"), 512)
+
+    B.clear_scene()
+    parts = [box("plinth", (0.5, 0.95, 0.14), (0, 0, 0.07), "headstone", 0.02),
+             box("stone", (0.16, 0.7, 0.8), (0, 0, 0.54), "headstone", 0.025),
+             cyl("stone_top", 0.35, 0.16, (0, 0, 0.94), "headstone", axis="X", verts=28),
+             box("cross_v", (0.02, 0.07, 0.36), (-0.081, 0, 0.66), "flagstone_dark", 0.004),
+             box("cross_h", (0.02, 0.24, 0.07), (-0.081, 0, 0.74), "flagstone_dark", 0.004),
+             torus("wreath", 0.13, 0.035, (-0.2, 0.12, 0.16), "moss", axis="Z", seg=18)]
+    for k in range(3):  # moss in the plinth corners
+        parts.append(sphere(f"moss{k}", 0.06, (-0.2 + k * 0.2, -0.42, 0.13), "moss", scale=(1.4, 1, 0.5), seg=10))
+    join("Gravestone", parts, origin=(0, 0, 0))
+    B.bake_and_export(os.path.join(OUT, "gravestone.glb"), 512)
+
+
 def build_come_along():
     B.clear_scene()
     # ratchet puller held in the right hand: body along Y, the pump handle reaches forward (+Y = Godot -Z) and up
@@ -238,6 +313,8 @@ if __name__ == "__main__":
         build_kiosk()
     if ONLY is None or "sign" in ONLY:
         build_sign()
+    if ONLY is None or "platform" in ONLY:
+        build_platform()
     if ONLY is None or "tools" in ONLY:
         build_come_along()
     if ONLY is None or "arm" in ONLY:

@@ -87,7 +87,7 @@ in two groups of five (the top 2 of the 50 bits are zero).
 | 127.0.0.1:24599 | `3Z000-02R0Q` |
 
 `InviteCode.decode()` (`scripts/net/invite_code.gd`) also accepts a plain `ip`, `ip:port`, `localhost` or a host name,
-ignores case, spaces and dashes, and reads O as 0 and I / L as 1. `Net.encode_invite()` / `decode_invite()` wrap it.
+ignores case, spaces and dashes, and reads O as 0 and I / L as 1. `InviteCode.encode()` / `InviteCode.decode()` (used by `Net.invite_code()` and `Net.join_game()`).
 The host has two codes: `Net.lan_code()` (best LAN address, "" without a network) and `Net.internet_code()` (the public
 IP: typed, from UPnP or looked up; "" while unknown). `Net.invite_code()` is the internet code when known, else the LAN
 code. A client's lobby shows the code it joined with so it can pass it on.
@@ -97,7 +97,7 @@ code. A client's lobby shows the code it joined with so it can pass it on.
 `Net.players` is the host's list, sent to everyone on every change:
 `peer id -> {name, ready, color, host, world}` (`world` = that peer has loaded the run's world).
 
-- **Join:** the client connects, then sends `_rpc_register(PROTOCOL, name)`. The host refuses a different `PROTOCOL`
+- **Join:** the client connects, then sends `_rpc_register(PROTOCOL, name, rejoin_token)` (the token is "" unless it is rejoining). The host refuses a different `PROTOCOL`
   ("different version"), a run in progress ("already started"), or a 6th player ("the lobby is full"), with the reason
   shown on the client; otherwise it adds the player (unique name, the next free colour) and broadcasts the list.
   A client that gets no answer in 10 s gives up with a hint about the code and the port.
@@ -248,7 +248,11 @@ xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3
 ## Limits (v1)
 
 - No joining mid-run as a new player; no host migration (the host leaving ends the run).
-- **Rejoining:** a player who was in the run (matched by name; `Net._run_roster`) may join again while it runs. The host
+- **Rejoining:** a player who was in the run may join again while it runs. At the start of the run the host gives each
+  client a random per-session rejoin ticket (`_rpc_rejoin_ticket`, 16 random bytes, sent only to that peer; kept in
+  `Net._run_roster`). The client keeps it in memory with the address it joined (`Net._rejoin_ticket`, not cleared by
+  `leave()`) and sends it with `_rpc_register` when it joins the same address again. Only a matching ticket gets back
+  in, under the name it had at the start (the name it sends is ignored), so typing someone's name is not enough. The host
   sends them `_rpc_start_run` with the checkpoint its own world was built from (`_world_cp`) and their role; when their
   world is loaded they get the full state (WorldSync) and a new Player on the train's middle car.
 - When a player leaves mid-run the host re-checks the crew wipe (`Game.check_crew_wipe`), and without the impostor

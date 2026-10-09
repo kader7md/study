@@ -11,6 +11,7 @@ var failures := 0
 
 
 func _ready() -> void:
+	Game.use_save_dir(Game.test_save_dir())  # user://test/<scene>/: never the player's own saves and settings
 	Game.new_game(false)
 	Game.world_sabotage = false
 	main = load("res://scenes/main/Main.tscn").instantiate()

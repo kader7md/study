@@ -128,7 +128,7 @@ All keys can be changed in Settings > Controls.
 - The host's PC runs the game; everyone sees the same train, track, repairs and inventory. With 3 to 5 players one of
   you is secretly the **impostor** (a private banner tells only them). If the host leaves, everyone goes back to the menu
   ("The host ended the run" when the host chose Back to menu). A player who drops out can rejoin the running run:
-  join again with the same code and the same name, and you appear on the train.
+  join again with the same code from the same game window (the host gave it a private rejoin ticket), and you appear on the train.
 - Details, the Steam plug-in steps and the invite-code format: [`docs/NETWORK.md`](docs/NETWORK.md).
 
 ### Tests
@@ -149,8 +149,8 @@ xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 re
 tests/run_net_test.sh                                   # multiplayer: headless host + client (+ latecomer, + 3 players with a rejoin); GODOT=/path/to/godot
 ```
 
-Note: the tests play the route offline and write the real `user://checkpoint_solo.json`, `checkpoint_host.json` and
-`settings.cfg` (known issue T3-02 in the polish report). Back up your own saves before you run them.
+The tests never touch your own saves: every scene started from `res://tests/` keeps its checkpoints and settings in
+`user://test/<TestScene>/` (`Game.save_dir`, see `Game.use_save_dir()`).
 
 ### Known issues (see `docs/POLISH_REPORT.md`)
 - With a solo save present, the main menu's Quit button can run off the bottom of a 16:9 window (T3-01).

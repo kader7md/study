@@ -27,7 +27,7 @@ var _rails_placed := 0
 var _bolts_left := 4
 var _label: Label3D
 var _area: BuildArea
-var _ghost: MeshInstance3D
+var _ghost: Node3D
 var _ghost_mat := StandardMaterial3D.new()
 
 
@@ -60,13 +60,13 @@ func _ready() -> void:
 	_area.repair = self
 	Build.collider(_area, Vector3(3.2, 2.2, Track.PIECE_LENGTH), Vector3(0, -0.9, 0))
 	add_child(_area)
-	_ghost = MeshInstance3D.new()
-	var gm := BoxMesh.new()
-	gm.size = Vector3(2.4, 0.12, 0.3)
-	_ghost.mesh = gm
+	# "place here" preview: the plank model in a see-through colour (green ground, yellow join, red falls)
+	_ghost = Props.instance("plank")
+	_ghost.name = "Ghost"
 	_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_ghost_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_ghost.material_override = _ghost_mat
+	for mi in _ghost.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).material_override = _ghost_mat
 	_ghost.visible = false
 	add_child(_ghost)
 	for side in 2:
@@ -258,7 +258,7 @@ func _on_rail_placed(_player: Node, x: float) -> void:
 	create_tween().tween_property(rail, "position:y", Track.RAIL_Y + x * tan(deg_to_rad(build_roll())), 0.2).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	_rails_placed += 1
 	for j in 2:
-		var z := -Track.PIECE_LENGTH * 0.5 + 0.25 if j == 0 else Track.PIECE_LENGTH * 0.5 - 0.25
+		var z := -Track.PIECE_LENGTH * 0.5 + 0.29 if j == 0 else Track.PIECE_LENGTH * 0.5 - 0.29  # the inner fishplate holes (rail.glb)
 		var bolt := NailSpot.new()
 		bolt.name = "Bolt%d_%d" % [side, j]
 		bolt.style = "bolt"

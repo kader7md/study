@@ -4,32 +4,26 @@ extends Node
 ## Settings load/save/rebind/reset (on a separate test file), audio and graphics apply, the main menu
 ## (120 frames, no Game.track/train), and the pause menu stopping the train in solo play.
 
-const TEST_PATH := "user://test_settings.cfg"
+const TEST_PATH := Game.TEST_SAVE_DIR + "TestMenu/menu_settings.cfg"
 
 var failures := 0
 
 
 func _ready() -> void:
+	Game.use_save_dir(Game.TEST_SAVE_DIR + "TestMenu/")  # never the player's own saves and settings
 	Settings.path = TEST_PATH
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
 	Settings.load_settings()
-	# keep the player's real checkpoint save: these checks write their own
-	var real_save := FileAccess.get_file_as_string(Game.SAVE_PATH) if FileAccess.file_exists(Game.SAVE_PATH) else ""
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(Game.SAVE_PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Game.save_path("solo")))
 	await _settings_checks()
 	await _hint_checks()
 	await _menu_checks()
 	await _pause_checks()
 	await _continue_checks()
 	await _flow_checks()
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(Game.SAVE_PATH))
-	if real_save != "":
-		var sf := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
-		sf.store_string(real_save)
-		sf.close()
-	# Back to the real settings file
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Game.save_path("solo")))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
-	Settings.path = Settings.PATH
+	Settings.path = Game.save_dir + Settings.FILE
 	Settings.load_settings()
 	print("\n%s: %d failure(s)" % ["PASSED" if failures == 0 else "FAILED", failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -250,7 +244,7 @@ func _continue_checks() -> void:
 	Game.track.open_gate(1)
 	Game.next_station = 2
 	Game.on_train_stopped_at_station(2)
-	check(FileAccess.file_exists(Game.SAVE_PATH), "station 2 saved the checkpoint to disk")
+	check(FileAccess.file_exists(Game.save_path("solo")), "station 2 saved the checkpoint to disk")
 	main.queue_free()
 	await _frames(3)
 	Game.new_game(false)
@@ -260,6 +254,18 @@ func _continue_checks() -> void:
 	await _frames(3)
 	var texts: Array = (menu.get("_buttons") as Array).map(func(b: Button) -> String: return b.text)
 	check(texts.has("Continue  (station 2)"), "the main menu offers Continue (station 2)")
+	# T3-01: with Continue there are six buttons; the last (Quit) must end well above the bottom of the screen
+	# (stretch mode canvas_items + expand: a 16:9 window is always 1600x900 here, taller aspects only get more room)
+	var old_size := get_tree().root.size
+	get_tree().root.size = Vector2i(1600, 900)  # headless windows have no fixed shape: test the 16:9 one
+	await _frames(3)
+	var view := (menu.get("_root") as Control).get_viewport_rect().size
+	var last: Button = (menu.get("_buttons") as Array).back()
+	var bottom := (last.get_global_transform() * Vector2(0.0, last.size.y)).y
+	check(last.text == "Quit" and bottom <= view.y - 50.0,
+		"with a save, Quit ends %d px above the bottom of the %dx%d screen (>= 50)" % [int(view.y - bottom), int(view.x), int(view.y)])
+	check(is_equal_approx(view.y, 900.0), "the check ran on a 900 px high screen (%d)" % int(view.y))
+	get_tree().root.size = old_size
 	menu.queue_free()
 	await _frames(2)
 	check(Game.continue_from_save(), "continue_from_save reads it")

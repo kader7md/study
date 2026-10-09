@@ -26,16 +26,15 @@ Things we couldn't do from the cloud session. Do these **first** once the repo i
 - [ ] Test: Claude creates a cube in Blender, and Claude runs an empty Godot project
 
 ## 3. Things from the polish session that need your PC (see `docs/POLISH_REPORT.md`)
-- [ ] **Back up your saves before you run the tests.** The tests still write the real `user://checkpoint_solo.json`,
-  `checkpoint_host.json` and `settings.cfg` (issue T3-02, a fix is planned). On Windows they are in
-  `%APPDATA%\Godot\app_userdata\Trust Issues\`.
+- [x] ~~Back up your saves before you run the tests~~: fixed (T3-02). Test scenes keep their saves and settings in
+  `user://test/<TestScene>/` (on Windows `%APPDATA%\Godot\app_userdata\Trust Issues\test\`), never your own files.
 - [ ] **Microphone with real hardware:** Settings > Microphone: pick the device, check that the level meter moves, try
   "hear yourself", push-to-talk on (V) and off (noise gate). Then talk to a friend online and check proximity volume.
   The cloud session had no audio device, so voice is only tested in code.
 - [ ] **Playtest with friends (M5):** host from the main menu, send the **Same Wi-Fi** code to someone on your network
   and the **Internet** code to someone outside it (forward UDP 24565 on the router, or press "Open the port (UPnP)").
   Play 2, 3 (impostor) and 5 players to station 5. Note lag, desyncs, confusing UI and where people got stuck;
-  also try a drop-out and rejoin with the same name.
+  also try a drop-out and rejoin (same invite code, without closing the game).
 - [ ] **Firewall:** the first Host game on Windows shows a firewall prompt; allow private and public networks.
 - [ ] **Steam / GodotSteam:** get a Steam App ID (or test with 480 Spacewar), install the GodotSteam GDExtension for
   4.7, fill in `scripts/net/steam_backend.gd` (steps in `docs/NETWORK.md`), then test lobby invites through the Steam
@@ -79,3 +78,16 @@ Things we couldn't do from the cloud session. Do these **first** once the repo i
   ~120 m; health only comes back by eating) with 2-5 players.
 - [ ] Re-take the HUD screenshots on a real GPU (`tests/Screenshot.tscn ... hud`: play, shop, pause, inventory,
   low health / frost, come-along hooked and pulling, help).
+
+## Open from the fixes pass
+> ⚠️ **Not done in the cloud fixes pass. Pick these up locally.**
+- [ ] **T3-03, and T3-05 in the HUD, plus the HUD per-frame allocations:** handed to the HUD redesign (`scripts/ui/hud.gd`).
+  The intro banner still overlaps the train card's wheel warning line, and the inventory chip still says "Winch".
+- [ ] **Platform flagstones look almost white in Godot** (the bake is fine; Godot's lighting brightens them). Darken
+  `flagstone` / `flagstone_dark` / `coping_stone` in `blender/scripts/build_station.py` and re-run `only=platform`.
+- [ ] **No screenshots yet of the new build items** (plank sleeper, rail, track spike, fishplate bolt, spare panel) in game:
+  run `Screenshot.tscn -- <dir> tools` and `repair`, and check that the spike and bolt sizes look right.
+- [ ] Tools and props that use the `paint` material (wrench grip, nail gun, welder machine, come-along, kiosk tins)
+  still have the old speckled bake. Re-run `build_assets.py only=props` and `build_station.py only=tools` to give them
+  the clean paint. Only the four train models were re-baked.
+- [ ] Rejoin tickets live only in memory. A player who closes the game cannot rejoin the running run (by design for now).

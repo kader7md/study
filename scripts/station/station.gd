@@ -26,10 +26,6 @@ func display_name() -> String:
 	return "Station %d / %d" % [index, Game.STATION_COUNT]
 
 
-func _train_here() -> bool:
-	return Game.train != null and Game.train.current_station == index
-
-
 ## Platform top (local y) and the track-side edge of the platform (local x).
 const PLATFORM_TOP := 1.2
 const EDGE_X := 1.9
@@ -38,16 +34,29 @@ const SIGN_Z := -24.0
 const GRAVE_Z := 28.0
 const SIGN_X := 5.4
 
+## Platform dressing: the Blender platform section is this long; benches and lamps outside the canopy (z).
+const SECTION_LENGTH := 6.0
+const BENCH_Z: Array[float] = [-18.0, 16.5]
+const LAMP_Z: Array[float] = [-29.0, -19.5, 18.0, 29.0]
+
 static var _paving: StandardMaterial3D
 
 
 func _build() -> void:
 	var length := Track.STATION_LENGTH
-	# Platform (right side of the track): paving, a stone coping along the edge and a yellow safety line
+	# Platform (right side of the track): a collision block, dressed with Blender platform sections (brick face,
+	# stone coping with the yellow safety line, flagstones) every SECTION_LENGTH metres. The block's own mesh only
+	# is hidden (its paving material stays as the fallback look).
 	var platform := Build.solid_box(self, Vector3(4.0, 4.0, length), Vector3(3.9, PLATFORM_TOP - 2.0, 0), Color(0.4, 0.38, 0.35))
 	(platform.get_child(0) as MeshInstance3D).material_override = paving_material()
-	Build.box(self, Vector3(0.45, 0.1, length), Vector3(EDGE_X + 0.22, PLATFORM_TOP + 0.04, 0), Color(0.55, 0.53, 0.5))
-	Build.box(self, Vector3(0.1, 0.02, length), Vector3(EDGE_X + 0.62, PLATFORM_TOP + 0.005, 0), Color(0.95, 0.75, 0.15))
+	# the sections' brick faces sit on the block's faces: hide the block's mesh (no z-fighting), keep its collider
+	(platform.get_child(0) as MeshInstance3D).visible = false
+	var sections := int(ceil(length / SECTION_LENGTH))
+	for k in sections:
+		var sec := Props.instance("platform_section")
+		sec.name = "Platform%d" % k
+		sec.position = Vector3(EDGE_X, PLATFORM_TOP + 0.002, -length * 0.5 + SECTION_LENGTH * (k + 0.5))
+		add_child(sec)
 	# Canopy with columns, valance, benches and lamps (Blender model station_shelter.glb)
 	var shelter := Props.instance("station_shelter")
 	shelter.position = Vector3(3.6, PLATFORM_TOP, 0)
@@ -78,10 +87,28 @@ func _build() -> void:
 	WelderSource.create(self, "station", 30.0, Vector3(3.2, PLATFORM_TOP, 0))
 	Build.label(self, "STATION WELDER", Vector3(3.2, PLATFORM_TOP + 2.0, 0), 40)
 
+	# Benches and lamps along the open ends of the platform (the canopy has its own)
+	for z: float in BENCH_Z:
+		_prop_with_collider("station_bench", Vector3(5.45, PLATFORM_TOP, z), Vector3(0.7, 1.0, 1.9), Vector3(0.05, 0.5, 0))
+	for z: float in LAMP_Z:
+		_prop_with_collider("station_lamp", Vector3(2.75, PLATFORM_TOP, z), Vector3(0.25, 3.0, 0.25), Vector3(0, 1.5, 0))
+
 	# Grave (carrying a body here to revive it comes in M5; for now it only says how reviving works today)
-	Build.box(self, Vector3(0.8, 1.0, 0.25), Vector3(5.2, PLATFORM_TOP + 0.5, GRAVE_Z), Color(0.5, 0.5, 0.52))
+	_prop_with_collider("gravestone", Vector3(5.2, PLATFORM_TOP, GRAVE_Z), Vector3(0.5, 1.2, 0.95), Vector3(0, 0.6, 0))
 	ActionSpot.create(self, Vector3(1.2, 1.4, 1.0), Vector3(5.2, PLATFORM_TOP + 0.6, GRAVE_Z),
 		func(_p): return "A quiet grave. Downed crewmates get back up when the train reaches a station (or with a medkit)", func(_p): pass)
+
+
+## A Blender prop on the platform with a simple box collider (`size` centred at `offset` above the prop's origin).
+func _prop_with_collider(id: String, pos: Vector3, size: Vector3, offset: Vector3) -> void:
+	var model := Props.instance(id)
+	model.position = pos
+	add_child(model)
+	var body := StaticBody3D.new()
+	body.collision_layer = Build.LAYER_WORLD
+	body.position = pos
+	add_child(body)
+	Build.collider(body, size, offset)
 
 
 ## Painted text on a board facing the track (-X), `width` metres wide at most.
