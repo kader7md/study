@@ -424,6 +424,8 @@ func _send_action(clip: String) -> void:
 	net_action = "%s#%d" % [clip, _action_n]
 	if body:
 		body.play_action(clip)
+	if clip in ["interact", "shovel", "lever", "wave"]:
+		viewmodel.play(clip)  # the tool clips are played by use_tool()
 
 
 ## The action clip pressing [E] on `target` plays: shovelling at the furnace, hauling the lever, else a reach.

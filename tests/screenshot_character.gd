@@ -231,15 +231,16 @@ func _remote_shots(main: Node3D, player: Player, train: Train) -> void:
 		main.add_child(rb)
 		rb.setup("Crew %d" % (i + 1), Net.COLORS[i])
 		rb.set_look(Appearance.random(rng).encode())
-		rb.global_position = t.origin + t.basis.x * (3.0 + (i % 2) * 1.4) - t.basis.z * (i * 1.3) + Vector3.UP * 0.05
+		rb.global_position = _ground(main, t.origin + t.basis.x * (3.0 + (i % 2) * 1.4) - t.basis.z * (i * 1.3))
 		rb.rotation.y = t.basis.get_euler().y + (0.5 if i % 2 == 0 else -0.4) + PI
 		rb.set_held(acts[i][0], acts[i][1])
 		bodies.append(rb)
 	bodies[2].set_welding(true)
 	var free_cam := Camera3D.new()
 	main.add_child(free_cam)
-	free_cam.global_position = t.origin + t.basis.x * 6.5 + t.basis.z * 3.5 + Vector3.UP * 2.0
-	free_cam.look_at(t.origin + t.basis.x * 3.5 - t.basis.z * 2.0 + Vector3.UP * 0.9)
+	var floor_y := _ground(main, t.origin + t.basis.x * 3.5).y - t.origin.y
+	free_cam.global_position = t.origin + t.basis.x * 6.5 + t.basis.z * 3.5 + Vector3.UP * (2.0 + floor_y)
+	free_cam.look_at(t.origin + t.basis.x * 3.5 - t.basis.z * 2.0 + Vector3.UP * (0.9 + floor_y))
 	free_cam.make_current()
 	main.hud.visible = false
 	for k in 10:
@@ -303,3 +304,10 @@ func _sheet(name: String, frames: Array[Image], cols: int) -> void:
 	sheet.save_png("%s/%s.png" % [out, name])
 	shot_count += 1
 	print("saved ", name)
+
+
+## The walkable surface (platform, ground) under `p`.
+func _ground(main: Node3D, p: Vector3) -> Vector3:
+	var q := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 20.0, p - Vector3.UP * 20.0, Build.LAYER_WORLD | Build.LAYER_TRAIN)
+	var hit := main.get_world_3d().direct_space_state.intersect_ray(q)
+	return hit.position if hit else p

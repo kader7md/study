@@ -49,6 +49,32 @@ const ANIMS := {
 		[0.38, Vector3(0.0, 0.14, 0.05), Vector3(0.45, 0.0, 0.0), Vector3(0.6, 0.0, 0.0)],
 		[0.68, Vector3(0.0, -0.08, -0.04), Vector3(-0.2, 0.0, 0.0), Vector3(-0.3, 0.0, 0.0)],
 		[1.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]]},
+	# [E]: reach forward and press / grab
+	"interact": {"len": 0.4, "event": 1.0, "keys": [
+		[0.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
+		[0.35, Vector3(-0.1, 0.07, -0.2), Vector3(0.35, 0.0, 0.1), Vector3(-0.3, 0.0, 0.0)],
+		[0.55, Vector3(-0.1, 0.06, -0.19), Vector3(0.3, 0.0, 0.1), Vector3(-0.2, 0.0, 0.0)],
+		[1.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]]},
+	# at the furnace: both hands scoop low, then heave forward
+	"shovel": {"len": 0.9, "event": 1.0, "two_handed": true, "keys": [
+		[0.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
+		[0.32, Vector3(-0.08, -0.22, 0.02), Vector3(-0.55, 0.0, 0.25), Vector3.ZERO],
+		[0.62, Vector3(0.0, 0.12, -0.18), Vector3(0.5, 0.0, -0.1), Vector3.ZERO],
+		[1.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]]},
+	# at the lever: grab high, haul back towards you
+	"lever": {"len": 0.6, "event": 1.0, "keys": [
+		[0.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
+		[0.3, Vector3(-0.12, 0.2, -0.16), Vector3(0.7, 0.0, 0.1), Vector3.ZERO],
+		[0.65, Vector3(-0.08, -0.02, 0.06), Vector3(0.1, 0.0, 0.1), Vector3.ZERO],
+		[1.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]]},
+	# [B]: a wave at whoever you are looking at
+	"wave": {"len": 1.1, "event": 1.0, "keys": [
+		[0.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
+		[0.18, Vector3(0.02, 0.3, -0.02), Vector3(1.0, 0.0, 0.35), Vector3.ZERO],
+		[0.36, Vector3(0.06, 0.31, -0.02), Vector3(1.0, 0.0, -0.3), Vector3.ZERO],
+		[0.54, Vector3(0.02, 0.3, -0.02), Vector3(1.0, 0.0, 0.35), Vector3.ZERO],
+		[0.72, Vector3(0.06, 0.31, -0.02), Vector3(1.0, 0.0, -0.3), Vector3.ZERO],
+		[1.0, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]]},
 }
 
 ## Carry poses: model position / rotation / scale, and where the two hands grip.
@@ -243,7 +269,8 @@ func select_tool(id: String) -> void:
 	_switch_t = 0.0 if _switch_t >= 1.0 else minf(_switch_t, 0.5)
 
 
-## Plays a one-shot tool animation ("hammer", "wrench", "nail_gun", "come_along").
+## Plays a one-shot animation: a tool ("hammer", "wrench", "nail_gun", "come_along") or "interact", "shovel",
+## "lever", "wave".
 func play(action: String) -> void:
 	if not ANIMS.has(action) or carry_item != "":
 		return

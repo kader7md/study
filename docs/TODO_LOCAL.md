@@ -43,3 +43,23 @@ Things we couldn't do from the cloud session. Do these **first** once the repo i
 - [ ] **Look at the game on a real GPU** (Forward+ instead of the cloud's software opengl3): lighting, shadows, FPS at
   1080p / 1440p, and the Graphics settings (window modes, V-Sync, resolution scale).
 - [ ] **Export builds** (Windows / Linux templates for 4.7.2) and try them on a friend's PC.
+
+## Open from the character pass
+**Flagged: these were not finished or not checked on a real screen in the cloud session.**
+- [ ] **Check the animations live on a real GPU, with friends** (`blender/scripts/build_character.py`). The cloud
+  machine was overloaded, so the clips were only checked as still frames (`tests/ScreenshotCharacter.tscn`, modes
+  model / anims / game). Watch walk / run timing (`CharacterAnimator.WALK_SPEED`, `RUN_SPEED`), the jump / fall
+  switch on remote players (worked out from the synced positions), and how the one-shot actions blend over walking.
+- [ ] **Tool grips on other players** (`CharacterModel.TOOL_GRIP`): the hammer and wrench look right. The nail gun and
+  the welding torch may point the wrong way in the hand: check them, and turn them in `TOOL_GRIP` if needed.
+- [ ] **The plank on the shoulder and the rail in the arms** (`CharacterModel.CARRY_POSE` and the
+  `carry_shoulder` / `carry_front` clips) were tuned once and not looked at again after the last change.
+- [ ] **First-person sleeve:** the new bare hand and sleeve (`fp_arm.glb`) fill a lot of the screen with the wrench.
+  Maybe make it thinner or shorter, or move `Viewmodel.RIGHT_REST`.
+- [ ] **The mirror image renders a bit dark** in opengl3 (`Mirror`; the glass tint tries to brighten it). Check it
+  in Forward+.
+- [ ] **New first-person clips** (`Viewmodel.ANIMS`: interact, shovel, lever, wave) were added at the end and never
+  seen on screen.
+- [ ] Downed pose: the body lies on the ground but was only seen from one angle. Check that it lies on its back.
+- [ ] Not done: a look preview in the crew lobby cards (the `look` is already in `Net.players`), and a climbing
+  state on the Player (the `climb` clip is in place for the mountain map).
