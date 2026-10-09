@@ -63,3 +63,19 @@ Things we couldn't do from the cloud session. Do these **first** once the repo i
 - [ ] Downed pose: the body lies on the ground but was only seen from one angle. Check that it lies on its back.
 - [ ] Not done: a look preview in the crew lobby cards (the `look` is already in `Net.players`), and a climbing
   state on the Player (the `climb` clip is in place for the mountain map).
+
+## Open from the HUD/inventory pass
+⚠️ Left open when the HUD redesign and the team pool / personal inventory split were committed:
+- [ ] **HUD draw cost on a real GPU:** the bars, train status and readout redraw every frame (striped fills are clipped
+  with `Geometry2D.intersect_polygons`). Check the FPS; if it costs, redraw only when a value changes (or cache the
+  stripes in a texture / a small shader). Headless runs already skip these redraws (`HudStyle.headless`).
+- [ ] **Held food has no first-person model:** with food in the hotbar the hands are empty (LMB still eats it). Add small
+  food props to the viewmodel / RemoteBody, and an eating animation.
+- [ ] **Come-along "reverse" (RMB):** the hints show Pull / Release only; slacking the chain is not built.
+- [ ] **Dropping items** out of the personal inventory onto the ground (and giving items to a crewmate) is not built.
+- [ ] **Old saves:** a checkpoint from before the split gives its coal / scrap / tools to the host; its scrap is not turned
+  into rails. Start a new run if a save feels off.
+- [ ] **Playtest the balance** of the split (each player starts with 10 coal, 4 scrap, a sandwich, 2 apples; food every
+  ~120 m; health only comes back by eating) with 2-5 players.
+- [ ] Re-take the HUD screenshots on a real GPU (`tests/Screenshot.tscn ... hud`: play, shop, pause, inventory,
+  low health / frost, come-along hooked and pulling, help).

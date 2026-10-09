@@ -12,11 +12,8 @@ var _rows := {}   # peer id -> Label
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = CREAM
-	sb.set_corner_radius_all(12)
-	sb.set_border_width_all(3)
-	sb.border_color = INK
+	# the HUD look: faint glass, a thin white outline, white rounded letters
+	var sb := HudStyle.frame_box(12.0, 1.5, HudStyle.GLASS_STRONG, Color(1, 1, 1, 0.45), true)
 	sb.content_margin_left = 12
 	sb.content_margin_right = 12
 	sb.content_margin_top = 6
@@ -25,11 +22,7 @@ func _ready() -> void:
 	_box = VBoxContainer.new()
 	_box.add_theme_constant_override("separation", 2)
 	add_child(_box)
-	var title := Label.new()
-	title.text = "CREW"
-	title.add_theme_font_size_override("font_size", 15)
-	title.add_theme_color_override("font_color", INK.lightened(0.3))
-	_box.add_child(title)
+	_box.add_child(HudStyle.label("Crew", 15, HudStyle.SOFT, 600))
 	Net.players_changed.connect(_rebuild)
 	_rebuild()
 
@@ -58,9 +51,7 @@ func _rebuild() -> void:
 		dot.custom_minimum_size = Vector2(14, 14)
 		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(dot)
-		var l := Label.new()
-		l.add_theme_font_size_override("font_size", 18)
-		l.add_theme_color_override("font_color", INK)
+		var l := HudStyle.label("", 17, HudStyle.WHITE, 600)
 		row.add_child(l)
 		_box.add_child(row)
 		_rows[id] = l

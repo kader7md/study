@@ -10,8 +10,8 @@ const SCENE := "res://scenes/menu/SettingsMenu.tscn"
 ## Friendly names, grouped. Actions not listed here land in "Other".
 const GROUPS := [
 	["Movement", ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint"]],
-	["Hands & tools", ["attack", "cancel", "interact", "interact_alt", "drop", "tool_1", "tool_2", "tool_3", "tool_4", "tool_5"]],
-	["Game", ["pause", "push_to_talk", "emote", "toggle_help"]],
+	["Hands & hotbar", ["attack", "cancel", "interact", "interact_alt", "drop", "winch_release", "tool_1", "tool_2", "tool_3", "tool_4", "tool_5", "inventory"]],
+	["Game", ["pause", "push_to_talk", "show_help", "emote"]],
 	["Impostor", ["sabotage_menu", "sabotage_1", "sabotage_2", "sabotage_3", "sabotage_4"]],
 	["Debug", ["toggle_role", "toggle_world_sabotage", "restart_checkpoint", "new_game"]],
 ]
@@ -19,8 +19,9 @@ const NAMES := {
 	"move_forward": "Walk forward", "move_back": "Walk back", "move_left": "Step left", "move_right": "Step right",
 	"jump": "Jump", "sprint": "Sprint", "attack": "Use tool / hit", "cancel": "Cancel / aim off",
 	"interact": "Use / place", "interact_alt": "Alternative use", "drop": "Put item back",
-	"tool_1": "Hammer", "tool_2": "Wrench", "tool_3": "Nail gun", "tool_4": "Welder", "tool_5": "Come-along",
-	"pause": "Pause menu", "push_to_talk": "Push to talk", "emote": "Wave (emote)", "toggle_help": "Show help",
+	"tool_1": "Hotbar slot 1", "tool_2": "Hotbar slot 2", "tool_3": "Hotbar slot 3", "tool_4": "Hotbar slot 4",
+	"tool_5": "Hotbar slot 5", "inventory": "Inventory", "winch_release": "Release the come-along",
+	"pause": "Pause menu", "push_to_talk": "Push to talk", "show_help": "Show help (hold)", "emote": "Wave (emote)",
 	"sabotage_menu": "Sabotage menu", "sabotage_1": "Sabotage 1", "sabotage_2": "Sabotage 2",
 	"sabotage_3": "Sabotage 3", "sabotage_4": "Sabotage 4",
 	"toggle_role": "Switch role (debug)", "toggle_world_sabotage": "World sabotage (debug)",

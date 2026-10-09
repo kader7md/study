@@ -1,7 +1,7 @@
 class_name SabotageManager
 extends Node
 ## The impostor's sabotage abilities, each with a cooldown.
-## - Impostor: uses them on purpose (debug: F2 to play as impostor, [Tab] menu, then keys 1-4).
+## - Impostor: uses them on purpose (debug: F2 to play as impostor, [X] menu, then keys 1-4).
 ## - No impostor (1-2 players): "the world" triggers random sabotage now and then.
 ## - A correct vote at the meeting table (M4) sets `locked`, silently disabling everything.
 

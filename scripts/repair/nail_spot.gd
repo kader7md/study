@@ -1,7 +1,7 @@
 class_name NailSpot
 extends Interactable
 ## A nail to drive in (or, style "bolt", a fishplate bolt joining two rails): 3 hammer hits,
-## or 1 shot with the nail gun. A nail uses 1 nail from the inventory (bolts come with the rail).
+## or 1 shot with the nail gun. A nail uses 1 nail, a bolt 1 bolt from the team pool.
 
 signal done
 
@@ -44,9 +44,10 @@ func on_tool_hit(tool: String, _player: Node) -> bool:
 	if require_tool != "" and tool != require_tool:
 		Game.say("Joining planks needs the NAIL GUN (buy one at a station shop)")
 		return false
-	if not _paid and style != "bolt":  # fishplate bolts come with the rail; nails cost 1 each
-		if not Game.take("nails"):
-			Game.say("No nails! Buy nails at a station shop.")
+	if not _paid:  # nails and bolts cost 1 each (team pool)
+		var what := "bolts" if style == "bolt" else "nails"
+		if not Game.take(what):
+			Game.say("No %s! Buy %s at a station shop." % [what, what])
 			return false
 		_paid = true
 	hits = HAMMER_HITS if tool == "nail_gun" else hits + 1

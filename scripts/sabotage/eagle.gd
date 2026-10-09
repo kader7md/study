@@ -8,7 +8,7 @@ enum State { APPROACH, STEAL, ESCAPE }
 const SPEED := 14.0
 const HP := 10.0
 const STEAL_TIME := 1.5
-const LOOT := ["wood", "scrap", "coal"]
+const LOOT := ["wood", "rail", "nails"]  # from the shared team pool
 
 var hp := HP
 var state := State.APPROACH

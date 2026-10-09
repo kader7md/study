@@ -124,7 +124,7 @@ Each Player has two synchronizers (`scripts/net/player_sync.gd`):
 | Synchronizer | Authority | Properties |
 |--------------|-----------|------------|
 | `InputSync` | the player's own peer (movement only) | `net_pos`, `net_yaw`, `net_pitch`, `net_car` at 20 Hz; `current_tool`, `welding` on change |
-| `StateSync` | host | `carried_item`, `health`, `frost`, `downed`, `welder_path` on change |
+| `StateSync` | host | `carried_item`, `health`, `warmth`, `bleeding`, `boosted`, `downed`, `welder_path` on change |
 
 - `net_pos` is **relative to the train car** the player stands on (`net_car`), and other screens smooth it in that
   car's space, so riders stay glued to a moving train everywhere (GDD 9: vehicle local space).
@@ -170,7 +170,8 @@ fasteners `Fix_<part>_<n>`, extras `Zombie_<n>`, `Eagle_<n>`, `Fallen_<n>`, `Anc
 | Rail pieces | reliable events | broken (index, cratered), repaired (index, roll) |
 | Rail repair progress | reliable, polled 8 Hz | `RailRepair.net_state()` per repair: planks (slot, roll, grounded, fixed, nail hits), rails, bolt hits; `apply_net_state()` on clients |
 | Cover pieces | reliable, polled 8 Hz | per part: attached, placed (pending), door open, nail / weld progress |
-| Inventory | reliable, on change | the whole dictionary |
+| Team pool (`Game.inventory`) | reliable, on change | the whole dictionary, to everyone |
+| Personal inventory (`Game.personal`) | reliable, on change | `_rpc_personal`: each player's own 30 slots, only to that player (the host keeps everyone's; the checkpoint saves them by player name). Clients move slots with `Game.move_slot` (applied at once, then the host's copy wins) |
 | Pickups, keys | reliable | taken (path), gold rock hits left |
 | Runtime pickups (RunDirector supply / coal crates) | reliable | created (name, item, amount, contents, position) |
 | Meteors | reliable | spawn (name, target); clients show the fall, only the host applies the impact (`# NET:` in meteor.gd) |

@@ -52,7 +52,8 @@ const CRANK_STEP := 5.0
 const WRENCH_REPAIR := 0.6
 
 ## Things the crew carries out of the cargo car and what each costs from the inventory.
-const CARRY_COST := {"plank": {"wood": 1}, "rail": {"scrap": 2}, "wheel": {"wheel": 1}, "panel": {"scrap": 2}}
+## plank / rail / wheel come from the team pool; a new metal panel from the taker's own scrap.
+const CARRY_COST := {"plank": {"wood": 1}, "rail": {"rail": 1}, "wheel": {"wheel": 1}, "panel": {"scrap": 2}}
 
 var track: Track
 var distance := 0.0
@@ -358,6 +359,17 @@ func attach_anchor(a: AnchorSpot) -> bool:
 	anchor = a
 	_chain.visible = true
 	Game.say("Chain anchored. Crank the come-along [LMB] to pull the train back up!")
+	return true
+
+
+## [R] with the come-along: unhooks it (chain and hook come off; hook it up again to keep pulling).
+func release_come_along() -> bool:
+	if not is_instance_valid(hook) and not is_instance_valid(anchor):
+		return false
+	hook = null
+	anchor = null
+	_chain.visible = false
+	Game.say("Come-along released")
 	return true
 
 
@@ -746,8 +758,8 @@ func _build_cargo(car: Node3D, length: float) -> void:
 
 
 func _cargo_summary() -> String:
-	return "coal %d · wood %d · scrap %d · nails %d · wheels %d" % [
-		Game.count("coal"), Game.count("wood"), Game.count("scrap"), Game.count("nails"), Game.count("wheel")]
+	return "wood %d · rails %d · wheels %d · your scrap %d" % [
+		Game.count("wood"), Game.count("rail"), Game.count("wheel"), Game.count("scrap")]
 
 
 ## A player takes a repair item out of the cargo car (paid from the crew inventory).

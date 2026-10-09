@@ -54,7 +54,14 @@ What's in it:
   hauling the lever, reaching, waving ([B]), downed and climbing. Other players see all of it.
 - **Mirror** in the utility wagon: it really reflects you, and [E] opens the look editor (live 3D preview, drag to
   turn, Randomise). Also from the main menu's name card (**Look**). Saved in `user://settings.cfg`, synced online.
-- First-person player with cartoony hands (your own skin colour and sleeves), a tool hotbar, and carrying items; can ride the moving train.
+- First-person player with cartoony hands (your own skin colour and sleeves), a personal 5-slot hotbar and a 5x5 inventory ([Tab]), and carrying items;
+  can ride the moving train. **Shared team supplies** (planks, rails, nails, bolts, engine oil, spare wheels, gold) are
+  used by everyone's repairs; coal, scrap, food, keys, tools and gold nuggets are **personal** (nuggets sell for crew
+  gold at a shop). Health only comes back by **eating** (sandwich, beans, apple, chocolate, hot soup, coffee, medkit);
+  warmth drains in the cold and at 0 you take damage
+- **In-game HUD** (RV There Yet-like, our own design): train status top centre (body bar, striped wheels / engine /
+  chassis bar, a winch line while the come-along is in play), team supplies beside it, health / warmth / status icons
+  bottom left, hotbar bottom centre, context key hints on the right; white line icons, the Fredoka font
   Every tool has its own first-person animation (hammer overhead swing with a camera kick, wrench twist with a ratchet
   tick, nail gun recoil and puff, welder steady hand with sparks, two-handed come-along pump) and every carried item
   its own pose (plank on the shoulder, rail low with a strained bob, wheel in front, panel flat at chest height)
@@ -73,20 +80,22 @@ What's in it:
 | Key | Action |
 |-----|--------|
 | WASD / Shift / Space | Move / sprint / jump |
-| Mouse · LMB | Look · use tool (hammer hit, nail gun shot, hold to weld) |
-| 1–5 (or mouse wheel) | Hammer / wrench / nail gun (once bought) / welder (only while holding a station torch) / come-along |
+| Mouse · LMB | Look · use what's in hand (hammer hit, nail gun shot, hold to weld, eat food) |
+| 1–5 (or mouse wheel) | Personal hotbar slots (start: hammer, wrench, -, sandwich, come-along for the host) |
+| Tab | Inventory: 5x5 grid + hotbar row; drag & drop or click to move, right-click food to eat (frees the mouse) |
 | E · Q · G | Use / place carried item · alternative use · put the carried item back |
-| Esc | Pause menu (closes the shop or Settings first) |
+| R | Release the come-along (while holding it) |
+| Esc | Pause menu with the controls help (closes the shop, inventory or Settings first) |
+| H (hold) | Controls help and the current objective |
 | V | Push to talk (voice chat, with multiplayer) |
 | B | Wave (emote) |
-| F1 | Show/hide help |
 | F11 | Fullscreen on/off |
-| F2 | Debug: play as **impostor** (**Tab** = sabotage menu, then 1–4; meteor: aim + LMB) |
+| F2 | Debug: play as **impostor** (**X** = sabotage menu, then 1–4; meteor: aim + LMB) |
 | F3 | Debug: world sabotage on/off |
 | F5 / F6 | Debug: last checkpoint / new game (offline or host only) |
 
 The F2/F3/F5/F6 debug keys only work in debug builds (the editor, or `developer/debug_keys=true` in
-`user://settings.cfg`), only during a run, and they only show in the F1 help then. Every key hint on screen follows
+`user://settings.cfg`), only during a run, and they only show in the help then. Every key hint on screen follows
 your own bindings from Settings > Controls.
 
 Going down: a player whose health reaches 0 is **down**. A **medkit** (station shop) saves you once when you would go

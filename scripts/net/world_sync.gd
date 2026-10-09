@@ -7,7 +7,7 @@ extends Node
 ##   extras, 20 Hz, unreliable, in packets of a few: the moving zombies, eagles, fallen panels and anchor points, which
 ##     clients show as puppets (only what moved, plus everything once a second); reliable "gone" when one disappears.
 ##   events, reliable: rail pieces broken / repaired (index, cratered, roll), each RailRepair's build state, train cover
-##     pieces (off / placed / nails and welds / doors), pickups taken, inventory, station reached, meteors, gates,
+##     pieces (off / placed / nails and welds / doors), pickups taken, team pool + each player's own inventory, station reached, meteors, gates,
 ##     objective and the end-of-run stats.
 ## A client that finished loading gets everything once (send_full_state), then the stream.
 ## Client-side, the train only interpolates (Train skips its simulation when not host).
@@ -27,6 +27,7 @@ var _host := false
 var _snap_clock := 0.0
 var _state_clock := 0.0
 var _inventory_dirty := false
+var _personal_dirty := {}   # host: peer -> true when that player's own inventory changed
 var _repair_sent := {}      # piece index -> last sent state (as text)
 var _part_sent := {}        # part index -> last sent state (as text)
 var _gone: Array[String] = []   # host: pickups and keys taken (paths relative to Main)
@@ -59,6 +60,7 @@ func setup(main_node: Node) -> void:
 		track.piece_repaired.connect(_on_piece_repaired)
 		track.gate_opened.connect(_on_gate_opened)
 		Game.inventory_changed.connect(func(): _inventory_dirty = true)
+		Game.personal_changed.connect(func(peer: int): _personal_dirty[peer] = true)
 		Game.station_reached.connect(_on_station_reached)
 		Game.run_finished.connect(_on_run_finished)
 		Game.objective_changed.connect(_on_objective_changed)
@@ -108,6 +110,12 @@ func _host_tick(delta: float) -> void:
 	if _inventory_dirty:
 		_inventory_dirty = false
 		_send(&"_rpc_inventory", [Game.inventory])
+	if not _personal_dirty.is_empty():
+		# each player only ever gets their own personal inventory
+		for peer: int in _personal_dirty:
+			if peer != Net.local_id() and Net.is_peer_ready(peer) and Net.players.has(peer):
+				_rpc_personal.rpc_id(peer, Game.slots(peer))
+		_personal_dirty.clear()
 	_snap_clock += delta
 	if _snap_clock >= 1.0 / SNAPSHOT_RATE:
 		_snap_clock = 0.0
@@ -276,6 +284,7 @@ func send_full_state(peer: int) -> void:
 		"gone": _gone,
 		"gold": gold,
 		"inventory": Game.inventory,
+		"personal": Game.slots(peer),
 		"next_station": Game.next_station,
 		"parts": _poll_parts(true),
 		"gates": gates,
@@ -559,6 +568,7 @@ func _rpc_full_state(s: Dictionary) -> void:
 	for rel: String in gold:
 		_rpc_gold(rel, gold[rel])
 	_rpc_inventory(s.inventory)
+	_rpc_personal(s.get("personal", []))
 	Game.next_station = s.next_station
 	var parts: Array = s.parts
 	for i in mini(parts.size(), train.parts.size()):
@@ -598,6 +608,12 @@ func _rpc_pickup(e: Array) -> void:
 	p.bundle = b.duplicate()
 	p.position = e[5]
 	main.add_child(p)
+
+
+## Client: our own personal inventory (hotbar + grid), as the host has it.
+@rpc("authority", "call_remote", "reliable")
+func _rpc_personal(raw: Array) -> void:
+	Game.set_personal(Net.local_id(), raw)
 
 
 @rpc("authority", "call_remote", "reliable")

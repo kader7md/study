@@ -51,8 +51,8 @@ const COLORS: Array[Color] = [
 const ALLOWED := {
 	"interact": "Interactable", "interact_alt": "Interactable",
 	"tool_hit": "Player", "come_along_hit": "Player", "weld_tick": "Player", "put_back": "Player",
-	"unplug_welder": "Player", "take_damage": "Player",
-	"buy": "Game", "use": "SabotageManager",
+	"unplug_welder": "Player", "take_damage": "Player", "eat_slot": "Player", "winch_release": "Player",
+	"buy": "Game", "sell_nuggets": "Game", "move_slot": "Game", "use": "SabotageManager",
 }
 
 var backend: NetBackend
@@ -754,7 +754,7 @@ func _add_crew_widget(hud: Node) -> void:
 func _show_role_banner(role: String) -> void:
 	_pending_role = ""
 	await get_tree().create_timer(1.5).timeout
-	var text := "YOU ARE THE IMPOSTOR\nSecretly sabotage the crew: [Tab] opens your sabotage menu. Nobody else knows."
+	var text := "YOU ARE THE IMPOSTOR\nSecretly sabotage the crew: [X] opens your sabotage menu. Nobody else knows."
 	if role != "impostor":
 		text = "YOU ARE CREW\nOne of your friends is a secret impostor. Trust no one."
 	print("[net] your role: ", role)
@@ -830,6 +830,12 @@ func run_as(peer: int, fn: Callable, args: Array = []) -> Variant:
 	return result
 
 
+## The player an action is for: the peer whose request the host is running, else this peer (offline: 1).
+## Game routes personal items (coal, food, tools...) to this player's inventory.
+func acting_peer() -> int:
+	return _actor if _actor != 0 else local_id()
+
+
 ## The remote peer whose request the host is running right now, or 0.
 func remote_actor() -> int:
 	return _actor if _actor != 0 and _actor != local_id() else 0
@@ -881,7 +887,7 @@ func _rpc_request(path: String, method: String, args: Array, aim: Vector3) -> vo
 		return
 	if not _in_reach(player, target, decoded):
 		return
-	if method == "buy" and not _near_shop(player):
+	if (method == "buy" or method == "sell_nuggets") and not _near_shop(player):
 		return
 	if not target.has_method(method):
 		return

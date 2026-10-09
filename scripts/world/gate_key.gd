@@ -134,7 +134,7 @@ func get_prompt(_player: Node) -> String:
 	return "Pick up the gate key  [E]"
 
 
-## Host: the crew gets the key; the key disappears.
+## Host: the player who picked it up gets the key; the key disappears.
 func interact(_player: Node) -> void:
 	if is_queued_for_deletion():
 		return

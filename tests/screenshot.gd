@@ -174,8 +174,10 @@ func _hud_shots(track: Track, train: Train, player: Player) -> void:
 	train.lever = 1
 	train.speed = 6.0
 	Game.add("nail_gun")
+	Game.add("soup", 2)
+	Game.add("gold_nugget", 6)
 	player.health = 72.0
-	player.frost = 35.0
+	player.warmth = 64.0
 	Game.say("A wheel came off! (5/6, speed -16%) New wheels are sold at stations.")
 	Game.say("Bought Nails x10")
 	await get_tree().create_timer(0.6).timeout
@@ -183,6 +185,7 @@ func _hud_shots(track: Track, train: Train, player: Player) -> void:
 	Game.show_banner("Station 1 / 5 reached!\nCheckpoint saved. Repair, shop, rest.")
 	await get_tree().create_timer(0.8).timeout
 	await _shot("hud_2_banner")
+	main.hud._banner.visible = false
 	var st := main.get_node_or_null("Station0") as Station
 	if st:
 		main.hud.open_shop(st)
@@ -201,6 +204,51 @@ func _hud_shots(track: Track, train: Train, player: Player) -> void:
 	img.save_png("%s/hud_5_play_1280x720.png" % out)
 	shot_count += 1
 	print("saved hud_5_play_1280x720")
+	# The inventory ([Tab]): grid + hotbar, team supplies beside it
+	main.hud.open_inventory()
+	await get_tree().create_timer(0.4).timeout
+	await _shot("hud_6_inventory")
+	main.hud.close_inventory()
+	# Low health, freezing and bleeding: the status icons and warning outlines
+	Game.wind_active = true
+	player.health = 18.0
+	player.warmth = 0.0
+	player.bleeding = true
+	player.set_physics_process(false)
+	main.hud.set_stamina(0.45, true)
+	await get_tree().create_timer(0.5).timeout
+	await _shot("hud_7_low_health_frost")
+	main.hud.set_stamina(1.0, false)
+	player.set_physics_process(true)
+	Game.wind_active = false
+	player.bleeding = false
+	player.health = 80.0
+	player.warmth = 100.0
+	# The come-along: the train tipped, hooked to its lifting eye (chain not anchored yet), then pulling
+	player.select_tool("come_along")
+	train.speed = 0.0
+	train.lever = 0
+	train.tip_over(1.0)
+	await get_tree().create_timer(0.4).timeout
+	var hooks := train.cars[0].find_children("*", "HookSpot", true, false)
+	if not hooks.is_empty():
+		train.attach_hook(hooks[0])
+	await get_tree().create_timer(0.4).timeout
+	await _shot("hud_8_winch_hooked")
+	var anchors := main.find_children("*", "AnchorSpot", true, false)
+	if not anchors.is_empty():
+		train.attach_anchor(anchors[0])
+	for k in 6:
+		train.crank()
+		await get_tree().create_timer(0.12).timeout
+	await _shot("hud_9_winch_pulling", 0.05)
+	# Hold [H]: the help card
+	Input.action_press("show_help")
+	await get_tree().create_timer(0.3).timeout
+	await _shot("hud_10_help")
+	Input.action_release("show_help")
+
+
 func _gate_shots(track: Track, train: Train, player: Player) -> void:
 	var seg := 0
 	var g := track.gate_distance(seg)
