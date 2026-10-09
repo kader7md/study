@@ -7,7 +7,9 @@
   inventories (`personal`, hotbar + grid, `count/add/take` route by item and acting peer), checkpoints, signals, debug role, run
   `stats` (`add_stat`), `objective` (+ `objective_changed`), `run_finished`, `return_to_menu()`, balance (`SHOP`, `START_INVENTORY`).
   Keep state changes host-side so multiplayer (M1) can sync them later.
-- Main pieces: `Track` (rail pieces, gaps, stations, landscape themes, bridges), `Terrain` (ribbon mesh along the track),
+- Main pieces: `Track` (rail pieces, gaps, stations, landscape themes, bridges, quest sites `quest_zone(seg)`), `Landscape`
+  (the height function), `Terrain` (big chunked heightmap + fine ribbon along the rails, scatter, collision near players),
+  `WorldFeatures` (trails, hazards, caves, rope bridges, waterfalls, rockfalls, out of bounds), `Atmosphere` (weather per theme),
   `Train` (distance-based movement), `RailRepair`/`PlaceSlot`/`NailSpot`/`WeldSeam`/`WelderSource` (hands-on repair), `Station`,
   `SabotageManager` (+ `Meteor`, `Zombie`, `Eagle`), `Player` (+ `Viewmodel`: hands, tool animations, carry poses), `HUD`
   (`scripts/ui/hud/`: `HudStyle` look + line icons, `TrainStatus`, `HudBar`, `ItemSlot`, `KeyText`, `InventoryWindow`).

@@ -171,6 +171,29 @@ Stations are **1.5 km apart** (longer in the full game), each stretch with its o
 
 Bridges are wooden trestles. A broken bridge piece leaves a hole you can fall through into the water.
 
+### The overworld (walk off the train)
+The railway runs through a **big, hand-crafted-feeling landscape**, not a strip: the land goes on for about **900 m each
+side of the line** for the whole route, then climbs into high ridges that close it in (towards the sea it opens up).
+It is one deterministic heightmap (`Landscape`, from `Main.SEED`, the same on every peer), drawn in chunks with levels of
+detail; collision only exists near players. Near the rails the land stays gentle (embankments, cuttings, bridges);
+further out each theme takes over:
+- **Forest hills:** rolling wooded hills, thorn thickets and mud, a river gorge.
+- **River valley:** a wide valley between cliff-banded walls, a big meandering river, waterfalls, rope bridges, light rain.
+- **Mountain pass:** steep ridged mountains with snowy peaks, ice patches, geysers, rockfalls beside the track, snowfall.
+- **The lake:** a big lake with a wandering shore, mountains behind it, geysers, golden misty afternoon light.
+- **The coast:** dry grass, quicksand by the water, sea cliffs, the open sea, sunset.
+
+Off the rails (`WorldFeatures`): **trails** from the track up to **viewpoints** (cairn and flag, supplies left there), some
+blocked by a fallen log or a dead tree that comes down when you walk up; **caves** with a lantern and supplies inside;
+**rope bridges** over the river gorges; **waterfalls**. **Hazards:** mud and quicksand slow you down, ice keeps you
+sliding, thorns hurt, geysers throw you up. **Rockfalls:** boulders tumble down beside the track when the train passes
+some cliffs (they hurt anyone in the way). **Out of bounds:** near the corridor edge you are warned, then put back on the
+train. **Weather and time of day** change per theme (`Atmosphere`), blending as you travel.
+
+**Quest sites:** beside every locked gate an **80 x 80 m flat, cleared plateau** at rail height (low rope fence, open
+towards the gate, a "QUEST SITE" sign), reachable on foot from the gate. The quest maps / portals go there later.
+API: `Track.quest_zone(segment)` → `{center, size, gate_index, forward, side}` and a marker node `QuestZone_<segment>`.
+
 ### Resources
 | Resource | Where | Used for |
 |----------|-------|----------|

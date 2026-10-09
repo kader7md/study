@@ -4,6 +4,8 @@ extends Node
 ## menu: title screen, settings tabs, join dialog, title with a save (menu_save: only that one). hud: in-game HUD (1600x900 and 1280x720), shop, pause menu.
 ## station: station 1 (canopy, name board, shop kiosk) from the track and from the platform.
 ## gate: locked gate and key. end: Chapter 1 end screen. tools: tool animations and carry poses.
+## world: the overworld (aerial view per theme, the whole route, quest sites by the gates, ground-level views) and
+## an FPS measurement; add "aerial", "quest" or "ground" to take only that group.
 
 ## Each run first deletes the old PNGs of its own mode in <output_dir> (so a run that times out leaves no stale
 ## pictures that look fresh) and prints "DONE n shots" when it finishes. Run the modes one after another:
@@ -17,7 +19,7 @@ var shot_count := 0
 ## File name prefixes each mode writes (the default run writes the numbered landscape / repair / train shots).
 const MODE_PREFIXES := {
 	"menu": ["menu_"], "menu_save": ["menu_5"], "hud": ["hud_"], "gate": ["gate_"], "end": ["end_"], "tools": ["tool_", "carry_"],
-	"station": ["station_"], "repair": ["6_", "7_"], "train": ["8_", "9_"],
+	"station": ["station_"], "repair": ["6_", "7_"], "train": ["8_", "9_"], "world": ["world_"],
 }
 
 
@@ -50,6 +52,10 @@ func _ready() -> void:
 		get_tree().quit()
 		return
 	# gameplay modes: the locked gate and its key, the Chapter 1 end screen, tool animations and carry poses
+	if args.has("world"):
+		await _world_shots(track, player, args)
+		get_tree().quit()
+		return
 	if args.has("station"):
 		await _station_shots(main.get_node("Station1") as Station)
 		get_tree().quit()
@@ -384,6 +390,82 @@ func _station_shots(st: Station) -> void:
 		cam.look_at(st.to_global(v[2]), Vector3.UP)
 		await _shot(v[0], 0.6)
 	main.hud.visible = true
+
+
+func _world_cam() -> Camera3D:
+	if free_cam == null:
+		free_cam = Camera3D.new()
+		free_cam.far = 6000.0
+		main.add_child(free_cam)
+	free_cam.make_current()
+	main.hud.visible = false
+	return free_cam
+
+
+func _world_shots(track: Track, player: Player, args: PackedStringArray) -> void:
+	var all := not (args.has("aerial") or args.has("quest") or args.has("ground"))
+	var terrain: Terrain = Game.terrain
+	player.set_physics_process(false)
+	if all or args.has("aerial"):
+		var cam := _world_cam()
+		# the whole route from high above the departure end
+		var mid := track.point_at(track.get_length() * 0.45)
+		cam.global_position = track.point_at(0.0) + Vector3(-900.0, 1400.0, 900.0)
+		cam.look_at(mid, Vector3.UP)
+		var only_some := Array(args).any(func(a: String) -> bool: return a.begins_with("seg"))
+		if not only_some:
+			await _shot("world_0_route", 1.0)
+		for seg in Track.THEMES.size():
+			if only_some and not args.has("seg%d" % (seg + 1)):
+				continue
+			var d := track.station_distances[seg] + Track.SEGMENT_LENGTH * 0.45
+			var p := track.point_at(d)
+			var f := track.flat_forward(d)
+			var r := track.flat_right(d)
+			cam.global_position = p - f * 380.0 - r * 260.0 + Vector3.UP * 230.0
+			cam.look_at(p + f * 250.0 + r * 60.0, Vector3.UP)
+			await _shot("world_%d_aerial_%s" % [seg + 1, str(Track.THEMES[seg].name).to_lower().replace(" ", "_")], 1.0)
+	if all or args.has("quest"):
+		var cam := _world_cam()
+		for seg in [0, 2, 3]:
+			var q := track.quest_zone(seg)
+			var c: Vector3 = q.center
+			var side: float = q.side
+			var r := (q.forward as Vector3).cross(Vector3.UP)
+			var g := track.point_at(track.gate_distance(seg))
+			cam.global_position = g - r * side * 45.0 - (q.forward as Vector3) * 60.0 + Vector3.UP * 38.0
+			cam.look_at(c, Vector3.UP)
+			await _shot("world_q%d_quest_site" % seg, 1.0)
+		# from the track, by the gate
+		var q0 := track.quest_zone(0)
+		var g0 := track.transform_at(track.gate_distance(0) + 6.0)
+		_view_player(player, g0.origin + g0.basis.x * q0.side * 3.0 + Vector3.UP * 0.2, q0.center + Vector3.UP * 1.0)
+		player.camera.make_current()
+		main.hud.visible = false
+		await _shot("world_q_from_gate", 1.0)
+	if all or args.has("ground"):
+		var spots := [[0, 0.3, 120.0, "forest"], [1, 0.42, -150.0, "valley"], [2, 0.62, 140.0, "pass"], [3, 0.7, -90.0, "lake"], [4, 0.6, 80.0, "coast"]]
+		for sp in spots:
+			var d: float = track.station_distances[sp[0]] + Track.SEGMENT_LENGTH * float(sp[1])
+			var u: float = sp[2]
+			var on := track.point_at(d)
+			var pos := on + track.flat_right(d) * u
+			pos.y = terrain.ground_at(pos.x, pos.z) + 0.1
+			var look := on + track.flat_forward(d) * 160.0 - track.flat_right(d) * u * 0.4
+			look.y = pos.y + 8.0
+			_view_player(player, pos, look)
+			player.camera.make_current()
+			main.hud.visible = false
+			terrain.update_collision()
+			await _shot("world_g_%s" % sp[3], 1.2)
+		# frame rate at the last ground view
+		var frames := Engine.get_frames_drawn()
+		var t0 := Time.get_ticks_msec()
+		await get_tree().create_timer(3.0).timeout
+		var fps := (Engine.get_frames_drawn() - frames) * 1000.0 / maxf(Time.get_ticks_msec() - t0, 1.0)
+		print("[fps] ground view: %.1f fps, %d draw calls, %d primitives" % [fps,
+			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])
 
 
 func _view_player(player: Player, pos: Vector3, look: Vector3) -> void:

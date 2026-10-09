@@ -18,6 +18,8 @@ const RAILS_PER_PIECE := 2
 const BOLTS_PER_PIECE := 4
 const NAILS_PER_PIECE := 8
 const GAP_SUPPLY_RADIUS := 22.0
+## Thin haze, so the mountains several kilometres away still read.
+const FOG_DENSITY := 0.00028
 
 var track: Track
 var train: Train
@@ -25,6 +27,9 @@ var player: Player
 var hud: HUD
 var director: RunDirector
 var _env: Environment
+var _sky_mat: ProceduralSkyMaterial
+var _sun: DirectionalLight3D
+var atmosphere: Atmosphere
 var _rng := RandomNumberGenerator.new()
 var _pickups: Node3D
 var _pickup_count := 0
@@ -63,6 +68,9 @@ func _ready() -> void:
 	add_child(terrain)
 	terrain.build(track, _rng)
 	Game.terrain = terrain
+	atmosphere = Atmosphere.new()
+	atmosphere.setup(_env, _sky_mat, _sun, track)
+	add_child(atmosphere)
 	_spawn_pickups()
 
 	# quest maps: a portal beside each quest gate; the maps themselves are built when the crew enters
@@ -121,6 +129,7 @@ func _on_shop_requested(s: Station) -> void:
 
 func _build_environment() -> void:
 	var sky_mat := ProceduralSkyMaterial.new()
+	_sky_mat = sky_mat
 	sky_mat.sky_top_color = Color(0.3, 0.52, 0.85)
 	sky_mat.sky_horizon_color = Color(0.68, 0.77, 0.86)
 	sky_mat.ground_horizon_color = Color(0.5, 0.56, 0.48)
@@ -139,8 +148,13 @@ func _build_environment() -> void:
 	_env.adjustment_enabled = true
 	_env.adjustment_saturation = 1.0
 	_env.fog_enabled = true
-	_env.fog_density = 0.0008
+	_env.fog_density = FOG_DENSITY
 	_env.fog_light_color = Color(0.75, 0.82, 0.9)
+	# distant mountains fade into the sky colour; valleys hold a little mist
+	_env.fog_aerial_perspective = 0.55
+	_env.fog_sky_affect = 0.25
+	_env.fog_height = 6.0
+	_env.fog_height_density = 0.004
 	var we := WorldEnvironment.new()
 	we.environment = _env
 	add_child(we)
@@ -149,13 +163,16 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-50, -35, 0)
 	sun.light_energy = 1.0
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 150.0
+	sun.directional_shadow_max_distance = 180.0
 	add_child(sun)
+	_sun = sun
 
 
 func _on_wind_changed(active: bool) -> void:
+	if atmosphere:
+		return  # the atmosphere blends the wind's fog in with the weather
 	var tween := create_tween()
-	tween.tween_property(_env, "fog_density", 0.02 if active else 0.0008, 2.0)
+	tween.tween_property(_env, "fog_density", 0.02 if active else FOG_DENSITY, 2.0)
 	tween.parallel().tween_property(_env, "fog_light_color", Color(0.85, 0.92, 1.0) if active else Color(0.75, 0.82, 0.9), 2.0)
 
 
@@ -216,6 +233,13 @@ func _spawn_pickups() -> void:
 		if _good_spot(fd, fp):
 			add_pickup(food, 2 if food == "apple" else 1, fp)
 		fd += FOOD_SPACING * frng.randf_range(0.6, 1.4)
+	# 6. Supplies out in the land, worth the walk: in the caves and at the viewpoints at the end of the trails
+	var terrain: Terrain = Game.terrain
+	if terrain and terrain.features:
+		var spots := terrain.features.resource_spots
+		for k in spots.size():
+			var item: String = ["gold", "coal", "scrap", "gold", "wood"][k % 5]
+			add_pickup(item, 0 if item == "gold" else _rng.randi_range(3, 5), spots[k])
 
 
 ## Adds a pickup named Pickup_<n> (n = spawn order, the same on every peer). item "gold" = a gold rock.
