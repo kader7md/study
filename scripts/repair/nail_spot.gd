@@ -20,13 +20,16 @@ func _ready() -> void:
 	Build.collider(self, Vector3(0.35, 0.35, 0.35), Vector3(0, 0.1, 0))
 	_nail = Node3D.new()
 	add_child(_nail)
+	# Blender models (build_assets.py build_fasteners): a fishplate bolt that slides in along -X as it is
+	# tightened (the fishplate itself is part of rail.glb), or a track spike driven down into the tie plate.
 	if style == "bolt":
-		Build.box(self, Vector3(0.05, 0.12, 0.5), Vector3(0.05, 0.0, 0), Color(0.35, 0.33, 0.32))  # fishplate
-		Build.cylinder(_nail, 0.035, 0.18, Vector3(0.1, 0.0, 0), Color(0.6, 0.6, 0.62)).rotation.z = PI * 0.5
-		Build.cylinder(_nail, 0.055, 0.04, Vector3(0.19, 0.0, 0), Color(0.5, 0.5, 0.52)).rotation.z = PI * 0.5
+		var bolt := Props.instance("track_bolt")
+		bolt.position = Vector3(0.05, 0.0, 0)
+		_nail.add_child(bolt)
 	else:
-		Build.cylinder(_nail, 0.025, 0.25, Vector3(0, 0.12, 0), Color(0.7, 0.7, 0.72))
-		Build.cylinder(_nail, 0.06, 0.03, Vector3(0, 0.25, 0), Color(0.75, 0.75, 0.78))
+		var spike := Props.instance("track_spike")
+		spike.position = Vector3(0, 0.05, 0)  # driven 0.2 m down: the head ends on the tie plate
+		_nail.add_child(spike)
 
 
 func get_prompt(player: Node) -> String:

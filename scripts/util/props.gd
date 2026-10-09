@@ -9,6 +9,9 @@ const PATHS := {
 	"wheel": "res://assets/models/props/wheel.glb",
 	"plank": "res://assets/models/props/plank.glb",
 	"rail": "res://assets/models/props/rail.glb",
+	"panel": "res://assets/models/props/panel.glb",
+	"track_spike": "res://assets/models/props/track_spike.glb",
+	"track_bolt": "res://assets/models/props/track_bolt.glb",
 	"hammer": "res://assets/models/props/hammer.glb",
 	"welder": "res://assets/models/props/welder_torch.glb",
 	"nail_gun": "res://assets/models/props/nail_gun.glb",
@@ -22,6 +25,10 @@ const PATHS := {
 	"station_shelter": "res://assets/models/props/station_shelter.glb",
 	"shop_kiosk": "res://assets/models/props/shop_kiosk.glb",
 	"station_sign": "res://assets/models/props/station_sign.glb",
+	"platform_section": "res://assets/models/props/platform_section.glb",
+	"station_bench": "res://assets/models/props/station_bench.glb",
+	"station_lamp": "res://assets/models/props/station_lamp.glb",
+	"gravestone": "res://assets/models/props/gravestone.glb",
 	"gold_ore": "res://assets/models/props/gold_ore.glb",
 	"coal_pile": "res://assets/models/props/coal_pile.glb",
 	"scrap_pile": "res://assets/models/props/scrap_pile.glb",
@@ -34,13 +41,6 @@ static var _cache := {}
 
 
 static func instance(id: String) -> Node3D:
-	if id == "panel":
-		# generic spare panel carried by the player (fits any missing piece)
-		var n := Node3D.new()
-		Build.box(n, Vector3(1.6, 1.0, 0.1), Vector3.ZERO, Color(0.55, 0.33, 0.16))
-		Build.box(n, Vector3(1.64, 0.12, 0.12), Vector3(0, 0.3, 0), Color(0.36, 0.2, 0.1))
-		Build.box(n, Vector3(1.64, 0.12, 0.12), Vector3(0, -0.3, 0), Color(0.36, 0.2, 0.1))
-		return n
 	if not _cache.has(id):
 		_cache[id] = load(PATHS[id])
 	return _cache[id].instantiate()

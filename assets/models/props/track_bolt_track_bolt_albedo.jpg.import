@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://crgvd7g18qpmh"
-path="res://.godot/imported/plank_plank_albedo.jpg-0385231dce6014c58e78b82e7e93ac25.ctex"
+uid="uid://dm8j4a7plpypv"
+path="res://.godot/imported/track_bolt_track_bolt_albedo.jpg-e5ac2a8bafc35e1036a2b5885c63cfc4.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "d4ecb7720dbe2548fad40ed6898f24f4"
+"md5": "f8a9d787a3c9c9f0900c5633fc146bc4"
 }
 
 [deps]
 
-source_file="res://assets/models/props/plank_plank_albedo.jpg"
-dest_files=["res://.godot/imported/plank_plank_albedo.jpg-0385231dce6014c58e78b82e7e93ac25.ctex"]
+source_file="res://assets/models/props/track_bolt_track_bolt_albedo.jpg"
+dest_files=["res://.godot/imported/track_bolt_track_bolt_albedo.jpg-e5ac2a8bafc35e1036a2b5885c63cfc4.ctex"]
 
 [params]
 

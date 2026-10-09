@@ -98,6 +98,11 @@ The full sets above come from an earlier run.
 
 ## 4. What is still missing or weak
 
+> **Update (fix round 3):** T3-01, T3-02, T3-04 to T3-09, rejoin hardening (per-session rejoin ticket) and the dead-code
+> clean-ups are fixed. T3-03, T3-05 in the HUD and the HUD per-frame allocations move to the HUD redesign. The train
+> paint was re-baked as clean painted metal, and the build items (plank, rail, track spike, fishplate bolt, spare panel)
+> are textured Blender models now.
+
 ### Major (fix next)
 - **T3-01 Main menu overflows with a save.** The button column is centred with no bottom limit. When Continue is shown, Quit runs off a 16:9 screen and covers the footer.
   Returning players see this every time (`main_menu.gd _build_ui`).

@@ -1,7 +1,9 @@
 """Builds the Trust Issues train, repair items and tools in Blender, bakes worn PBR-style textures, exports .glb.
 
 Run headless:
-    blender --background --python blender/scripts/build_assets.py -- <repo_root> [only=train,props,gate,rail,pickups]
+    blender --background --python blender/scripts/build_assets.py -- <repo_root> [only=train,props,gate,items,pickups]
+    (items = the build items: plank, rail, track spike, fishplate bolt, spare panel; or one by one with
+    only=plank / rail / fasteners / panel)
 Or open Blender → Scripting tab → open this file → Run Script.
 
 Style: stylized realism (Sea of Thieves / Valheim direction): real proportions, rivets, bolts, iron straps,
@@ -82,6 +84,11 @@ MATS = {
     "coal_lump": ("rock", (0.045, 0.043, 0.045), 0.1, 0.45),
     "rope": ("canvas", (0.55, 0.43, 0.25), 0.0, 0.95),
     "rail_steel": ("iron", (0.3, 0.28, 0.26), 0.75, 0.45),
+    # build items: creosoted sleeper timber (the same brown as the intact track's sleepers), cast plates, spikes
+    "sleeper_wood": ("wood", (0.4, 0.25, 0.13), 0.0, 0.85),
+    "wood_end": ("plain", (0.12, 0.075, 0.04), 0.0, 0.9),
+    "tie_plate": ("iron", (0.2, 0.19, 0.18), 0.8, 0.6),
+    "spike_steel": ("iron", (0.24, 0.23, 0.22), 0.85, 0.5),
 }
 _mats = {}
 
@@ -139,6 +146,7 @@ def mat(name):
     coord = _n(nt, "ShaderNodeTexCoord").outputs["Object"]
     ao = _n(nt, "ShaderNodeAmbientOcclusion")
     ao.inputs["Distance"].default_value = 0.25
+    ao.samples = 32                    # smooth corner dirt (fewer rays bake as salt-and-pepper speckles)
     geo = _n(nt, "ShaderNodeNewGeometry")
     dirt = _ramp(nt, ao.outputs["AO"], 0.2, 0.9)           # 0 in corners, 1 in the open
     grime = _ramp(nt, _noise(nt, coord, 3.0, 3.0), 0.5, 0.8)
@@ -178,27 +186,56 @@ def mat(name):
         nt.links.new(moss, mul.inputs[0])
         nt.links.new(_ramp(nt, _noise(nt, coord, 3.0), 0.35, 0.6), mul.inputs[1])
         color = _mix(nt, color, (0.06, 0.13, 0.03), mul.outputs[0])
+    elif kind == "stone":
+        # dressed stone / flagstones: soft mottling and a fine grit, no moss (it is walked on)
+        color = _mix(nt, tuple(c * 0.86 for c in base), tuple(min(c * 1.1, 1.0) for c in base), _ramp(nt, _noise(nt, coord, 2.5, 4.0), 0.3, 0.7))
+        color = _mix(nt, color, tuple(c * 0.8 for c in base), _ramp(nt, _noise(nt, coord, 40.0, 1.0), 0.62, 0.75))
+    elif kind == "brick":
+        # brick courses on a wall facing X (the platform's track side): the brick pattern runs along Y and Z
+        sep = _n(nt, "ShaderNodeSeparateXYZ")
+        nt.links.new(coord, sep.inputs[0])
+        comb = _n(nt, "ShaderNodeCombineXYZ")
+        nt.links.new(sep.outputs["Y"], comb.inputs["X"])
+        nt.links.new(sep.outputs["Z"], comb.inputs["Y"])
+        nt.links.new(sep.outputs["X"], comb.inputs["Z"])
+        tb = _n(nt, "ShaderNodeTexBrick")
+        tb.offset = 0.5
+        tb.inputs["Color1"].default_value = (*base, 1.0)
+        tb.inputs["Color2"].default_value = (*(c * 0.72 for c in base), 1.0)
+        tb.inputs["Mortar"].default_value = (0.42, 0.4, 0.36, 1.0)
+        tb.inputs["Scale"].default_value = 1.0
+        tb.inputs["Mortar Size"].default_value = 0.012
+        tb.inputs["Brick Width"].default_value = 0.23
+        tb.inputs["Row Height"].default_value = 0.077
+        nt.links.new(comb.outputs[0], tb.inputs["Vector"])
+        color = _mix(nt, tb.outputs["Color"], tuple(c * 0.8 for c in base), _ramp(nt, _noise(nt, coord, 3.0, 4.0), 0.45, 0.8))
     elif kind == "enamel":
         # signal enamel: glossy, only a faint colour variation (no chipping, so stripes read cleanly from afar)
         color = _mix(nt, tuple(c * 0.9 for c in base), base, _ramp(nt, _noise(nt, coord, 0.8, 2.0), 0.35, 0.65))
     elif kind == "paint":
-        # subtle colour variation, then bare metal on chipped edges
-        color = _mix(nt, tuple(c * 0.93 for c in base), base, _ramp(nt, _noise(nt, coord, 0.8, 2.0), 0.35, 0.65))
-        edge = _ramp(nt, geo.outputs["Pointiness"], 0.52, 0.6)
-        chip = _ramp(nt, _noise(nt, coord, 30.0, 2.0), 0.45, 0.6)
+        # Clean painted metal: a very soft, large-scale tone variation and only a few worn patches on the sharpest
+        # edges, in a darker, duller shade of the paint (no fine noise: small chips bake as speckles that shimmer
+        # in game). Corner dirt and grime are toned down below.
+        color = _mix(nt, tuple(c * 0.96 for c in base), base, _ramp(nt, _noise(nt, coord, 0.5, 1.0), 0.35, 0.65))
+        edge = _ramp(nt, geo.outputs["Pointiness"], 0.56, 0.64)
+        chip = _ramp(nt, _noise(nt, coord, 4.0, 1.0), 0.6, 0.7)
         mul = _n(nt, "ShaderNodeMath")
         mul.operation = "MULTIPLY"
         nt.links.new(edge, mul.inputs[0])
         nt.links.new(chip, mul.inputs[1])
-        color = _mix(nt, color, (0.32, 0.31, 0.3), mul.outputs[0])
+        worn = tuple(c * 0.6 + 0.04 for c in base)
+        color = _mix(nt, color, worn, mul.outputs[0])
         bsdf.inputs["Metallic"].default_value = 0.15
     if kind not in ("lamp", "glass"):
         # dirt and soot collect in corners, streaks of grime everywhere
         inv = _n(nt, "ShaderNodeInvert")
         nt.links.new(dirt, inv.inputs["Color"])
         dirty = tuple(c * 0.3 for c in base) if kind != "brass" else (0.12, 0.08, 0.03)
+        if kind == "paint":
+            dirty = tuple(c * 0.7 for c in base)  # paint: a light shadow of dirt in the corners only
         color = _mix(nt, color, dirty, inv.outputs[0])
-        color = _mix(nt, color, tuple(c * 0.7 for c in base) if kind != "brass" else (0.3, 0.22, 0.08), _ramp(nt, grime, 0.75, 1.0))
+        streak = tuple(c * (0.9 if kind == "paint" else 0.7) for c in base) if kind != "brass" else (0.3, 0.22, 0.08)
+        color = _mix(nt, color, streak, _ramp(nt, grime, 0.75, 1.0))
     if isinstance(color, tuple):
         rgb = _n(nt, "ShaderNodeRGB")
         rgb.outputs[0].default_value = (*color, 1.0)
@@ -346,7 +383,9 @@ def clear_scene():
 
 # --- Bake: procedural wear → one texture per model ---------------------------------
 
-def bake_and_export(path, size=2048):
+def bake_and_export(path, size=2048, repack=False):
+    """`repack`: pack the UV islands again with rotation, so long thin parts (planks, rails) fill the whole texture
+    instead of a strip of it (more texels on the model, sharper grain)."""
     objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     for o in objs:
         apply_all(o)
@@ -358,6 +397,9 @@ def bake_and_export(path, size=2048):
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.003)
+    if repack:
+        bpy.ops.uv.select_all(action="SELECT")
+        bpy.ops.uv.pack_islands(rotate=True, margin=0.004)
     bpy.ops.object.mode_set(mode="OBJECT")
 
     img = bpy.data.images.new(os.path.splitext(os.path.basename(path))[0] + "_albedo", size, size)
@@ -775,14 +817,7 @@ def build_props():
     loco_wheel("Wheel", (0, 0, 0))
     bake_and_export(os.path.join(OUT_PROPS, "wheel.glb"), 1024)
 
-    clear_scene()
-    parts = [box("plank", (2.4, 0.3, 0.12), (0, 0, 0), "wood_grey", 0.01)]
-    for x in (-0.95, 0.95):
-        parts.append(box(f"plate{x}", (0.25, 0.32, 0.02), (x, 0, 0.065), "iron", 0.004))
-    join("Plank", parts, origin=(0, 0, 0))
-    bake_and_export(os.path.join(OUT_PROPS, "plank.glb"), 512)
-
-    build_rail()
+    build_items()
 
     clear_scene()
     # forged claw hammer: hickory handle with leather grip, steel head with curved claw
@@ -859,9 +894,44 @@ def build_props():
     bake_and_export(os.path.join(OUT_PROPS, "wrench.glb"), 512)
 
 
+def build_items():
+    """The build items a player carries and places on a broken piece of track."""
+    build_plank()
+    build_rail()
+    build_fasteners()
+    build_panel()
+
+
+def build_plank():
+    """plank.glb: a creosoted timber sleeper, 2.4 x 0.3 x 0.12 m (the same size as the intact track's sleepers): chamfered
+    edges, darker end grain, a few seasoning cracks along the top, and two cast tie plates where the rails sit
+    (x = +-0.95, under the rails at +-0.85; the game drives a nail into each plate). Origin at the centre."""
+    clear_scene()
+    parts = [box("sleeper", (2.4, 0.3, 0.12), (0, 0, 0), "sleeper_wood", 0.022)]
+    for sx in (-1, 1):
+        parts.append(box(f"endgrain{sx}", (0.012, 0.27, 0.1), (sx * 1.198, 0, 0), "wood_end", 0.004))
+    rng = random.Random(7)
+    for k in range(5):
+        x = rng.uniform(-1.05, 1.05)
+        if abs(abs(x) - 0.95) < 0.2:
+            x += 0.3 * (1 if x >= 0 else -1)
+        parts.append(box(f"crack{k}", (rng.uniform(0.25, 0.6), 0.008, 0.01), (x, rng.uniform(-0.09, 0.09), 0.057),
+                         "wood_end", 0.0, rot=(0, 0, math.radians(rng.uniform(-3, 3)))))
+    for sx in (-1, 1):
+        x = sx * 0.95
+        parts.append(box(f"plate{sx}", (0.26, 0.32, 0.018), (x, 0, 0.069), "tie_plate", 0.005))
+        for dx in (-0.075, 0.075):  # shoulders either side of the rail seat (rail at +-0.85)
+            parts.append(box(f"shoulder{sx}{dx}", (0.018, 0.3, 0.02), (sx * 0.85 + dx * 1.13, 0, 0.086), "tie_plate", 0.004))
+        for dy in (-0.11, 0.11):
+            parts.append(cyl(f"hole{sx}{dy}", 0.014, 0.004, (x + sx * 0.08, dy, 0.079), "coal", verts=10, bevel=0.0))
+    join("Plank", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "plank.glb"), 1024, repack=True)
+
+
 def build_rail():
     """A 4 m length of flat-bottom rail: a rounded, worn steel head, a rusty web and foot, bolt holes and fishplates
-    at both ends (where the game bolts it), so a placed rail reads as a real rail instead of a bar."""
+    at both ends (where the game bolts it), so a placed rail reads as a real rail instead of a bar. Each fishplate
+    carries its outer bolt; the inner bolt (y = +-1.71) is the one the player drives in (track_bolt.glb, NailSpot)."""
     clear_scene()
     parts = [box("rail_head", (0.075, 4.0, 0.045), (0, 0, 0.052), "rail_steel", 0.016),
              box("rail_head_top", (0.06, 3.99, 0.012), (0, 0, 0.076), "steel", 0.005),
@@ -873,12 +943,54 @@ def build_rail():
         y = end * 1.82
         for sx in (-1, 1):
             parts.append(box(f"fish{end}{sx}", (0.012, 0.42, 0.055), (sx * 0.022, y, 0.0), "iron", 0.004))
-        for k in (-1, 1):
-            parts.append(cyl(f"bolt{end}{k}", 0.012, 0.08, (0, y + k * 0.11, 0.0), "steel", axis="X", verts=8))
-            for sx in (-1, 1):
-                parts.append(cyl(f"nut{end}{k}{sx}", 0.018, 0.012, (sx * 0.034, y + k * 0.11, 0.0), "iron", axis="X", verts=6))
+        # outer bolt with its nuts; an empty hole for the inner one
+        yo = y + end * 0.11
+        parts.append(cyl(f"bolt{end}", 0.012, 0.08, (0, yo, 0.0), "steel", axis="X", verts=8))
+        for sx in (-1, 1):
+            parts.append(cyl(f"nut{end}{sx}", 0.018, 0.012, (sx * 0.034, yo, 0.0), "iron", axis="X", verts=6))
+            parts.append(cyl(f"hole{end}{sx}", 0.011, 0.003, (sx * 0.0285, y - end * 0.11, 0.0), "coal", axis="X", verts=10, bevel=0.0))
     join("Rail", parts, origin=(0, 0, 0))
-    bake_and_export(os.path.join(OUT_PROPS, "rail.glb"), 512)
+    bake_and_export(os.path.join(OUT_PROPS, "rail.glb"), 1024, repack=True)
+
+
+def build_fasteners():
+    """track_spike.glb: a cut track spike (square shank with a chisel tip and an offset head), tip at the origin,
+    head up (+Z, Godot +Y), 0.25 m long. track_bolt.glb: a fishplate bolt with a square head and a washer, the shank
+    along -X (Godot -X) from the washer face at the origin, so it is driven in by moving it along -X."""
+    clear_scene()
+    parts = [box("shank", (0.018, 0.018, 0.21), (0, 0, 0.125), "spike_steel", 0.002),
+             box("tip", (0.018, 0.01, 0.03), (0, 0, 0.012), "spike_steel", 0.002, rot=(math.radians(10), 0, 0)),
+             box("head", (0.05, 0.03, 0.02), (0.012, 0, 0.24), "spike_steel", 0.005),
+             box("head_lip", (0.02, 0.03, 0.014), (0.032, 0, 0.226), "spike_steel", 0.004)]
+    join("TrackSpike", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "track_spike.glb"), 256)
+
+    clear_scene()
+    parts = [cyl("shank", 0.012, 0.15, (-0.075, 0, 0), "steel", axis="X", verts=12),
+             box("head", (0.022, 0.04, 0.04), (0.016, 0, 0), "spike_steel", 0.004),
+             cyl("washer", 0.024, 0.005, (0.0025, 0, 0), "iron", axis="X", verts=16)]
+    for k in range(6):  # thread rings near the end
+        parts.append(torus(f"thread{k}", 0.012, 0.0018, (-0.12 - k * 0.006, 0, 0), "steel", axis="X", seg=12))
+    join("TrackBolt", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "track_bolt.glb"), 256)
+
+
+def build_panel():
+    """panel.glb: the spare cover panel from the cargo car (fits any missing wall piece): 1.6 x 1.0 m of tongue-and-
+    groove boards on two battens, with iron corner straps and carriage bolts. Upright, facing -Y (Godot +Z)."""
+    clear_scene()
+    parts = []
+    for k in range(6):
+        z = -0.5 + 0.0835 + k * 0.1667
+        parts.append(box(f"board{k}", (1.6, 0.06, 0.16), (0, 0, z), "wood" if k % 2 else "wood_dark", 0.012))
+    for x in (-0.55, 0.55):
+        parts.append(box(f"batten{x}", (0.12, 0.04, 0.96), (x, 0.045, 0), "wood_dark", 0.01))
+    for z in (-0.3, 0.3):
+        parts.append(box(f"strap{z}", (1.64, 0.012, 0.09), (0, -0.036, z), "iron", 0.004))
+        for x in (-0.7, -0.25, 0.25, 0.7):
+            parts.append(cyl(f"bolt{z}{x}", 0.018, 0.012, (x, -0.044, z), "steel", axis="Y", verts=10))
+    join("Panel", parts, origin=(0, 0, 0))
+    bake_and_export(os.path.join(OUT_PROPS, "panel.glb"), 1024, repack=True)
 
 
 # --- Trackside pickups: gold ore, coal, scrap, planks, nails, supply crate ----------------------
@@ -1161,8 +1273,12 @@ if __name__ == "__main__":
         build_props()
     if ONLY is None or "gate" in ONLY:
         build_gate_props()
-    if ONLY is not None and "rail" in ONLY:
-        build_rail()
+    if ONLY is not None and "items" in ONLY:
+        build_items()
+    elif ONLY is not None:  # single build items: only=plank,rail,fasteners,panel
+        for key, fn in (("plank", build_plank), ("rail", build_rail), ("fasteners", build_fasteners), ("panel", build_panel)):
+            if key in ONLY:
+                fn()
     if ONLY is None or "pickups" in ONLY:
         build_pickups()
     elif "gold" in ONLY:

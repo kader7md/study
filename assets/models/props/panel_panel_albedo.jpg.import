@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://crgvd7g18qpmh"
-path="res://.godot/imported/plank_plank_albedo.jpg-0385231dce6014c58e78b82e7e93ac25.ctex"
+uid="uid://dnewwy07x66ip"
+path="res://.godot/imported/panel_panel_albedo.jpg-55280315ea47736c0702aac7f45785ff.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "d4ecb7720dbe2548fad40ed6898f24f4"
+"md5": "bc0ebce7f3a9da5393c2fab9b8b4a7db"
 }
 
 [deps]
 
-source_file="res://assets/models/props/plank_plank_albedo.jpg"
-dest_files=["res://.godot/imported/plank_plank_albedo.jpg-0385231dce6014c58e78b82e7e93ac25.ctex"]
+source_file="res://assets/models/props/panel_panel_albedo.jpg"
+dest_files=["res://.godot/imported/panel_panel_albedo.jpg-55280315ea47736c0702aac7f45785ff.ctex"]
 
 [params]
 
