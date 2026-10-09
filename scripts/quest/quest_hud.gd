@@ -28,8 +28,8 @@ func _ready() -> void:
 	_bar_bg.anchor_bottom = 1.0
 	_bar_bg.offset_left = -W * 0.5 - 4
 	_bar_bg.offset_right = W * 0.5 + 4
-	_bar_bg.offset_top = -132
-	_bar_bg.offset_bottom = -110
+	_bar_bg.offset_top = -172
+	_bar_bg.offset_bottom = -150
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.12, 0.09, 0.06, 0.8)
 	sb.set_corner_radius_all(8)
