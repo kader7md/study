@@ -9,6 +9,9 @@ cd "D:\desktop\work\games coding\Trust Issues game"
 git clone -b claude/sharp-clarke-rqh9ii https://github.com/kader7md/study.git "Trust Issues"
 cd "Trust Issues"
 ```
+No Git? Download the ZIP instead: https://github.com/kader7md/study/archive/refs/heads/claude/sharp-clarke-rqh9ii.zip
+and unzip it into that folder.
+
 Then open the folder in Godot 4.7.2 and press F5. The tests (as in CLAUDE.md) should print PASSED.
 
 **Reference games (study only, never copy files into this public repo):** RV There Yet (HUD, winch, repair,
