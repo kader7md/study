@@ -42,3 +42,16 @@ Things we couldn't do from the cloud session. Do these **first** once the repo i
 - [ ] **Look at the game on a real GPU** (Forward+ instead of the cloud's software opengl3): lighting, shadows, FPS at
   1080p / 1440p, and the Graphics settings (window modes, V-Sync, resolution scale).
 - [ ] **Export builds** (Windows / Linux templates for 4.7.2) and try them on a friend's PC.
+
+## Open from the fixes pass
+> ⚠️ **Not done in the cloud fixes pass. Pick these up locally.**
+- [ ] **T3-03, and T3-05 in the HUD, plus the HUD per-frame allocations:** handed to the HUD redesign (`scripts/ui/hud.gd`).
+  The intro banner still overlaps the train card's wheel warning line, and the inventory chip still says "Winch".
+- [ ] **Platform flagstones look almost white in Godot** (the bake is fine; Godot's lighting brightens them). Darken
+  `flagstone` / `flagstone_dark` / `coping_stone` in `blender/scripts/build_station.py` and re-run `only=platform`.
+- [ ] **No screenshots yet of the new build items** (plank sleeper, rail, track spike, fishplate bolt, spare panel) in game:
+  run `Screenshot.tscn -- <dir> tools` and `repair`, and check that the spike and bolt sizes look right.
+- [ ] Tools and props that use the `paint` material (wrench grip, nail gun, welder machine, come-along, kiosk tins)
+  still have the old speckled bake. Re-run `build_assets.py only=props` and `build_station.py only=tools` to give them
+  the clean paint. Only the four train models were re-baked.
+- [ ] Rejoin tickets live only in memory. A player who closes the game cannot rejoin the running run (by design for now).

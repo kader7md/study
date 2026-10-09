@@ -46,9 +46,11 @@ func _build() -> void:
 	var length := Track.STATION_LENGTH
 	# Platform (right side of the track): a collision block, dressed with Blender platform sections (brick face,
 	# stone coping with the yellow safety line, flagstones) every SECTION_LENGTH metres. The block's own mesh only
-	# shows below the sections (its paving material is the fallback look).
+	# is hidden (its paving material stays as the fallback look).
 	var platform := Build.solid_box(self, Vector3(4.0, 4.0, length), Vector3(3.9, PLATFORM_TOP - 2.0, 0), Color(0.4, 0.38, 0.35))
 	(platform.get_child(0) as MeshInstance3D).material_override = paving_material()
+	# the sections' brick faces sit on the block's faces: hide the block's mesh (no z-fighting), keep its collider
+	(platform.get_child(0) as MeshInstance3D).visible = false
 	var sections := int(ceil(length / SECTION_LENGTH))
 	for k in sections:
 		var sec := Props.instance("platform_section")
