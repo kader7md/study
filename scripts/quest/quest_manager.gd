@@ -96,7 +96,7 @@ func origin() -> Vector3:
 # --- Host: entering and leaving -------------------------------------------------------------
 
 func can_enter(seg: int) -> bool:
-	return not active and has_map(seg) and Game.track != null and Game.track.is_gate_locked(seg) and not Game.has("key")
+	return not active and has_map(seg) and Game.track != null and Game.track.is_gate_locked(seg) and Game.crew_count("key") == 0
 
 
 ## Host: the whole crew enters segment `seg`'s quest map.

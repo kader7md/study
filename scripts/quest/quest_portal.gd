@@ -80,7 +80,7 @@ func get_prompt(_player: Node) -> String:
 		return ""
 	if q.active:
 		return ""
-	if Game.has("key"):
+	if Game.crew_count("key") > 0:
 		return "You already have a key: use it on the gate"
 	return "Enter %s with the whole crew (hold %s)" % [QuestManager.map_title(segment), Settings.key_hint("interact")]
 

@@ -832,6 +832,8 @@ func _affect(player: Player, delta: float) -> void:
 
 
 func _check_bounds(player: Player, st: Dictionary) -> void:
+	if Game.in_quest():
+		return  # quest maps lie far from the line and have their own bounds (QuestManager)
 	var pos := player.global_position
 	var du := terrain.track_coords(pos.x, pos.z)
 	var past_end := du.x < -Terrain.EXTEND + 60.0 or du.x > track.get_length() + Terrain.EXTEND - 60.0

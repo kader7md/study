@@ -2,6 +2,22 @@
 
 Things we couldn't do from the cloud session. Do these **first** once the repo is cloned locally and the weekly limit is back.
 
+## 0. Move to the local PC (start here)
+Local folder: `D:\desktop\work\games coding\Trust Issues game\Trust Issues`
+```powershell
+cd "D:\desktop\work\games coding\Trust Issues game"
+git clone -b claude/sharp-clarke-rqh9ii https://github.com/kader7md/study.git "Trust Issues"
+cd "Trust Issues"
+```
+Then open the folder in Godot 4.7.2 and press F5. The tests (as in CLAUDE.md) should print PASSED.
+
+**Reference games (study only, never copy files into this public repo):** RV There Yet (HUD, winch, repair,
+map flow), Peak (climbing, stamina, the mountain level), Raft (sea chapter), Among Us (impostor, voting).
+Ideas taken from them so far are in `docs/REFERENCE_NOTES.md`; keep the games' own files outside git.
+
+**Next big features not built yet:** meeting-table voting, body carry / goat altar revive, the intro and kidnap,
+crafting (spear, blueprints), the Backrooms-style Nest quest map, Chapter 2 (sea / raft), real sound and music, Steam.
+
 ## 1. Fully analyse the reference video
 - Video: https://www.youtube.com/watch?v=oJ5PJcOGuaY ("САМЫЕ МОЩНЫЕ НЕЙРОСЕТИ СОЗДАЮТ ELDEN RING С НУЛЯ | Claude Opus vs GPT Astra в движке Godot", НейроЧел+)
 - **Why it's open:** YouTube blocked the cloud server (robot check), so Claude never saw the transcript.

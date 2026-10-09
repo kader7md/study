@@ -578,7 +578,7 @@ func _client() -> void:
 		Net.request(anchor, &"interact", [me])
 		check(await _wait_until(func(): return anchor.ladder != null, 10.0), "our rope ladder hangs from Anchor_0 (host-approved)")
 	_tell.rpc_id(1, "quest_checked", true)
-	check(await _wait_until(func(): return not Game.in_quest() and Game.count("key") == 1, 20.0), "won: back from the quest map with the key")
+	check(await _wait_until(func(): return not Game.in_quest() and Game.quest.won, 20.0), "won: back from the quest map with the key")
 	var portal := Game.quest.get_node_or_null("Portal_2") as Node3D
 	check(portal != null and me.global_position.distance_to(portal.global_position) < 10.0, "we are back beside the portal")
 	_tell.rpc_id(1, "client_back", true)

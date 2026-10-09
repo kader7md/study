@@ -257,6 +257,11 @@ func key_label(action: String) -> String:
 	return t
 
 
+## "[E]" for an action, with the player's current binding (quest texts use this).
+func key_hint(action: String) -> String:
+	return "[%s]" % key_label(action)
+
+
 ## Hints in game texts are written with the default keys ("[E]", "[Q]", "[Tab]", "[LMB]", "[E / Esc]").
 ## This puts the player's current bindings in their place.
 func hint(text: String) -> String:
