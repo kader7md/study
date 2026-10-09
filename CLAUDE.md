@@ -3,12 +3,14 @@
 - Godot 4.7.2, GDScript, typed. Models come from Blender 4.5 scripts: `blender/scripts/build_assets.py` (train, tools,
   repair items) and `build_nature.py` (trees, rocks, cliffs), `build_station.py` (station canopy, shop kiosk, name board, come-along, arm). Procedural wear is baked into one texture per model; `.glb`
   goes to `assets/models/`, loaded via `Props` / `Terrain.nature_mesh`. `render_showcase.py` renders preview pictures. Other grey-box geometry is built in code (`scripts/util/build.gd`).
-- `Game` autoload (`scripts/autoload/game.gd`) holds shared state: inventory, checkpoints, signals, debug role, run
+- `Game` autoload (`scripts/autoload/game.gd`) holds shared state: the team pool (`inventory`, TEAM_ITEMS) and personal
+  inventories (`personal`, hotbar + grid, `count/add/take` route by item and acting peer), checkpoints, signals, debug role, run
   `stats` (`add_stat`), `objective` (+ `objective_changed`), `run_finished`, `return_to_menu()`, balance (`SHOP`, `START_INVENTORY`).
   Keep state changes host-side so multiplayer (M1) can sync them later.
 - Main pieces: `Track` (rail pieces, gaps, stations, landscape themes, bridges), `Terrain` (ribbon mesh along the track),
   `Train` (distance-based movement), `RailRepair`/`PlaceSlot`/`NailSpot`/`WeldSeam`/`WelderSource` (hands-on repair), `Station`,
-  `SabotageManager` (+ `Meteor`, `Zombie`, `Eagle`), `Player` (+ `Viewmodel`: hands, tool animations, carry poses), `HUD`.
+  `SabotageManager` (+ `Meteor`, `Zombie`, `Eagle`), `Player` (+ `Viewmodel`: hands, tool animations, carry poses), `HUD`
+  (`scripts/ui/hud/`: `HudStyle` look + line icons, `TrainStatus`, `HudBar`, `ItemSlot`, `KeyText`, `InventoryWindow`).
   `ActionSpot` = interactable from callables. Locked gates: `TrackGate` (`Gate_<seg>`, Track gate API) + `GateKey`
   (`Key_<seg>`). `RunDirector` (objective, softlock guards, ending) shows the `EndScreen`. Node names are deterministic
   (`Repair_<piece>`, `Pickup_<n>`, `Station<i>`) because every peer builds the world from `Main.SEED`.

@@ -75,6 +75,8 @@ func _run() -> void:
 	check(train.current_station == 0 and train.cars.size() == 4, "train with 4 cars starts in the departure station")
 	check(train.cars[0].find_child("Wheel_0", true, false) != null, "locomotive uses the Blender model (has Wheel_0)")
 
+	await _inventory_checks()
+
 	print("Fuel, lever & hills")
 	var coal := Game.count("coal")
 	var fuel := train.fuel
@@ -114,20 +116,22 @@ func _run() -> void:
 			n.on_tool_hit("hammer", player)
 	check(Game.count("nails") == nails_before - 8 and repair.fixed_count() == 4, "all planks nailed down")
 	check(repair.step() == 2, "→ step 2 (rails)")
-	var scrap := Game.count("scrap")
+	var rails := Game.count("rail")
 	for s2 in repair.find_children("*", "PlaceSlot", true, false).filter(func(x): return x.item == "rail"):
 		train.take_item(player, "rail")
 		s2.interact(player)
 	await _frames(2)
-	check(Game.count("scrap") == scrap - 4 and repair.step() == 3, "two rails placed (4 scrap) → step 3 (bolts)")
+	check(Game.count("rail") == rails - 2 and repair.step() == 3, "two rails placed (2 rails from the team pool) → step 3 (bolts)")
 	var bolts := repair.find_children("*", "NailSpot", true, false).filter(func(n): return n.style == "bolt")
 	check(bolts.size() == 4, "4 rail joints to bolt")
 	player.select_tool("welder")
 	check(player.current_tool == "hammer", "no welder on the track (welders are only at stations)")
+	var bolts_before := Game.count("bolts")
 	for b2 in bolts:
 		for k in NailSpot.HAMMER_HITS:
 			b2.on_tool_hit("hammer", player)
 	await _frames(3)
+	check(Game.count("bolts") == bolts_before - 4, "4 bolts from the team pool")
 	check(not track.is_broken(gap_piece) and absf(track.piece_roll(gap_piece)) < Train.BUMP_ROLL, "track rebuilt, level (tilt %.1f°)" % absf(track.piece_roll(gap_piece)))
 	train.lever = 1
 	await _wait(2.0)
@@ -284,10 +288,10 @@ func _run() -> void:
 	sab.use("freezing_wind")
 	check(Game.wind_active and train.max_speed_now() < top, "freezing wind slows the train")
 	Game.wind_active = false
-	var loot_before := Game.count("wood") + Game.count("scrap") + Game.count("coal")
+	var loot_before := Game.count("wood") + Game.count("rail") + Game.count("nails")
 	sab.use("eagles")
 	await _wait(9.0)
-	check(Game.count("wood") + Game.count("scrap") + Game.count("coal") < loot_before, "eagles steal cargo")
+	check(Game.count("wood") + Game.count("rail") + Game.count("nails") < loot_before, "eagles steal from the team pool")
 	sab.use("zombies")
 	await _frames(2)
 	check(get_tree().get_nodes_in_group("enemy").size() > 0, "zombies spawn")
@@ -510,3 +514,115 @@ func _run() -> void:
 	var done := await _wait_until(func(): return Game.next_station > Game.STATION_COUNT, 10.0)
 	check(done, "reaching station 5 completes the chapter")
 	Engine.time_scale = 1.0
+
+
+## Personal inventory vs the shared team pool, the hotbar, [Tab], eating, warmth.
+func _inventory_checks() -> void:
+	print("Inventory: team pool, personal hotbar + grid")
+	var me := Net.local_id()
+	check(Game.slot_item(me, 0) == "hammer" and Game.slot_item(me, 1) == "wrench" and Game.slot_item(me, 4) == "come_along",
+		"hotbar starts with hammer, wrench and (the host's) come-along")
+	check(Game.count("coal") == Game.START_PERSONAL.coal and not Game.inventory.has("coal"), "coal is personal (%d), not in the team pool" % Game.count("coal"))
+	var wood := int(Game.inventory.get("wood", 0))
+	Game.add("wood", 2)
+	check(int(Game.inventory.wood) == wood + 2 and Game.count_in(me, "wood") == wood + 2, "planks go to the shared team pool")
+	Game.take("wood", 2)
+	# hotbar: keys pick slots, the hand holds what is in the slot
+	player.select_slot(1)
+	await _frames(2)
+	check(player.current_tool == "wrench", "key 2 → the wrench in hand")
+	check(Game.move_slot(1, 12) and Game.slot_item(me, 12) == "wrench" and Game.slot_item(me, 1) == "", "move the wrench from the hotbar into the grid")
+	await _frames(2)
+	check(player.current_tool == "", "slot 2 is empty now: empty hands")
+	Game.add("coal", 3)
+	var coal_slot := -1
+	for i in range(Game.HOTBAR_SIZE, Game.SLOT_COUNT):
+		if Game.slot_item(me, i) == "coal":
+			coal_slot = i
+	check(Game.move_slot(coal_slot, 1) and Game.slot_item(me, 1) == "coal", "swap coal into hotbar slot 2")
+	check(Game.move_slot(12, 1) and Game.slot_item(me, 1) == "wrench" and Game.slot_item(me, 12) == "coal", "drop the wrench on it: they swap back")
+	await _frames(2)
+	check(player.current_tool == "wrench", "the wrench is back in hand")
+	player.select_slot(0)
+	# [Tab] opens the inventory window and frees the mouse; [Tab] again closes it
+	var hud: HUD = main.hud
+	await _press("inventory")
+	check(hud.inventory.is_open and Game.is_ui_open(&"inventory"), "[Tab] opens the inventory grid")
+	check(hud.inventory.find_children("*", "ItemSlot", true, false).size() == Game.SLOT_COUNT, "5x5 grid + 5 hotbar slots")
+	await _press("inventory")
+	check(not hud.inventory.is_open and not Game.ui_open, "[Tab] closes it again")
+	# eating: health only comes back from food
+	player.health = 40.0
+	var sandwiches := Game.count("sandwich")
+	player.select_slot(3)
+	await _frames(2)
+	check(player.current_tool == "sandwich", "a sandwich in hotbar slot 4")
+	player.use_tool()
+	check(is_equal_approx(player.health, 75.0) and Game.count("sandwich") == sandwiches - 1, "eating the sandwich: health 40 → %d" % int(player.health))
+	player.health = 100.0
+	var apples := Game.count("apple")
+	check(not player.eat_slot(_slot_of("apple")) and Game.count("apple") == apples, "not hungry at full health: nothing eaten")
+	player.select_slot(0)
+	# warmth: drains in the cold, 0 warmth hurts, soup warms you up
+	var keep := player.global_position
+	player.set_physics_process(false)
+	player.global_position = keep + Vector3(0, 300, 0)  # far from the furnace and the station
+	Game.wind_active = true
+	player.warmth = 3.0
+	player._update_body(1.0)
+	var hp := player.health
+	player._update_body(1.0)
+	player._update_body(1.0)
+	check(player.warmth == 0.0 and player.health < hp, "at 0 warmth the player takes damage (%.0f → %.0f)" % [hp, player.health])
+	check("freezing" in player.status_effects(), "status effect: freezing")
+	Game.add("soup")
+	check(player.eat_slot(_slot_of("soup")) and player.warmth >= 59.0, "hot soup warms you up (warmth %.0f)" % player.warmth)
+	Game.wind_active = false
+	player.take_damage(12.0)
+	check(player.bleeding and "bleeding" in player.status_effects(), "a hard hit makes you bleed")
+	var hb := player.health
+	player._update_body(1.0)
+	check(player.health < hb, "bleeding costs health")
+	player._update_body(5.0)
+	check(not player.bleeding, "…for a few seconds")
+	player.health = 100.0
+	player.warmth = 100.0
+	player.global_position = keep
+	player.set_physics_process(true)
+	# shop: team items to the pool, personal items to the buyer
+	var gold := Game.count("gold")
+	var nails := Game.count("nails")
+	Game.buy("nails")
+	Game.buy("coffee")
+	check(Game.count("nails") == nails + 10 and Game.count("coffee") >= 1 and Game.count("gold") == gold - Game.SHOP.nails.price - Game.SHOP.coffee.price,
+		"the shop: nails to the team pool, coffee to the buyer")
+	Game.add("gold_nugget", 3)
+	var g2 := Game.count("gold")
+	Game.sell_nuggets()
+	check(Game.count("gold_nugget") == 0 and Game.count("gold") == g2 + 3 * Game.NUGGET_PRICE, "gold nuggets sell for crew gold")
+	# the HUD shows the hotbar and a stamina bar on request
+	hud.set_stamina(0.5, true)
+	check(hud._stamina.visible and is_equal_approx(hud._stamina.value, 0.5), "HUD.set_stamina shows the stamina bar")
+	hud.set_stamina(1.0, false)
+
+
+func _slot_of(item: String) -> int:
+	for i in Game.SLOT_COUNT:
+		if Game.slot_item(Net.local_id(), i) == item:
+			return i
+	return -1
+
+
+func _press(action: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var up := InputEventAction.new()
+	up.action = action
+	up.pressed = false
+	Input.parse_input_event(up)
+	await get_tree().process_frame
+	await get_tree().process_frame

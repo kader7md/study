@@ -9,7 +9,7 @@ const END_DELAY := 2.0
 ## The objective switches to "Gate locked" / "Rebuild the track" this far ahead of the train.
 const OBJECTIVE_RANGE := 150.0
 ## Supply crate (softlock guard) contents.
-const SUPPLY_CRATE := {"wood": 6, "nails": 10, "scrap": 4}
+const SUPPLY_CRATE := {"wood": 6, "nails": 10, "rail": 2, "bolts": 4}
 const COAL_CRATE := {"coal": 6}
 
 var main: Node
@@ -64,12 +64,12 @@ func compute_objective() -> String:
 		var n := gap_size(piece)
 		return "Rebuild the broken track ahead (%d piece%s): planks, rails, bolts" % [n, "" if n == 1 else "s"]
 	if gate >= 0:
-		if Game.has("key"):
+		if Game.crew_count("key") > 0:
 			return "Open the gate: use the key on its padlock"
 		return "Gate locked: find the key (it glows beside the track)"
-	if train.fuel <= 0.5 and not Game.has("coal"):
+	if train.fuel <= 0.5 and Game.crew_count("coal") <= 0:
 		return "Out of coal! Collect coal beside the track (or buy it at a station)"
-	if train.fuel < 12.0 and Game.has("coal"):
+	if train.fuel < 12.0 and Game.crew_count("coal") > 0:
 		return "The fire is dying: shovel coal into the furnace"
 	if train.is_stopped() and train.wheels < Train.MAX_WHEELS and Game.has("wheel"):
 		return "Fit the spare wheel: carry it from the cargo car and bolt it on"
@@ -110,7 +110,7 @@ func guard() -> void:
 	var piece := first_broken_ahead(train.distance, 25.0) if train.lever >= 0 else -1
 	if piece >= 0 and not _crates.has(piece):
 		var n := gap_size(piece)
-		var need := {"wood": 3 * n, "nails": 6 * n, "scrap": 4 * n}
+		var need := {"wood": 3 * n, "nails": 6 * n, "rail": 2 * n, "bolts": 4 * n}
 		var missing_cost := 0
 		for item: String in need:
 			var short: int = int(need[item]) - Game.count(item)
@@ -121,7 +121,7 @@ func guard() -> void:
 		var bridge := false
 		for k in n:
 			bridge = bridge or track.is_bridge(piece + k)
-		var gun_missing := bridge and not Game.has("nail_gun")
+		var gun_missing := bridge and Game.crew_count("nail_gun") <= 0
 		if gun_missing:
 			missing_cost += int(Game.SHOP.nail_gun.price)
 		if missing_cost > 0 and Game.count("gold") < missing_cost:
@@ -134,12 +134,13 @@ func guard() -> void:
 			Game.say("Short of supplies? A supply crate lies beside the broken track (%s)" % Game.cost_text(items))
 	# 2. No fuel, no coal, no gold for coal: a coal crate (at most one every 200 m). At a station the station
 	#    master hands over a coal ration instead (once per station).
-	if train.fuel <= 0.0 and not Game.has("coal") and Game.count("gold") < int(Game.SHOP.coal.price):
+	if train.fuel <= 0.0 and Game.crew_count("coal") <= 0 and Game.count("gold") < int(Game.SHOP.coal.price):
 		var d := train.distance
 		if train.current_station >= 0:
 			if not _coal_ration.has(train.current_station):
 				_coal_ration[train.current_station] = true
-				Game.add("coal", int(COAL_CRATE.coal))
+				for p in get_tree().get_nodes_in_group("player"):
+					Game.add_to((p as Player).peer_id, "coal", int(COAL_CRATE.coal))
 				Game.say("The station master shovels you a ration of coal (%d). Feed the furnace!" % int(COAL_CRATE.coal))
 		elif not _coal_crates.any(func(c: float): return absf(c - d) < 200.0):
 			_coal_crates.append(d)

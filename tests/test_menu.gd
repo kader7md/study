@@ -222,6 +222,8 @@ func _hint_checks() -> void:
 	check(Settings.hint("Close  [E / Esc]") == "Close  [F / Esc]", "combined hints: '%s'" % Settings.hint("Close  [E / Esc]"))
 	check(Settings.hint("[LMB] drop · [RMB] cancel") == "[LMB] drop · [RMB] cancel", "mouse hints: LMB / RMB")
 	check(HUD.help_text().contains("F use / place"), "the help panel shows the new key")
+	check(Settings.key_label("inventory") == "Tab" and Settings.key_label("sabotage_menu") == "X", "Tab opens the inventory, X the impostor's sabotage menu")
+	check(Settings.hint("[Tab] inventory · [X] sabotage") == "[Tab] inventory · [X] sabotage", "hints for Tab and X")
 	var key := GateKey.new()
 	check(Settings.hint(key.get_prompt(null)).ends_with("[F]"), "the gate key prompt shows [F] (%s)" % Settings.hint(key.get_prompt(null)))
 	key.free()
@@ -242,6 +244,8 @@ func _continue_checks() -> void:
 	add_child(main)
 	await _frames(3)
 	Game.add("gold", 27)
+	Game.add("soup", 2)
+	var coal_saved := Game.count("coal")
 	Game.track.open_gate(0)
 	Game.track.open_gate(1)
 	Game.next_station = 2
@@ -267,6 +271,8 @@ func _continue_checks() -> void:
 	check(main.get_node_or_null("Track/Key_2") != null and main.get_node_or_null("Track/Key_1") == null, "only the locked gate has its key")
 	check(Game.count("gold") == Game.START_INVENTORY.gold + 27 and typeof(Game.inventory.gold) == TYPE_INT, "the inventory came back (gold %s)" % str(Game.inventory.gold))
 	check(Game.stat("gates") >= 2.0, "and the run stats")
+	check(Game.count("soup") == 2 and Game.count("coal") == coal_saved and Game.slot_item(Net.local_id(), 0) == "hammer",
+		"the personal inventory came back too (soup %d, coal %d)" % [Game.count("soup"), Game.count("coal")])
 	main.queue_free()
 	await _frames(3)
 	Game.new_game(false)

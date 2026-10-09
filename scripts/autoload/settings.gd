@@ -28,8 +28,9 @@ const EXTRA_INPUTS := {"push_to_talk": [KEY_V], "pause": [KEY_ESCAPE]}
 
 ## Default key names used in game texts -> the action they stand for (see hint()).
 const HINT_ACTIONS := {
-	"E": "interact", "Q": "interact_alt", "G": "drop", "Tab": "sabotage_menu", "LMB": "attack", "RMB": "cancel",
-	"Esc": "pause", "V": "push_to_talk", "F1": "toggle_help", "Space": "jump", "Shift": "sprint",
+	"E": "interact", "Q": "interact_alt", "G": "drop", "Tab": "inventory", "X": "sabotage_menu", "R": "winch_release",
+	"LMB": "attack", "RMB": "cancel", "Esc": "pause", "V": "push_to_talk", "H": "show_help", "Space": "jump",
+	"Shift": "sprint",
 }
 
 ## Shadow quality presets: [sun shadows, directional atlas size, soft filter quality, max distance].
@@ -369,6 +370,10 @@ func _apply_bindings() -> void:
 		var action := key.trim_prefix("bind_")
 		var value: Variant = cfg.get_value("controls", key)
 		if not InputMap.has_action(action) or not (value is Array):
+			continue
+		# Tab used to open the sabotage menu; it is the inventory now (the sabotage menu moved to X)
+		if action == "sabotage_menu" and (value as Array).has("key:%d" % KEY_TAB):
+			cfg.erase_section_key("controls", key)
 			continue
 		var descs: Array[String] = []
 		for d: Variant in value:

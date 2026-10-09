@@ -7,12 +7,12 @@ extends RefCounted
 ##                                         riders stay glued to the car on every screen (GDD 9: vehicle local space).
 ##   current_tool, welding                 on change.
 ## StateSync  (authority = host: game state about the player)
-##   carried_item, health, frost, downed, welder_path   on change.
+##   carried_item, health, warmth, bleeding, boosted, downed, welder_path   on change.
 ##   Its visibility also gates the MultiplayerSpawner: a client only gets the players once its world is loaded.
 
 const INPUT_PROPS := ["net_pos", "net_yaw", "net_pitch", "net_car"]
 const INPUT_ON_CHANGE := ["current_tool", "welding"]
-const STATE_PROPS := ["carried_item", "health", "frost", "downed", "welder_path"]
+const STATE_PROPS := ["carried_item", "health", "warmth", "bleeding", "boosted", "downed", "welder_path"]
 const INTERVAL := 0.05
 
 

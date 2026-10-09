@@ -8,11 +8,14 @@ extends Node3D
 
 const SEED := 20261008
 const PICKUP_SPACING := 34.0
+## Food pickups (apples, beans, chocolate, a sandwich, coffee) about this far apart along the line.
+const FOOD_SPACING := 120.0
 const GOLD_ROCKS_PER_SEGMENT := 3
 ## Supplies left beside every pre-placed gap (balance table in docs/GDD.md). Per broken piece:
-## WOOD_PER_PIECE wood in 2-3 piles, SCRAP_PER_PIECE scrap, NAILS_PER_PIECE nails in a crate.
+## WOOD_PER_PIECE wood in 2-3 piles, RAILS_PER_PIECE rails, NAILS_PER_PIECE nails and BOLTS_PER_PIECE bolts in crates.
 const WOOD_PER_PIECE := 4
-const SCRAP_PER_PIECE := 4
+const RAILS_PER_PIECE := 2
+const BOLTS_PER_PIECE := 4
 const NAILS_PER_PIECE := 8
 const GAP_SUPPLY_RADIUS := 22.0
 
@@ -176,7 +179,8 @@ func _spawn_pickups() -> void:
 		var wood_piles: Array = [3, 2] if n == 1 else [3, 3, 3]
 		for w: int in wood_piles:
 			_cache(center, "wood", w)
-		_cache(center, "scrap", SCRAP_PER_PIECE * n)
+		_cache(center, "rail", RAILS_PER_PIECE * n)
+		_cache(center, "bolts", BOLTS_PER_PIECE * n)
 		_cache(center, "nails", NAILS_PER_PIECE * n)
 		_cache(center, "coal", _rng.randi_range(3, 4))
 		if g % 2 == 0:
@@ -194,6 +198,18 @@ func _spawn_pickups() -> void:
 			var p := track.ground_point(d2, side * _rng.randf_range(6.0, 14.0))
 			if p.y > Track.WATER_LEVEL + 0.5:
 				add_pickup("gold", 0, p)
+	# 5. Food along the line (its own random stream, so the pickups above stay where they were)
+	var frng := RandomNumberGenerator.new()
+	frng.seed = SEED + 77
+	var foods := ["apple", "apple", "beans", "chocolate", "sandwich", "coffee"]
+	var fd := Track.LEAD_IN + Track.STATION_LENGTH + 40.0
+	while fd < track.get_length() - 40.0:
+		var side := -1.0 if frng.randf() < 0.5 else 1.0
+		var food: String = foods[frng.randi() % foods.size()]
+		var fp := track.ground_point(fd, side * frng.randf_range(2.5, 5.5))
+		if _good_spot(fd, fp):
+			add_pickup(food, 2 if food == "apple" else 1, fp)
+		fd += FOOD_SPACING * frng.randf_range(0.6, 1.4)
 
 
 ## Adds a pickup named Pickup_<n> (n = spawn order, the same on every peer). item "gold" = a gold rock.

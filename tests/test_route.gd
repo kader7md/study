@@ -11,7 +11,7 @@ const TIME_SCALE := 12.0
 const SEGMENT_TIMEOUT := 900.0      # game seconds per segment before the test gives up
 ## Idle furnace time per segment a real crew spends repairing (for the coal budget).
 const IDLE_ALLOWANCE := 480.0
-const NEEDS_PER_PIECE := {"wood": Main.WOOD_PER_PIECE, "scrap": Main.SCRAP_PER_PIECE, "nails": 8}
+const NEEDS_PER_PIECE := {"wood": Main.WOOD_PER_PIECE, "rail": Main.RAILS_PER_PIECE, "bolts": Main.BOLTS_PER_PIECE, "nails": 8}
 
 var main: Node3D
 var train: Train
@@ -137,7 +137,7 @@ func _check_budget() -> void:
 	print("Resource budget per segment")
 	var near := []
 	for s in Game.STATION_COUNT:
-		near.append({"wood": 0, "scrap": 0, "nails": 0, "coal": 0, "gold": 0})
+		near.append({"wood": 0, "rail": 0, "bolts": 0, "nails": 0, "coal": 0, "gold": 0})
 	for p: Pickup in main.get_node("Pickups").get_children():
 		var d := track.closest_distance(p.global_position)
 		var on := track.point_at(d)
@@ -148,7 +148,7 @@ func _check_budget() -> void:
 		for item: String in c:
 			if near[seg].has(item):
 				near[seg][item] += int(c[item])
-	var have := {"wood": Game.count("wood"), "scrap": Game.count("scrap"), "nails": Game.count("nails")}
+	var have := {"wood": Game.count("wood"), "rail": Game.count("rail"), "bolts": Game.count("bolts"), "nails": Game.count("nails")}
 	for s in Game.STATION_COUNT:
 		var pieces := track.gap_pieces_in_segment(s)
 		var line := PackedStringArray()
@@ -283,7 +283,7 @@ func _drive_segment(seg: int) -> bool:
 	var near_coal := int(get_meta("near")[seg].coal)
 	check(near_coal >= 1.5 * need, "segment %d coal: burnt %d (+%d idling), %d lies near the track (%.1fx), the crew picked up %d at its stops" % [
 		target, int(coal_used[seg]), int(idle_coal), near_coal, near_coal / need, int(collected[seg].get("coal", 0))])
-	var at_stops := int(collected[seg].get("coal", 0)) + (int(Game.START_INVENTORY.coal) if seg == 0 else 0)
+	var at_stops := int(collected[seg].get("coal", 0)) + (int(Game.START_PERSONAL.coal) if seg == 0 else 0)
 	check(at_stops >= 1.2 * need, "segment %d: the coal beside the gaps and the gate alone covers the burn (%.1fx)" % [target, at_stops / need])
 	_collect_near(seg)
 	check(gate_done, "segment %d: the train stopped at the locked gate and it was opened" % target)
@@ -377,7 +377,7 @@ func _check_softlock_guards() -> void:
 	train.distance = float(gap.first) * Track.PIECE_LENGTH - 2.0
 	train.speed = 0.0
 	train.lever = 0
-	for item in ["wood", "nails", "scrap", "gold"]:
+	for item in ["wood", "nails", "rail", "bolts", "gold"]:
 		Game.take(item, Game.count(item))
 	await _frames(2)
 	director.guard()
@@ -385,7 +385,7 @@ func _check_softlock_guards() -> void:
 	check(crate != null, "stuck at a gap with no wood, nails or gold: a supply crate turns up beside it")
 	if crate:
 		crate.interact(player)
-		check(Game.count("wood") >= 3 and Game.count("nails") >= 6, "the crate holds enough for a piece (%s)" % Game.cost_text({"wood": Game.count("wood"), "nails": Game.count("nails"), "scrap": Game.count("scrap")}))
+		check(Game.count("wood") >= 3 and Game.count("nails") >= 6, "the crate holds enough for a piece (%s)" % Game.cost_text({"wood": Game.count("wood"), "nails": Game.count("nails"), "rail": Game.count("rail")}))
 	# a broke crew with two wheels left at a station gets one emergency wheel
 	train.distance = track.station_distances[3] + 18.0
 	train.current_station = 3

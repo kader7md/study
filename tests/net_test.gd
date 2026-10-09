@@ -414,6 +414,18 @@ func _client() -> void:
 		check(await _wait_until(func(): return Game.count(item) > before, 5.0), "the shared inventory grew (%s %d -> %d)" % [item, before, Game.count(item)])
 		_tell.rpc_id(1, "pickup", pickup_name)
 
+	print("Personal inventory (host-authoritative, only my own)")
+	var my := Net.local_id()
+	check(await _wait_until(func(): return Game.slot_item(my, 0) == "hammer" and Game.slot_item(my, 1) == "wrench", 5.0),
+		"my own hotbar came from the host (hammer, wrench)")
+	check(Game.personal.size() == 1 and Game.personal.has(my), "a client only holds its own personal inventory")
+	Game.move_slot(1, 9)
+	await _wait(1.0)
+	check(Game.slot_item(my, 9) == "wrench" and Game.slot_item(my, 1) == "", "moving the wrench into the grid sticks after the host's answer")
+	Game.move_slot(9, 1)
+	check(await _wait_until(func(): return Game.slot_item(my, 1) == "wrench", 3.0), "and back into the hotbar")
+	me.select_tool("wrench")
+
 	print("Take a plank, place it, nail it")
 	var cargo := train.cars[1]
 	var spot: Interactable = null

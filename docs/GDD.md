@@ -140,13 +140,14 @@ then **bolt it on with 3 hammer hits**. With fewer than 3 wheels (or a wrecked t
 pace, so it can always reach a station.
 
 ### Train damage: two bars (100 % = 50 % body + 50 % mechanics)
-HUD top centre (train card): 🟩 **body bar**, then the mechanics as **6 yellow wheel squares** (a square empties as its
-wheel wears loose; a lost wheel is an empty slot with an X), a 🟥 **engine bar** and a 🟦 **chassis bar**.
+HUD top centre: 🟩 **body bar** (shield), then one striped **mechanics bar** in three segments: **6 yellow wheel cells**
+(a cell empties as its wheel wears loose; a lost wheel is an empty cell with an x), 🟥 **engine** and 🟦 **chassis**, with
+their icons underneath and a skull at the end while the train is critical.
 Every hit is split **half to the body, half to the mechanics** (two random wheels wear, the chassis bends, the engine suffers).
 
 | Part | Share | What damage does | How to fix |
 |------|-------|------------------|------------|
-| **Body / cover** | 50 % | Panels, roofs, doors, boiler plates **break off and fly away** (bare frame, gaps you can fall out of) | Pick up the piece or take a new panel (2 scrap), place it: **wood → nails** (anywhere), **metal → weld** (station) |
+| **Body / cover** | 50 % | Panels, roofs, doors, boiler plates **break off and fly away** (bare frame, gaps you can fall out of) | Pick up the piece or take a new panel (2 of your own scrap), place it: **wood → nails** (anywhere), **metal → weld** (station) |
 | **Wheels** (6) | 15 % (2.5 % each) | Each wheel has its own wear. At **2.5 % (5 % of the mechanics bar)** it **comes off and drops to the ground**; each lost wheel = **-1/6 speed** (with N wheels: -1/N) | **Wrench**: tighten a loose wheel before it falls. Lost: buy a new wheel, lift it in, bolt with the hammer |
 | **Engine** | 20 % | Less power (up to -50 % speed). Big damage when the engine **goes into water** (crash at a broken bridge) | **Engine oil** at the furnace [Q] (shop) |
 | **Chassis** | 15 % | Only a value (it never falls off), makes the train drag (up to -30 % speed) | **Welder at a station**: glowing weld points on the frame |
@@ -178,30 +179,42 @@ Bridges are wooden trestles. A broken bridge piece leaves a hole you can fall th
 | **Gold** | Mining **gold rocks** near the track | Shop currency, crafting blueprints. **Carried into Chapter 2** |
 
 ### Shops (at stations)
-Nail gun · nails · planks (wood) · scrap · coal · grappling hook (reach cliffs, cross gaps, like Peak) · medkit · train wheels ·
+Nail gun · nails · planks (wood) · rails · bolts · scrap · coal · food (sandwich, hot soup, canned beans, coffee) · grappling hook (reach cliffs, cross gaps, like Peak) · medkit · train wheels ·
 engine oil · come-along · later: repair hammer and blueprint special items (tools, guns)
 
 ### Balance (Chapter 1, v1; constants in `game.gd`, `track.gd`, `main.gd`, `train.gd`, `sabotage_manager.gd`)
-One broken piece on solid ground costs about **4 wood** (planks), **4 scrap** (2 rails) and **8 nails** (2 per plank).
+One broken piece on solid ground costs about **4 wood** (planks), **2 rails**, **8 nails** (2 per plank) and **4 bolts**
+(one per fishplate bolt), all from the **shared team pool**.
+
+**Inventories.** The crew shares one **team pool**: planks (wood), rails, nails, bolts, engine oil, spare wheels and gold.
+Everyone builds with it, pickups of those go into it (they carry a small TEAM sign), and the HUD shows it top centre.
+Everything else is **personal**: each player has a 5-slot hotbar (keys 1-5) and a 5x5 grid ([Tab]) for tools (hammer,
+wrench, nail gun, come-along), coal, scrap, food, medkits, gate keys and gold nuggets. Gold rocks give nuggets that sell
+at a station shop (1 gold each) for the crew. Host-authoritative; each client only knows its own inventory.
 
 | What | Value | Why |
 |------|-------|-----|
-| Start inventory | 12 coal, 10 wood, 10 scrap, 15 gold, 30 nails, 1 spare wheel, 1 engine oil, 1 come-along | Covers a couple of meteor holes or panels on top of the gaps |
+| Start: team pool | 10 wood, 5 rails, 30 nails, 12 bolts, 15 gold, 1 spare wheel, 1 engine oil | Covers a couple of meteor holes or panels on top of the gaps |
+| Start: each player | hammer, wrench, a sandwich, 10 coal, 4 scrap, 2 apples (the host also brings the come-along) | |
 | Pre-placed gaps | segment 1: **2**, segments 2-5: **3**, 1-2 pieces each, one per third of the segment | Never on a bridge (that needs the nail gun), never within 60 m before a gate |
-| Supplies beside every gap (within 22 m) | 2-3 wood piles (4 wood per piece + 1), 1 scrap pile (4 per piece), a nail crate (8 per piece), 3-4 coal; a gold rock at every other gap | A crew that never shops still has enough |
+| Supplies beside every gap (within 22 m) | 2-3 wood piles (4 wood per piece + 1), rails (2 per piece), a nail crate (8 per piece), a bolt crate (4 per piece), 3-4 coal; a gold rock at every other gap | A crew that never shops still has enough |
 | Beside every gate | 4 coal and a gold rock | The crew stops there anyway |
-| Along the line | a pile every ~34 m (60 % coal, 20 % wood, 20 % scrap), 3 extra gold rocks per segment 6-14 m out | Coal near the track is 4-8x the burn; the coal at the gaps and gate alone is ~1.5-2.5x (checked by TestRoute) |
-| Gold rock | 3 hits x 2 gold | Each segment has 30+ gold near the track: a wheel + oil (14) and more |
-| Shop | nails x10 = 4, wood x5 = 3, scrap x5 = 3, coal x5 = 2, wheel = 8, oil = 6, medkit = 7, come-along = 10, nail gun = 15 (grappling hook = 12 once the climbing maps exist) | Wood and scrap are the softlock fallback |
+| Along the line | a pile every ~34 m (60 % coal, 20 % wood, 20 % scrap), 3 extra gold rocks per segment 6-14 m out; food every ~120 m (apples, beans, chocolate, a sandwich, coffee) | Coal near the track is 4-8x the burn; the coal at the gaps and gate alone is ~1.5-2.5x (checked by TestRoute) |
+| Gold rock | 3 hits x 2 nuggets (sold 1 gold each) | Each segment has 30+ gold near the track: a wheel + oil (14) and more |
+| Shop | nails x10 = 4, wood x5 = 3, rails x2 = 3, bolts x8 = 3, coal x5 = 2, scrap x5 = 3, wheel = 8, oil = 6, medkit = 7, come-along = 10, nail gun = 15, sandwich = 4, hot soup = 3, beans x2 = 4, coffee = 2 (grappling hook = 12 once the climbing maps exist) | Wood, rails and bolts are the softlock fallback |
+| Food | sandwich +35, beans +22, chocolate +14, apple +10, hot soup +15 and +60 warmth, coffee +4, +25 warmth and faster walking for 20 s, medkit +50 (stops bleeding) | Health only comes back by eating (or a revive) |
 | Crash | (speed - 4 m/s) x 3.5 + 4 damage (a locked gate: half) | Full speed into a gap ≈ 39 of 100 |
 | Wheels | wear at 2.5 falls off; bumpy track (4-8° tilt) +0.4 per crossing; crash damage spreads over 2 wheels | Tighten with the wrench in time |
 | World sabotage (1-2 players) | every 100-160 s in segment 1, 80-140, 65-120, 55-105, 50-95 s by segment 5; never within 20 s of leaving a station; world meteors avoid bridges and gates | Calm start, busier towards the port |
-| Softlock guards | supply crate (6 wood, 10 nails, 4 scrap; + a loaned nail gun over water) when stopped at a gap without the materials or the gold to buy them; a coal crate when out of coal and gold; one emergency wheel per station when under 3 wheels and broke; a limping train can always reverse or crawl to a station | |
+| Softlock guards | supply crate (6 wood, 10 nails, 2 rails, 4 bolts; + a loaned nail gun over water) when stopped at a gap without the materials or the gold to buy them; a coal crate when out of coal and gold; one emergency wheel per station when under 3 wheels and broke; a limping train can always reverse or crawl to a station | |
 | Pace | ~2.5 min of driving per segment; with 3-5 pieces to rebuild by hand, the gate and the stops: about 6-10 min per segment solo | |
 
 ### Cold and heat
 - Areas get cold. The furnace heats the cabin, and players near the heat are safe.
-- Out in the cold, players build up **frost**: slower, then taking damage.
+- Out in the cold (the freezing wind, or a map's cold zone: `Player.cold_zone`) a player's **warmth** drains: below
+  half they are slower, at 0 they take damage. The furnace and a station's shelter warm them back up; hot soup and
+  coffee too. Hard hits make a player **bleed** for a few seconds. Health does not come back by itself: **eat**.
+  Status icons over the health bar: chilly / cold / freezing, bleeding, warming up, coffee kick, heavy load.
 
 ## 5. Impostor sabotage
 The impostor plays normally (shovels, repairs) but has a **secret sabotage menu** with **cooldowns**.
@@ -268,9 +281,9 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
      and sacrifice it. That revives a **random** dead player.
   3. **Station grave:** carry the body to the **grave at the next checkpoint station**.
 - Dead players spectate until revived.
-- *Prototype stopgap until M5:* a downed player is revived by a crewmate's medkit (aim + E), a medkit in the crew
-  inventory saves a player once when they would go down, and everyone who is down gets up when the train reaches the
-  next station. Health regenerates slowly, faster by the warm furnace or in a station.
+- *Prototype stopgap until M5:* a downed player is revived by a crewmate's medkit (aim + E), a medkit in your own
+  inventory saves you once when you would go down, and everyone who is down gets up when the train reaches the
+  next station. Health only comes back by eating.
 
 ## 9. Look, camera and UI (reference: RV There Yet)
 - **Art style: stylized realism** (updated: assets should be detailed, not childish): realistic proportions with slight
@@ -281,13 +294,24 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
   (`UiTheme`, built in code) for every menu, HUD card and panel: cream paper and varnished wood panels, dark ink
   outlines, big rounded corners, soft drop shadows, bold Open Sans text, rust and teal accents, honey hover states.
   Train colours: body green, wheels yellow, engine red, chassis blue, journey orange.
-- **HUD:**
-  - Top centre: the **train card** (body bar, wheel squares, engine and chassis bars) and the **journey strip**:
-    stations 0 to 5 as pips, a train marker, padlocks on locked rail sections, the next station's name and metres to go
-  - Top left: inventory chips (icon + count); multiplayer widgets (player list, speaking icons) go below them
-  - Top right: speed, lever and fuel card, and the **objective note** (a pinned paper card)
-  - Right: messages as toasts that slide in and fade · centre: crosshair, prompt pill, hold bar · banners on a wood plate
-  - Bottom: health and frost (left), tool hotbar and help (centre), the impostor's sabotage panel (right)
+- **HUD** (`scripts/ui/hud.gd` + `scripts/ui/hud/`, look in `HudStyle`): minimal and clean like the reference, our own
+  drawing: white rounded outlines, soft drop shadows, diagonal-striped bar fills, small white line icons drawn in code,
+  the rounded **Fredoka** font (SIL OFL), no heavy panels over the view.
+  - Top centre: **train status** only: body bar (green, shield) and the striped mechanics bar (wheels with one cell per
+    wheel, engine, chassis, icons under them, a skull when critical). Above them, only while the come-along is in play,
+    a **winch line** (hook — train — anchor, red padlocks where it is not attached, chevrons while pulling)
+  - Left of the train bars: the **shared team supplies** as white icon + number (planks, rails, nails, bolts, oil, spare
+    wheels, gold); top-left corner: multiplayer widgets (crew list, speaking marks)
+  - Top right: speed, lever, fuel, the freezing-wind warning, and small toasts under them
+  - Centre: a small crosshair dot (a ring fills while holding [E]), the interaction prompt with key caps; banners and the
+    objective show briefly when they change (the journey strip and the help panel are gone: help is in the pause menu
+    and while [H] is held)
+  - Bottom left: status effect icons, the striped **health** bar, a stamina bar (hidden; `HUD.set_stamina(value, visible)`
+    for maps that need it) and the **warmth** bar
+  - Bottom centre: the personal **hotbar** (slots 1-5; the station torch shows as an extra slot while held)
+  - Right: **context key hints** for what is in hand (e.g. "LMB Pull · R Release"), from the current bindings
+  - [Tab]: the **inventory** window (5x5 grid + hotbar row, drag & drop, tooltips, the team supplies beside it);
+    the station shop and the pause menu use the same dark-glass style
   - Readable at 1280x720 and 1920x1080 (the UI scales with the window height)
 - **Menus:** the title screen shows **TRUST ISSUES** over a slow camera at the departure station (the real Chapter 1
   world from the same seed, chimney smoke, a small generated music-box loop). Buttons: **Continue (station N)** (only

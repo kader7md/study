@@ -1,6 +1,7 @@
 class_name PauseMenu
 extends CanvasLayer
-## Esc menu in game: Resume, Restart from last station (solo / host), Settings, Back to menu, Quit. Offline it pauses the tree (the train stops);
+## Esc menu in game: Resume, Restart from last station (solo / host), Settings, Back to menu, Quit, and the controls
+## help with the current objective beside them (HUD look: HudStyle). Offline it pauses the tree (the train stops);
 ## online the game keeps running for everyone else. While open, Game.ui_open frees the mouse.
 ## Esc closes Settings first; a shop window (Game.ui_open without us) is closed by its owner instead.
 
@@ -13,6 +14,8 @@ var _subtitle: Label
 var _settings: SettingsMenu
 var _resume_btn: Button
 var _restart_btn: Button
+var _help: KeyText
+var _objective: Label
 
 
 static func instantiate() -> PauseMenu:
@@ -23,36 +26,49 @@ func _ready() -> void:
 	layer = 60
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_root = Control.new()
-	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
+	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var dim := ColorRect.new()
-	dim.color = Color(UiTheme.INK, 0.5)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0.02, 0.03, 0.06, 0.55)
 	_root.add_child(dim)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(center)
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# the in-game look (HudStyle): dark glass card, white outline, rounded display font
 	_card = PanelContainer.new()
-	_card.theme_type_variation = &"WoodPanel"
-	_card.custom_minimum_size = Vector2(440, 0)
+	_card.theme = HUD.hud_theme()
+	_card.add_theme_stylebox_override("panel", HudStyle.panel_box(22.0, 26.0))
 	center.add_child(_card)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 30)
+	_card.add_child(row)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 14)
-	_card.add_child(col)
-	col.add_child(UiTheme.title_label("PAUSED", 56))
-	_subtitle = Label.new()
-	_subtitle.theme_type_variation = &"HudSmall"
-	_subtitle.add_theme_font_size_override("font_size", 18)
-	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 12)
+	row.add_child(col)
+	col.add_child(HudStyle.label("Paused", 48, HudStyle.WHITE, 700))
+	_subtitle = HudStyle.label("", 17, HudStyle.SOFT, 500)
 	col.add_child(_subtitle)
-	_resume_btn = _button(col, "Resume", &"AccentButton", close)
-	_restart_btn = _button(col, "Restart from last station", &"BigButton", _ask_restart)
-	_button(col, "Settings", &"BigButton", _open_settings)
-	_button(col, "Back to menu", &"BigButton", _back_to_menu)
-	_button(col, "Quit game", &"BigButton", _quit)
+	_resume_btn = _button(col, "Resume", &"HudAccent", close)
+	_restart_btn = _button(col, "Restart from last station", &"", _ask_restart)
+	_button(col, "Settings", &"", _open_settings)
+	_button(col, "Back to menu", &"", _back_to_menu)
+	_button(col, "Quit game", &"", _quit)
+	# help lives here (and while [H] is held in game)
+	var help := VBoxContainer.new()
+	help.add_theme_constant_override("separation", 10)
+	help.custom_minimum_size = Vector2(520, 0)
+	row.add_child(help)
+	help.add_child(HudStyle.label("Controls", 26, HudStyle.WHITE, 650))
+	_help = KeyText.create("", 16, HORIZONTAL_ALIGNMENT_LEFT)
+	help.add_child(_help)
+	_objective = HudStyle.label("", 17, HudStyle.GOLD, 600)
+	_objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_objective.custom_minimum_size = Vector2(520, 0)
+	help.add_child(_objective)
 
 	_settings = SettingsMenu.instantiate()
 	_settings.hide()
@@ -65,7 +81,7 @@ func _button(parent: Control, text: String, variation: StringName, action: Calla
 	var b := Button.new()
 	b.text = text
 	b.theme_type_variation = variation
-	b.custom_minimum_size = Vector2(360, 0)
+	b.custom_minimum_size = Vector2(320, 46)
 	b.pressed.connect(action)
 	parent.add_child(b)
 	return b
@@ -100,6 +116,8 @@ func open() -> void:
 	Game.open_ui(&"pause")
 	_restart_btn.visible = Game.is_host()  # online only the host restarts (for everyone)
 	_restart_btn.text = "Restart from station %d" % int(Game.checkpoint.station) if not Game.checkpoint.is_empty() else "Restart the run"
+	_help.text = HUD.help_keys()
+	_objective.text = ("Objective: " + Game.objective) if Game.objective != "" else ""
 	_settings.hide()
 	_card.show()
 	_root.show()

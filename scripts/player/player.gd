@@ -1,11 +1,15 @@
 class_name Player
 extends CharacterBody3D
 ## First-person player (big cartoony hands; the hands, tools and carry poses live in Viewmodel):
-## walk, sprint, jump, ride the train, use things ([E]/[Q], hold [E]),
-## tools on keys 1-5: hammer (nails, bolts, wheels, fight), nail gun (if bought), welder (only while holding the
-## torch taken from a STATION welder machine: hold LMB, the cable has a length limit).
+## walk, sprint, jump, ride the train, use things ([E]/[Q], hold [E]).
+## HOTBAR: keys 1-5 (or the mouse wheel) pick one of the five personal hotbar slots (Game.slots, first 5); whatever
+## sits there is in the hand: a tool (hammer, wrench, nail gun, come-along: [LMB] to use) or food ([LMB] eats it).
+## [Tab] opens the personal inventory (HUD) to arrange it. The welder torch taken from a STATION welder machine is
+## held on top of the hotbar until you pick a slot again (hold LMB to weld, the cable has a length limit).
+## Health only comes back by eating (or a medkit / a revive). Warmth drains in the cold (freezing wind, or a
+## cold_zone set by a map); at 0 warmth you take damage. Hard hits make you bleed for a few seconds.
 ## Carry repair items (plank, rail, wheel) in both hands; [G] puts them back.
-## Debug impostor (F2): [Tab] opens the sabotage menu, then keys 1-4; meteor is aimed (LMB drop, RMB cancel).
+## Debug impostor (F2): [X] opens the sabotage menu, then keys 1-4; meteor is aimed (LMB drop, RMB cancel).
 ## NET: one Player per peer (Players/Player_<peer id>, spawned by Net). The local one moves itself and sends its
 ## position (InputSync); everything that changes game state goes through Net.request() so it runs on the host.
 ## Other players are shown with a third-person RemoteBody; their first-person arms and camera stay hidden.
@@ -18,15 +22,35 @@ const AIM_RANGE := 500.0
 const HAMMER_DAMAGE := 20.0
 const NAIL_GUN_DAMAGE := 8.0
 const WARM_RADIUS := 7.0
-## Health regeneration per second: by the furnace or in a station, and anywhere else.
-const REGEN_WARM := 4.0
-const REGEN_IDLE := 0.5
+## Warmth per second: lost in the cold, regained out of it (twice as fast by the furnace or in a station).
+const WARMTH_DRAIN := 6.0
+const WARMTH_RECOVER := 10.0
+## Damage per second at 0 warmth, and while bleeding (a hit of BLEED_HIT or more bleeds for BLEED_TIME s).
+const FREEZE_DAMAGE := 4.0
+const BLEED_DAMAGE := 1.5
+const BLEED_HIT := 8.0
+const BLEED_TIME := 4.0
+## Coffee: faster walking for this long.
+const BOOST_SPEED := 1.25
 const SKIN := Color(1.0, 0.76, 0.6)
-const TOOLS := ["hammer", "wrench", "nail_gun", "welder", "come_along"]
 const TOOL_NAMES := {"hammer": "Hammer", "wrench": "Wrench", "welder": "Welder", "nail_gun": "Nail gun", "come_along": "Come-along"}
 
 var health := 100.0
-var frost := 0.0
+## 100 = warm, 0 = freezing (damage). NET: host state.
+var warmth := 100.0
+## Old name, kept for other code: 0 = warm, 100 = freezing.
+var frost: float:
+	get:
+		return 100.0 - warmth
+	set(value):
+		warmth = clampf(100.0 - value, 0.0, 100.0)
+## A map can make a place cold on its own (0..1, e.g. a mountain top); the freezing wind counts as 1.
+var cold_zone := 0.0
+var bleeding := false
+## Coffee kick: walking faster for a while. NET: host state.
+var boosted := false
+## Hotbar slot in the hand (0-4). Local to the owning peer; current_tool says what it holds.
+var hotbar_index := 0
 var downed := false
 var camera: Camera3D
 var focused: Interactable
@@ -76,6 +100,8 @@ var _remote_car := -1
 var _remote_local := Vector3.ZERO
 var _revive_spot: ReviveSpot
 var _was_downed := false
+var _bleed_t := 0.0
+var _boost_t := 0.0
 
 
 func _ready() -> void:
@@ -152,7 +178,8 @@ func _ready() -> void:
 	else:
 		viewmodel.visible = false  # NET: other players' first-person hands stay hidden
 		viewmodel.set_process(false)
-	select_tool("hammer")
+	if is_local():
+		_apply_held()
 
 
 ## NET: true for the player this peer controls (always true offline).
@@ -162,15 +189,21 @@ func is_local() -> bool:
 
 # --- Hands, tools, carrying --------------------------------------------------------
 
+## Tools in the hotbar (plus the welder while holding a station torch).
 func available_tools() -> Array[String]:
-	var list: Array[String] = ["hammer", "wrench"]
-	if Game.has("nail_gun"):
-		list.append("nail_gun")
+	var list: Array[String] = []
+	for i in Game.HOTBAR_SIZE:
+		var id := Game.slot_item(peer_id, i)
+		if Game.item_kind(id) == "tool" and not id in list:
+			list.append(id)
 	if is_instance_valid(welder_source):
 		list.append("welder")
-	if Game.has("come_along"):
-		list.append("come_along")
 	return list
+
+
+## What the selected hotbar slot holds ("" = empty hands).
+func held_item() -> String:
+	return Game.slot_item(peer_id, hotbar_index)
 
 
 ## Takes the welding torch from a station welder machine (the only welders in the game).
@@ -180,21 +213,42 @@ func take_welder(source: WelderSource) -> void:
 		return
 	welder_source = source
 	welder_path = str(source.get_path())  # NET: the owner's client picks the torch up from this
-	select_tool("welder")
-	Game.say("Welding torch in hand (cable %d m). Switch tools or walk away to put it back." % int(source.cable_length))
+	_apply_held()
+	Game.say("Welding torch in hand (cable %d m). Pick a hotbar slot or walk away to put it back." % int(source.cable_length))
 
 
+## Picks hotbar slot i (0-4). Holding the station torch, it goes back to its welder.
+func select_slot(i: int) -> void:
+	hotbar_index = clampi(i, 0, Game.HOTBAR_SIZE - 1)
+	if is_instance_valid(welder_source):
+		_unplug(false)
+	_apply_held()
+
+
+## Puts what the hand should hold in it (the torch, else the selected slot), e.g. after the inventory changed.
+func _apply_held() -> void:
+	var id := "welder" if is_instance_valid(welder_source) else held_item()
+	current_tool = id
+	if viewmodel:
+		viewmodel.select_tool(id)
+
+
+## Picks the hotbar slot holding `tool` ("welder": the station torch in hand). Tests and old code use it.
 func select_tool(tool: String) -> void:
-	if not tool in available_tools():
-		if tool == "nail_gun":
-			Game.say("No nail gun yet (buy one at a station shop)")
-		elif tool == "welder":
+	if tool == "welder":
+		if is_instance_valid(welder_source):
+			_apply_held()
+		else:
 			Game.say("Welding torches are only at stations: take one from the station welder")
 		return
-	current_tool = tool
-	viewmodel.select_tool(tool)
-	if tool != "welder":
-		_unplug(false)
+	for i in Game.HOTBAR_SIZE:
+		if Game.slot_item(peer_id, i) == tool:
+			select_slot(i)
+			return
+	if Game.count_in(peer_id, tool) > 0:
+		Game.say("Put the %s in your hotbar first ([Tab] inventory)" % Game.item_name(tool).to_lower())
+	elif tool == "nail_gun":
+		Game.say("No nail gun yet (buy one at a station shop)")
 
 
 func carry(item: String) -> void:
@@ -212,14 +266,12 @@ func _show_carry(item: String) -> void:
 		viewmodel.drop_carry()
 	else:
 		viewmodel.carry(item)
-	select_tool(current_tool)
 
 
 ## The carried item was placed (or put back): the hands lower it out of view.
 func consume_carried() -> void:
 	carried_item = ""
 	_show_carry("")
-	select_tool(current_tool)
 
 
 ## [G]: put the carried item back (refunds it to the crew inventory).
@@ -271,15 +323,16 @@ func _handle_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.pressed and carried_item == "":
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			var tools := available_tools()
 			var step := 1 if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1
-			select_tool(tools[(tools.find(current_tool) + step + tools.size()) % tools.size()])
+			select_slot((hotbar_index + step + Game.HOTBAR_SIZE) % Game.HOTBAR_SIZE)
 			return
-	for i in TOOLS.size():
+	for i in Game.HOTBAR_SIZE:
 		if event.is_action_pressed("tool_%d" % (i + 1)):
-			select_tool(TOOLS[i])
+			select_slot(i)
 			return
-	if event.is_action_pressed("attack"):
+	if event.is_action_pressed("winch_release") and current_tool == "come_along":
+		Net.request(self, &"winch_release")
+	elif event.is_action_pressed("attack"):
 		use_tool()
 	elif event.is_action_pressed("drop"):
 		Net.request(self, &"put_back")  # NET: state changes run on the host
@@ -321,9 +374,13 @@ func _handle_sabotage_input(event: InputEvent) -> bool:
 	return false
 
 
-## Left mouse with the hammer or nail gun.
+## Left mouse: use the tool in hand, or eat what's in the hand.
 func use_tool() -> void:
 	if carried_item != "" or _tool_cd > 0.0 or current_tool == "welder":
+		return
+	if Game.item_kind(current_tool) == "food":
+		_tool_cd = 0.6
+		Net.request(self, &"eat_slot", [hotbar_index])  # NET: runs on the host
 		return
 	var hit := _ray.get_collider() if _ray.is_colliding() else null
 	if current_tool == "hammer":
@@ -375,6 +432,41 @@ static func tool_damage(tool: String) -> float:
 	return 0.0
 
 
+## Host: eats (or uses the medkit) from hotbar slot `index`: health back, warmth back, bleeding stops (medkit), coffee
+## gives a speed kick. Returns true if something was eaten.
+func eat_slot(index: int) -> bool:
+	var item := Game.slot_item(peer_id, index)
+	if Game.item_kind(item) != "food" or downed:
+		return false
+	var info: Dictionary = Game.ITEMS[item]
+	var heal := float(info.get("heal", 0.0))
+	var warm := float(info.get("warm", 0.0))
+	var boost := float(info.get("boost", 0.0))
+	var useful := health < 99.5 or (warm > 0.0 and warmth < 99.0) or boost > 0.0 or (item == "medkit" and bleeding)
+	if not useful:
+		Net.run_as(peer_id, Game.say, ["You're not hungry"])
+		return false
+	Game.take_slot(peer_id, index)
+	health = minf(health + heal, 100.0)
+	warmth = minf(warmth + warm, 100.0)
+	if item == "medkit":
+		bleeding = false
+		_bleed_t = 0.0
+	if boost > 0.0:
+		boosted = true
+		_boost_t = boost
+	var what := "Patched up" if item == "medkit" else "Ate the %s" % Game.item_name(item).to_lower()
+	if item in ["coffee", "soup"]:
+		what = "Drank the %s" % Game.item_name(item).to_lower()
+	Net.run_as(peer_id, Game.say, ["%s (+%d health%s)" % [what, int(heal), ", warmer" if warm > 0.0 else ""]])
+	return true
+
+
+## Host: [R] with the come-along unhooks it from the train.
+func winch_release() -> bool:
+	return Game.train != null and Game.train.release_come_along()
+
+
 ## The come-along used on `hit`: hook it to the train, chain it to an anchor, or crank. NET: runs on the host.
 func come_along_hit(hit: Node) -> bool:
 	var train := Game.train
@@ -401,7 +493,9 @@ func _physics_process(delta: float) -> void:
 func _local_physics(delta: float) -> void:
 	_tool_cd = maxf(_tool_cd - delta, 0.0)
 	if Game.is_host():
-		_update_cold(delta)  # NET: health and frost are host state
+		_update_body(delta)  # NET: health, warmth, bleeding are host state
+	if current_tool != ("welder" if is_instance_valid(welder_source) else held_item()):
+		_apply_held()  # the slot changed (eaten up, moved in the inventory, a tool bought)
 
 	if global_position.y < Track.WATER_LEVEL - 1.2:
 		Game.say("You fell in the water!")
@@ -418,8 +512,10 @@ func _local_physics(delta: float) -> void:
 	var speed := SPRINT if Input.is_action_pressed("sprint") and carried_item == "" else WALK
 	if carried_item == "rail":
 		speed *= 0.75
-	if frost > 50.0:
+	if warmth < 50.0:
 		speed *= 0.7
+	if boosted:
+		speed *= BOOST_SPEED
 	var dir := (transform.basis * Vector3(input.x, 0, input.y)).normalized()
 	velocity.x = dir.x * speed
 	velocity.z = dir.z * speed
@@ -466,7 +562,7 @@ func _remote_update(delta: float) -> void:
 	rotation.y = lerp_angle(rotation.y, net_yaw, k)
 	camera.rotation.x = net_pitch
 	if Game.is_host():
-		Net.run_as(peer_id, _update_cold, [delta])  # "you died" goes to that player
+		Net.run_as(peer_id, _update_body, [delta])  # "you died" goes to that player
 		# the torch cable is pulled out if they walked off with it
 		if is_instance_valid(welder_source):
 			var plug := welder_source.plug_position()
@@ -492,10 +588,7 @@ func _process(_delta: float) -> void:
 		_seen_welder_path = welder_path
 		if is_local() and not Game.is_host():
 			welder_source = get_node_or_null(welder_path) as WelderSource if welder_path != "" else null
-			if welder_source:
-				select_tool("welder")
-			elif current_tool == "welder":
-				select_tool("hammer")
+			_apply_held()
 
 
 func set_speaking(on: bool) -> void:
@@ -556,7 +649,7 @@ func _update_focus(delta: float) -> void:
 func _update_welder(delta: float) -> void:
 	welding = false
 	if current_tool == "welder" and not is_instance_valid(welder_source):
-		select_tool("hammer")
+		_apply_held()
 	var holding := current_tool == "welder" and carried_item == "" and not downed
 	if not holding or not is_instance_valid(welder_source):
 		_cable.visible = false
@@ -568,7 +661,7 @@ func _update_welder(delta: float) -> void:
 	var limit := welder_source.cable_length
 	if flat.length() > limit + 4.0:
 		_unplug(true)
-		select_tool("hammer")
+		_apply_held()
 		return
 	if flat.length() > limit:
 		var back := plug + flat.normalized() * limit
@@ -660,21 +753,62 @@ func _update_aim() -> void:
 		_aim_marker.global_position = _aim_point + Vector3.UP * 0.05
 
 
-func _update_cold(delta: float) -> void:
-	var cold := 1.0 if Game.wind_active else 0.0
+## True near the furnace (while it burns) or in a station with the train stopped: warmth comes back fast.
+func is_warm_spot() -> bool:
 	var train := Game.train
-	var warm := train != null and train.fuel > 0.0 and global_position.distance_to(train.furnace_position()) < WARM_RADIUS
+	if train == null:
+		return false
+	if train.fuel > 0.0 and global_position.distance_to(train.furnace_position()) < WARM_RADIUS:
+		return true
+	# a station's shelter, with the train stopped there
+	return train.current_station >= 0 and train.is_stopped() \
+		and global_position.distance_to(train.cars[mini(1, train.cars.size() - 1)].global_position) < 40.0
+
+
+## How cold it is where the player stands (0 = not cold, 1 = freezing wind).
+func coldness() -> float:
+	return maxf(1.0 if Game.wind_active else 0.0, cold_zone)
+
+
+## Host: warmth, freezing, bleeding and the coffee kick. Health does not come back by itself: eat something.
+func _update_body(delta: float) -> void:
+	var cold := coldness()
+	var warm := is_warm_spot()
 	if cold > 0.0 and not warm:
-		frost = minf(frost + 6.0 * cold * delta, 100.0)
+		warmth = maxf(warmth - WARMTH_DRAIN * cold * delta, 0.0)
 	else:
-		frost = maxf(frost - 12.0 * delta, 0.0)
-	if frost >= 100.0:
-		take_damage(4.0 * delta)
-	elif not downed and health < 100.0 and frost <= 0.0:
-		# warmth heals: quickly by the furnace or in a station, slowly anywhere else
-		var at_station := train != null and train.current_station >= 0 and train.is_stopped()
-		var rate := REGEN_WARM if warm or at_station else REGEN_IDLE
-		health = minf(health + rate * delta, 100.0)
+		warmth = minf(warmth + WARMTH_RECOVER * (2.0 if warm else 1.0) * delta, 100.0)
+	if warmth <= 0.0:
+		_lose_health(FREEZE_DAMAGE * delta)
+	if bleeding:
+		_bleed_t -= delta
+		_lose_health(BLEED_DAMAGE * delta)
+		if _bleed_t <= 0.0:
+			bleeding = false
+	if boosted:
+		_boost_t -= delta
+		if _boost_t <= 0.0:
+			boosted = false
+
+
+## Status effects for the HUD (small icons above the health bar).
+func status_effects() -> Array[String]:
+	var list: Array[String] = []
+	if warmth <= 0.0:
+		list.append("freezing")
+	elif warmth < 50.0:
+		list.append("cold")
+	elif coldness() > 0.0 and not is_warm_spot():
+		list.append("chilly")
+	if bleeding:
+		list.append("bleeding")
+	if boosted:
+		list.append("boost")
+	if carried_item == "rail":
+		list.append("heavy")
+	if is_warm_spot() and warmth < 100.0:
+		list.append("warming")
+	return list
 
 
 func take_damage(amount: float) -> void:
@@ -683,16 +817,27 @@ func take_damage(amount: float) -> void:
 	if Net.remote_actor() != 0:
 		amount = clampf(amount, 0.0, 25.0)  # NET: never a negative (healing) or huge amount from a client
 	amount = maxf(amount, 0.0)
+	if amount >= BLEED_HIT:
+		bleeding = true
+		_bleed_t = BLEED_TIME
+	_lose_health(amount)
+
+
+func _lose_health(amount: float) -> void:
+	if downed:
+		return
 	health = maxf(health - amount, 0.0)
 	if health <= 0.0:
-		if Game.take("medkit"):
+		if Game.take_from(peer_id, "medkit"):
 			health = Game.REVIVE_HEALTH
-			frost = 0.0
-			Game.say("A medkit saved you! (%d left)" % Game.count("medkit"))
+			warmth = 100.0
+			bleeding = false
+			Net.run_as(peer_id, Game.say, ["A medkit saved you! (%d left)" % Game.count_in(peer_id, "medkit")])
 			return
 		downed = true
+		bleeding = false
 		_update_revive_spot()
-		Game.say("You are down! A crewmate can revive you with a medkit [E], or reach the next station")
+		Net.run_as(peer_id, Game.say, ["You are down! A crewmate can revive you with a medkit [E], or reach the next station"])
 		Game.on_player_downed(self)
 
 
@@ -702,7 +847,8 @@ func revive(hp: float) -> void:
 		return
 	downed = false
 	health = clampf(hp, 1.0, 100.0)
-	frost = 0.0
+	warmth = 100.0
+	bleeding = false
 	_update_revive_spot()
 	Net.run_as(peer_id, Game.say, ["You are back on your feet!"])
 
