@@ -296,6 +296,19 @@ func _host() -> void:
 	await _wait_until(func(): return _flags.has("client_checked"), 30.0)
 	check(them != null and them.has_node("VoiceOut"), "a voice frame from the client plays at its body")
 
+	print("The crew enters The Mountain (quest map)")
+	check(Game.quest.enter(2), "the host takes the whole crew into The Mountain")
+	var qmap := Game.quest.map
+	var beach := qmap.to_global(MountainLayout.camp_position(0))
+	check(await _wait_until(func(): return them.global_position.distance_to(beach) < 12.0, 30.0), "the client's player turns up at the beach camp")
+	check(await _wait_until(func(): return "Snack_0" in Game.quest.taken, 30.0), "the client ate a snack (host state)")
+	check(await _wait_until(func(): return "Anchor_0" in Game.quest.placed, 30.0), "the client dropped a rope ladder from Anchor_0")
+	await _wait_until(func(): return _flags.has("quest_checked"), 30.0)
+	Game.quest.debug_win()
+	check(Game.count("key") == 1, "the summit key went to the crew inventory")
+	check(await _wait_until(func(): return not Game.quest.active, 15.0), "after the key, everyone goes back to the portal")
+	check(await _wait_until(func(): return _flags.has("client_back"), 20.0), "the client is back at the portal too")
+
 	print("A gate opens, then everyone goes back to the start (the crew-wiped / F6 path)")
 	Game.track.open_gate(0)
 	check(not Game.track.is_gate_locked(0) and 0 in Game.opened_gates, "the host opened gate 0")
@@ -533,6 +546,29 @@ func _client() -> void:
 	check(absf(Voice._mulaw_decode(Voice._mulaw_encode(0.5)) - 0.5) < 0.02, "voice samples survive mu-law")
 	await _wait(0.5)
 	_tell.rpc_id(1, "client_checked", true)
+
+	print("The Mountain")
+	check(await _wait_until(func(): return Game.in_quest() and Game.quest.map != null, 40.0), "the host took us into The Mountain: the map is built here too")
+	if Game.in_quest():
+		var qmap := Game.quest.map
+		var beach := qmap.to_global(MountainLayout.camp_position(0))
+		check(me.global_position.distance_to(beach) < 10.0 and me.climber.enabled, "we stand at the beach camp, climbing is on")
+		me.stamina = 10.0
+		var snack := qmap.get_node("Snack_0") as QuestPickup
+		_teleport(me, snack.global_position + Vector3(0, 0.6, 1.2))
+		await _wait(0.4)
+		Net.request(snack, &"interact", [me])
+		check(await _wait_until(func(): return me.stamina >= 60.0 and not snack.visible, 10.0), "the host gave us the snack's stamina, the snack is gone here too")
+		var anchor := qmap.get_node("Anchor_0") as RopeAnchor
+		_teleport(me, anchor.global_position - anchor.out * 1.5 + Vector3.UP * 0.8)
+		await _wait(0.6)
+		Net.request(anchor, &"interact", [me])
+		check(await _wait_until(func(): return anchor.ladder != null, 10.0), "our rope ladder hangs from Anchor_0 (host-approved)")
+	_tell.rpc_id(1, "quest_checked", true)
+	check(await _wait_until(func(): return not Game.in_quest() and Game.count("key") == 1, 20.0), "won: back from the quest map with the key")
+	var portal := Game.quest.get_node_or_null("Portal_2") as Node3D
+	check(portal != null and me.global_position.distance_to(portal.global_position) < 10.0, "we are back beside the portal")
+	_tell.rpc_id(1, "client_back", true)
 
 	print("A gate opens on the host")
 	check(await _wait_until(func(): return _flags.has("gate_open"), 40.0), "the host opened a gate")

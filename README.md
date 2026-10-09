@@ -54,6 +54,11 @@ What's in it:
   across the rails (striped boom, padlock, red lamp, a red signal post 120 m before it). Its **glowing key lies right
   beside the track**: pick it up [E], use it on the padlock [E], the boom swings up (placeholder until the quest maps).
   An objective line on the HUD says what to do next ("Gate locked: find the key", "Rebuild the broken track ahead"...)
+- **Quest map "The Mountain"** (the mountain-pass gate): a trailhead portal beside the gate takes the whole crew to a
+  ~305 m island peak (beach, forest, cliff bands, a jungle gorge with rope bridges, snowfields, the summit). Hold
+  **RMB** to climb steep rock with a **stamina bar**, lunge with Space, drop rope ladders from anchors, eat snacks,
+  pull up or boost a crewmate [E], campfires are checkpoints. The key waits on the summit; taking it brings everyone
+  back to the gate
 - **Chapter 1 complete** screen at the port with the run stats (time, distance, track rebuilt, panels, wheels lost,
   gates, gold), then *Back to main menu* or *Keep exploring*
 - **Balance**: supplies beside every gap and gate, softlock guards (supply crate, coal crate, emergency wheel, a limping
@@ -65,6 +70,7 @@ What's in it:
 | Key | Action |
 |-----|--------|
 | WASD / Shift / Space | Move / sprint / jump |
+| RMB (hold) | Climb steep rock (quest maps; Space while climbing: lunge) |
 | Mouse · LMB | Look · use tool (hammer hit, nail gun shot, hold to weld) |
 | 1–5 (or mouse wheel) | Hammer / wrench / nail gun (once bought) / welder (only while holding a station torch) / come-along |
 | E · Q · G | Use / place carried item · alternative use · put the carried item back |
@@ -92,6 +98,9 @@ blender --background --python blender/scripts/build_assets.py -- . only=gate   #
 blender --background --python blender/scripts/build_nature.py -- .      # trees, rocks, cliffs, bushes
 blender --background --python blender/scripts/build_station.py -- .     # station canopy, shop kiosk, name board,
                                                                          # come-along, first-person glove and sleeve
+blender --background --python blender/scripts/build_mountain.py -- . [only=tex,rocks,plants,camp,items] [force]
+                                                                         # The Mountain: rocks, plants, camp, items,
+                                                                         # tiling ground textures
 blender --background --python blender/scripts/render_icons.py -- . [only=key]   # item icons (assets/icons)
 blender --background --python blender/scripts/render_showcase.py -- . renders [shots=gate]   # preview pictures
 ```
@@ -116,6 +125,8 @@ All keys can be changed in Settings > Controls.
 godot --headless --path . --import                     # once after pulling (registers classes and imports assets)
 godot --headless --path . res://tests/TestTrain.tscn   # automated playthrough of the core loop, exit code 0 = pass
 godot --headless --path . res://tests/TestMenu.tscn    # settings save/load/rebind, main menu, pause menu, scene flow
+godot --headless --path . res://tests/TestQuest.tscn   # The Mountain: both routes to the summit, climbing, stamina,
+                                                       # ladders, camps, the key and the way back (~1 min)
 godot --headless --path . res://tests/TestRoute.tscn   # the whole Chapter 1 route: gaps, 5 gates and keys, every
                                                        # checkpoint, the end screen and a station 3 restart (~1-2 min)
 # Screenshots need a display (or xvfb-run); modes: repair, train, menu, hud, gate, end, tools, station.
@@ -123,6 +134,7 @@ godot --headless --path . res://tests/TestRoute.tscn   # the whole Chapter 1 rou
 # Each run deletes its own old PNGs first and prints "DONE n shots" at the end.
 xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/Screenshot.tscn -- <out_dir> menu
 xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/ScreenshotLobby.tscn -- <out_dir>   # lobby cards
+xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/ScreenshotQuest.tscn -- <out_dir>   # The Mountain
 tests/run_net_test.sh                                   # multiplayer: headless host + client (+ latecomer, + 3 players with a rejoin); GODOT=/path/to/godot
 ```
 
@@ -135,4 +147,4 @@ Note: the tests play the route offline and write the real `user://checkpoint_sol
 - Stations 1 to 5 still look grey-box.
 
 ### Not built yet (see GDD milestones)
-Steam lobbies (the backend is stubbed, ENet works) · joining mid-run as a new player (rejoining works) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **quest maps (next; the keys lie beside the gates until then)** · Chapter 2 sea
+Steam lobbies (the backend is stubbed, ENet works) · joining mid-run as a new player (rejoining works) · meeting-table voting (M4) · carry system + revive (M5) · intro and kidnap (M6) · crafting (M7) · **more quest maps (The Mountain is built; the other gates' keys lie beside the track until theirs exist)** · Chapter 2 sea

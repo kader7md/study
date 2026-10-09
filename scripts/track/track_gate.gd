@@ -39,6 +39,8 @@ class GateLock extends Interactable:
 			return ""
 		if Game.has("key"):
 			return "Unlock the gate with the key  [E]"
+		if QuestManager.has_map(gate.segment):
+			return "Locked: its key is won on %s (the trailhead beside the gate)" % QuestManager.map_title(gate.segment)
 		return "Locked: find the key nearby (it glows beside the track)"
 
 	func interact(player: Node) -> void:
@@ -67,7 +69,7 @@ func _ready() -> void:
 		_lamp = _model.find_child("Lamp", true, false).find_children("*", "MeshInstance3D", true, false)[0]
 	_lamp_light = _light(self, Vector3(-2.35, 2.0, 0.2), 6.0)
 
-	_sign = Build.label(self, "LOCKED\nkey nearby", Vector3(0, 2.6, 0), 56)
+	_sign = Build.label(self, _locked_text(), Vector3(0, 2.6, 0), 56)
 	_sign.modulate = Color(1.0, 0.85, 0.75)
 	_sign.outline_modulate = Color(0.25, 0.05, 0.02)
 
@@ -136,6 +138,10 @@ func _set_lamps(red: bool) -> void:
 	_signal_light.light_color = col
 
 
+func _locked_text() -> String:
+	return "LOCKED\nkey: %s" % QuestManager.map_title(segment) if QuestManager.has_map(segment) else "LOCKED\nkey nearby"
+
+
 func try_unlock(_player: Node) -> bool:
 	if not locked:
 		return false
@@ -177,7 +183,7 @@ func relock() -> void:
 	locked = true
 	_warned = false
 	_lock_spot.collision_layer = Build.LAYER_INTERACT
-	_sign.text = "LOCKED\nkey nearby"
+	_sign.text = _locked_text()
 	_sign.modulate = Color(1.0, 0.85, 0.75)
 	_sign.visible = true
 	if _boom:

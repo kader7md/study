@@ -112,6 +112,13 @@ var track: Track
 var train: Train
 var sabotage: SabotageManager
 var terrain: Terrain
+## The quest maps (Main/Quest, scripts/quest/quest_manager.gd).
+var quest: QuestManager
+
+
+## True while the crew is inside a quest map (The Mountain...).
+func in_quest() -> bool:
+	return is_instance_valid(quest) and quest.active
 
 
 func _ready() -> void:
@@ -148,7 +155,7 @@ func _setup_input() -> void:
 			var ev := InputEventKey.new()
 			ev.physical_keycode = key
 			InputMap.action_add_event(action, ev)
-	for pair: Array in [["attack", MOUSE_BUTTON_LEFT], ["cancel", MOUSE_BUTTON_RIGHT]]:
+	for pair: Array in [["attack", MOUSE_BUTTON_LEFT], ["cancel", MOUSE_BUTTON_RIGHT], ["climb", MOUSE_BUTTON_RIGHT]]:
 		if not InputMap.has_action(pair[0]):
 			InputMap.add_action(pair[0])
 			var mb := InputEventMouseButton.new()

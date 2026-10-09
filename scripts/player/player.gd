@@ -76,6 +76,14 @@ var _remote_car := -1
 var _remote_local := Vector3.ZERO
 var _revive_spot: ReviveSpot
 var _was_downed := false
+## Quest maps (scripts/quest/climber.gd): climbing state and stamina. Owner-written, synced by InputSync so other
+## peers can animate climbing (is_climbing / is_hanging) and offer to pull a hanging player up.
+var climber: Climber
+var is_climbing := false
+var is_hanging := false
+var stamina := 100.0
+var max_stamina := 100.0
+var _help_spot: HelpSpot
 
 
 func _ready() -> void:
@@ -143,6 +151,13 @@ func _ready() -> void:
 	Build.collider(_revive_spot, Vector3(1.2, 1.0, 1.8), Vector3(0, 0.5, 0))
 	add_child(_revive_spot)
 	_update_revive_spot()
+
+	# quest maps: climbing (local player) and the "pull up / boost" [E] target (other players)
+	climber = Climber.new()
+	climber.name = "Climber"
+	add_child(climber)
+	climber.setup(self)
+	_help_spot = HelpSpot.create(self)
 
 	if is_local():
 		if DisplayServer.get_name() != "headless":
@@ -403,7 +418,9 @@ func _local_physics(delta: float) -> void:
 	if Game.is_host():
 		_update_cold(delta)  # NET: health and frost are host state
 
-	if global_position.y < Track.WATER_LEVEL - 1.2:
+	if Game.in_quest():
+		Game.quest.check_local_player(self)  # falls into the sea / off the map: back to the last campfire
+	elif global_position.y < Track.WATER_LEVEL - 1.2:
 		Game.say("You fell in the water!")
 		Net.request(self, &"take_damage", [20.0])
 		respawn_on_train()
@@ -415,7 +432,12 @@ func _local_physics(delta: float) -> void:
 	var input := Vector2.ZERO
 	if not Game.ui_open and not downed:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var speed := SPRINT if Input.is_action_pressed("sprint") and carried_item == "" else WALK
+	var wants_jump := Input.is_action_just_pressed("jump") and not Game.ui_open and not downed
+	if climber.step(delta, input, wants_jump):
+		_after_move(delta)
+		return
+	var sprinting := Input.is_action_pressed("sprint") and carried_item == "" and climber.can_sprint()
+	var speed := SPRINT if sprinting else WALK
 	if carried_item == "rail":
 		speed *= 0.75
 	if frost > 50.0:
@@ -429,6 +451,11 @@ func _local_physics(delta: float) -> void:
 	else:
 		velocity.y -= _gravity * delta
 	move_and_slide()
+	climber.post_move(delta, input.length() > 0.1, sprinting)
+	_after_move(delta)
+
+
+func _after_move(delta: float) -> void:
 	_update_ride_car()
 
 	_update_focus(delta)
@@ -682,8 +709,20 @@ func take_damage(amount: float) -> void:
 		return
 	if Net.remote_actor() != 0:
 		amount = clampf(amount, 0.0, 25.0)  # NET: never a negative (healing) or huge amount from a client
-	amount = maxf(amount, 0.0)
+	_apply_damage(maxf(amount, 0.0))
+
+
+## A fall on a quest map (Climber): may be a big hit, so it has its own, higher cap. NET: runs on the host.
+func take_fall(amount: float) -> void:
+	if downed:
+		return
+	_apply_damage(clampf(amount, 0.0, 150.0))
+
+
+func _apply_damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)
+	if health <= 0.0 and Game.in_quest() and Game.quest.on_player_died(self):
+		return  # quest maps: back to the last campfire instead of going down
 	if health <= 0.0:
 		if Game.take("medkit"):
 			health = Game.REVIVE_HEALTH
@@ -731,6 +770,15 @@ class ReviveSpot extends Interactable:
 func _update_revive_spot() -> void:
 	if _revive_spot:
 		_revive_spot.collision_layer = Build.LAYER_INTERACT if downed and not is_local() else 0
+
+
+## Moves this (local) player to `xform` at once: no fall damage, off the train.
+func teleport(xform: Transform3D) -> void:
+	global_transform = Transform3D(Basis(Vector3.UP, xform.basis.get_euler().y), xform.origin)
+	velocity = Vector3.ZERO
+	_ride_car = null
+	if climber:
+		climber.on_teleport()
 
 
 func respawn_on_train() -> void:

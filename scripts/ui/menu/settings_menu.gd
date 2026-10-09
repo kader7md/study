@@ -9,7 +9,7 @@ const SCENE := "res://scenes/menu/SettingsMenu.tscn"
 
 ## Friendly names, grouped. Actions not listed here land in "Other".
 const GROUPS := [
-	["Movement", ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint"]],
+	["Movement", ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "climb"]],
 	["Hands & tools", ["attack", "cancel", "interact", "interact_alt", "drop", "tool_1", "tool_2", "tool_3", "tool_4", "tool_5"]],
 	["Game", ["pause", "push_to_talk", "toggle_help"]],
 	["Impostor", ["sabotage_menu", "sabotage_1", "sabotage_2", "sabotage_3", "sabotage_4"]],
@@ -17,7 +17,7 @@ const GROUPS := [
 ]
 const NAMES := {
 	"move_forward": "Walk forward", "move_back": "Walk back", "move_left": "Step left", "move_right": "Step right",
-	"jump": "Jump", "sprint": "Sprint", "attack": "Use tool / hit", "cancel": "Cancel / aim off",
+	"jump": "Jump", "sprint": "Sprint", "climb": "Climb (hold, quest maps)", "attack": "Use tool / hit", "cancel": "Cancel / aim off",
 	"interact": "Use / place", "interact_alt": "Alternative use", "drop": "Put item back",
 	"tool_1": "Hammer", "tool_2": "Wrench", "tool_3": "Nail gun", "tool_4": "Welder", "tool_5": "Come-along",
 	"pause": "Pause menu", "push_to_talk": "Push to talk", "toggle_help": "Show help",
@@ -27,7 +27,7 @@ const NAMES := {
 	"restart_checkpoint": "Last checkpoint (debug)", "new_game": "New game (debug)",
 }
 ## Pairs that share a key on purpose (only one of them works at a time).
-const SHARED_OK := [["tool_1", "sabotage_1"], ["tool_2", "sabotage_2"], ["tool_3", "sabotage_3"], ["tool_4", "sabotage_4"]]
+const SHARED_OK := [["cancel", "climb"], ["tool_1", "sabotage_1"], ["tool_2", "sabotage_2"], ["tool_3", "sabotage_3"], ["tool_4", "sabotage_4"]]
 
 var tabs: TabContainer
 var _rebind_buttons: Array[KeyRebindButton] = []
