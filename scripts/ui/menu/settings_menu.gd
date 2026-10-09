@@ -11,7 +11,7 @@ const SCENE := "res://scenes/menu/SettingsMenu.tscn"
 const GROUPS := [
 	["Movement", ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint"]],
 	["Hands & tools", ["attack", "cancel", "interact", "interact_alt", "drop", "tool_1", "tool_2", "tool_3", "tool_4", "tool_5"]],
-	["Game", ["pause", "push_to_talk", "toggle_help"]],
+	["Game", ["pause", "push_to_talk", "emote", "toggle_help"]],
 	["Impostor", ["sabotage_menu", "sabotage_1", "sabotage_2", "sabotage_3", "sabotage_4"]],
 	["Debug", ["toggle_role", "toggle_world_sabotage", "restart_checkpoint", "new_game"]],
 ]
@@ -20,7 +20,7 @@ const NAMES := {
 	"jump": "Jump", "sprint": "Sprint", "attack": "Use tool / hit", "cancel": "Cancel / aim off",
 	"interact": "Use / place", "interact_alt": "Alternative use", "drop": "Put item back",
 	"tool_1": "Hammer", "tool_2": "Wrench", "tool_3": "Nail gun", "tool_4": "Welder", "tool_5": "Come-along",
-	"pause": "Pause menu", "push_to_talk": "Push to talk", "toggle_help": "Show help",
+	"pause": "Pause menu", "push_to_talk": "Push to talk", "emote": "Wave (emote)", "toggle_help": "Show help",
 	"sabotage_menu": "Sabotage menu", "sabotage_1": "Sabotage 1", "sabotage_2": "Sabotage 2",
 	"sabotage_3": "Sabotage 3", "sabotage_4": "Sabotage 4",
 	"toggle_role": "Switch role (debug)", "toggle_world_sabotage": "World sabotage (debug)",

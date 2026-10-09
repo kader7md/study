@@ -277,6 +277,17 @@ The train stops, the crew enters the quest map, wins a **key** (opens locked rou
   stylization, detailed hand-painted textures with wear, rust and dirt (Sea of Thieves / Valheim direction).
   Gameplay feel and HUD stay RV There Yet-like.
 - **First-person camera** with big cartoony hands visible, holding tools and items.
+- **Crew members (our own design, cartoon, RV There Yet spirit):** the people are the one deliberately cartoony part:
+  a chunky body, a big round head, stubby limbs, flat colours with soft shading (`build_character.py`, rigged, every
+  animation keyframed in Blender). Everyone picks a look: skin colour, eyes (round, sleepy, grumpy, googly, dot), eye
+  colour, mouth (smile, grin, meh, oh!, frown, buck teeth), one accessory (beanie, cap, hard hat, glasses, scarf,
+  backpack, mustache, none) and its colour, outfit colour, or Randomise. Edited at the **mirror** in the utility wagon
+  (a real reflection; [E] opens the editor with a live 3D preview) or from the main menu. Saved per player, synced online.
+- **Animation:** other players are fully animated (`CharacterAnimator`, an AnimationTree driven by their state):
+  idle / walk / run / jump / fall / crouch / downed / climb for the body; carrying (plank on the shoulder, rail, wheel,
+  panel in front), holding a tool and welding layered on the upper body; one-shot actions per tool (hammer swing,
+  wrench turn, nail gun recoil, come-along pump) and for shovelling coal, the lever, reaching and waving ([B]).
+  Your own first-person hands show your skin colour and sleeves.
 - **UI look (our own design, same cosy and chunky spirit as the reference, nothing copied):** one warm theme
   (`UiTheme`, built in code) for every menu, HUD card and panel: cream paper and varnished wood panels, dark ink
   outlines, big rounded corners, soft drop shadows, bold Open Sans text, rust and teal accents, honey hover states.

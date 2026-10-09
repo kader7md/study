@@ -46,7 +46,15 @@ What's in it:
   forward so you can see ahead and walk to the front of the engine
 - **Shop** at every station, **checkpoints**, back to the last checkpoint if everyone dies
 - **Sabotage**: meteor (aimed), zombies, eagles (steal cargo), freezing wind
-- First-person player with cartoony hands, a tool hotbar, and carrying items; can ride the moving train.
+- **Cartoon crew members** (Blender-built, rigged and animated): a chunky worker with a big head, swappable eyes
+  (round, sleepy, grumpy, googly, dot), mouths (smile, grin, meh, oh!, frown, buck teeth), accessories (beanie, cap,
+  hard hat, glasses, scarf, backpack, mustache) and skin / eye / outfit / accessory colours. Keyframed animations:
+  idle, walk, run, jump, fall, crouch, carry (plank on the shoulder, rail / wheel / panel in front), a hold and a
+  distinct action per tool (hammer swing, wrench turn, nail gun recoil, welding, come-along pump), shovelling coal,
+  hauling the lever, reaching, waving ([B]), downed and climbing. Other players see all of it.
+- **Mirror** in the utility wagon: it really reflects you, and [E] opens the look editor (live 3D preview, drag to
+  turn, Randomise). Also from the main menu's name card (**Look**). Saved in `user://settings.cfg`, synced online.
+- First-person player with cartoony hands (your own skin colour and sleeves), a tool hotbar, and carrying items; can ride the moving train.
   Every tool has its own first-person animation (hammer overhead swing with a camera kick, wrench twist with a ratchet
   tick, nail gun recoil and puff, welder steady hand with sparks, two-handed come-along pump) and every carried item
   its own pose (plank on the shoulder, rail low with a strained bob, wheel in front, panel flat at chest height)
@@ -59,7 +67,7 @@ What's in it:
 - **Balance**: supplies beside every gap and gate, softlock guards (supply crate, coal crate, emergency wheel, a limping
   train can always reach a station). See the balance table in the GDD
 - **Online co-op for 1 to 5 players** (host-authoritative, ENet): crew lobby with invite codes, ready and kick, other
-  players drawn as chunky workers with name tags, a secret impostor with 3+ players, push-to-talk proximity voice
+  players drawn as their animated crew member (their own look) with name tags, a secret impostor with 3+ players, push-to-talk proximity voice
 
 ### Controls
 | Key | Action |
@@ -70,6 +78,7 @@ What's in it:
 | E · Q · G | Use / place carried item · alternative use · put the carried item back |
 | Esc | Pause menu (closes the shop or Settings first) |
 | V | Push to talk (voice chat, with multiplayer) |
+| B | Wave (emote) |
 | F1 | Show/hide help |
 | F11 | Fullscreen on/off |
 | F2 | Debug: play as **impostor** (**Tab** = sabotage menu, then 1–4; meteor: aim + LMB) |
@@ -90,6 +99,8 @@ slowly over time, and quickly near the warm furnace or in a station.
 blender --background --python blender/scripts/build_assets.py -- .      # train, tools, repair items, gate, key
 blender --background --python blender/scripts/build_assets.py -- . only=gate   # just the locked gate, signal post, key
 blender --background --python blender/scripts/build_nature.py -- .      # trees, rocks, cliffs, bushes
+blender --background --python blender/scripts/build_character.py -- .   # crew member (rig, face parts, accessories,
+                                                                         # all animations) + first-person arm
 blender --background --python blender/scripts/build_station.py -- .     # station canopy, shop kiosk, name board,
                                                                          # come-along, first-person glove and sleeve
 blender --background --python blender/scripts/render_icons.py -- . [only=key]   # item icons (assets/icons)
@@ -116,6 +127,8 @@ All keys can be changed in Settings > Controls.
 godot --headless --path . --import                     # once after pulling (registers classes and imports assets)
 godot --headless --path . res://tests/TestTrain.tscn   # automated playthrough of the core loop, exit code 0 = pass
 godot --headless --path . res://tests/TestMenu.tscn    # settings save/load/rebind, main menu, pause menu, scene flow
+godot --headless --path . res://tests/TestCharacter.tscn   # looks save/load, animation clip per state and tool,
+                                                          # the mirror opens the look editor
 godot --headless --path . res://tests/TestRoute.tscn   # the whole Chapter 1 route: gaps, 5 gates and keys, every
                                                        # checkpoint, the end screen and a station 3 restart (~1-2 min)
 # Screenshots need a display (or xvfb-run); modes: repair, train, menu, hud, gate, end, tools, station.
@@ -123,6 +136,7 @@ godot --headless --path . res://tests/TestRoute.tscn   # the whole Chapter 1 rou
 # Each run deletes its own old PNGs first and prints "DONE n shots" at the end.
 xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/Screenshot.tscn -- <out_dir> menu
 xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/ScreenshotLobby.tscn -- <out_dir>   # lobby cards
+xvfb-run -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tests/ScreenshotCharacter.tscn -- <out_dir> model|anims|game
 tests/run_net_test.sh                                   # multiplayer: headless host + client (+ latecomer, + 3 players with a rejoin); GODOT=/path/to/godot
 ```
 

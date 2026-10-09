@@ -1,6 +1,7 @@
 extends Node
 ## Player settings (autoload "Settings", registered after Game): controls, graphics, audio, microphone and profile.
-## Stored in user://settings.cfg (ConfigFile, sections [controls] [graphics] [audio] [mic] [profile]),
+## Stored in user://settings.cfg (ConfigFile, sections [controls] [graphics] [audio] [mic] [profile]: name, look = the
+## character Appearance code),
 ## applied at startup and whenever a value changes. A missing or corrupt file falls back to the defaults.
 ## Also applies the shared UiTheme to the whole game and gives every Button a click and hover sound.
 ##   Settings.set_value("audio", "music", 0.5)     # applies + saves
@@ -20,16 +21,16 @@ const DEFAULTS := {
 	"graphics": {"window_mode": 0, "vsync": true, "render_scale": 1.0, "shadows": 2, "fov": 80.0, "max_fps": 0, "aa": 1},
 	"audio": {"Master": 0.8, "Music": 0.7, "SFX": 0.8, "Voice": 1.0},
 	"mic": {"device": "Default", "push_to_talk": true},
-	"profile": {"name": ""},
+	"profile": {"name": "", "look": ""},
 }
 
 ## Actions added on top of Game.INPUTS (Game registers attack/cancel itself).
-const EXTRA_INPUTS := {"push_to_talk": [KEY_V], "pause": [KEY_ESCAPE]}
+const EXTRA_INPUTS := {"push_to_talk": [KEY_V], "pause": [KEY_ESCAPE], "emote": [KEY_B]}
 
 ## Default key names used in game texts -> the action they stand for (see hint()).
 const HINT_ACTIONS := {
 	"E": "interact", "Q": "interact_alt", "G": "drop", "Tab": "sabotage_menu", "LMB": "attack", "RMB": "cancel",
-	"Esc": "pause", "V": "push_to_talk", "F1": "toggle_help", "Space": "jump", "Shift": "sprint",
+	"Esc": "pause", "V": "push_to_talk", "B": "emote", "F1": "toggle_help", "Space": "jump", "Shift": "sprint",
 }
 
 ## Shadow quality presets: [sun shadows, directional atlas size, soft filter quality, max distance].

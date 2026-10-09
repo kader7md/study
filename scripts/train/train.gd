@@ -772,6 +772,8 @@ func _build_utility(car: Node3D, length: float) -> void:
 	Build.box(car, Vector3(0.9, 0.6, 0.9), Vector3(-0.6, f + 0.3, 2.6), Color(0.7, 0.68, 0.62))
 	ActionSpot.create(car, Vector3(1.0, 1.2, 1.0), Vector3(-0.6, f + 0.6, 2.6),
 		func(_p): return "Sacrifice altar (goat revive): coming in M5", func(_p): pass)
+	# full-length mirror on the right-hand wall: [E] changes your look (scripts/character/mirror.gd)
+	Mirror.create(car, Vector3(1.24, f + 1.0, -1.3), Vector3(-1, 0, 0))
 
 
 func _build_container(car: Node3D, length: float) -> void:
